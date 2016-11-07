@@ -5,6 +5,8 @@ var json_pointer = require('json-pointer');
 var auth = require("./auth.js");
 var models = require("./models.js");
 
+var jot = require("./jot");
+
 exports.create_routes = function(app) {
   // Set defaults for JSON responses.
   app.set("json spaces", 2);
@@ -123,17 +125,25 @@ exports.create_routes = function(app) {
 
   var document_content_route = document_route + '/document:pointer(/[\\w\\W]*)?';
 
-  function get_document_content(doc, pointer, cb) {
-    var jot = require("./jot");
+  function get_document_content(doc, pointer, at_revision, cb) {
+    if (at_revision == "singularity") {
+      // This is a special flag that signals the state of the document
+      // prior to the first Revision. The document is always a null value
+      // at that state.
+      cb(null, at_revision, null);
+      return;
+    }
 
     // Documents always start with a null value at the start of the revision history.
-    var revision_id = "newborn-document";
+    var revision_id = "singularity";
     var content = null;
 
-    // Find the most recent Revision with cached content.
+    // Find the most recent Revision with cached content, but no later
+    // than the base_revision.
     models.Revision.findOne({
       where: {
         documentId: doc.id,
+        id: { "$lte": at_revision ? at_revision.id : 9007199254740991 }, // ugh TODO replace this
         has_cached_document: true
       },
       order: [["id", "DESC"]]
@@ -143,7 +153,10 @@ exports.create_routes = function(app) {
       models.Revision.findAll({
         where: {
           documentId: doc.id,
-          id: { "$gt": peg_revision ? peg_revision.id : 0 }
+          id: {
+            "$gt": peg_revision ? peg_revision.id : 0,
+            "$lte": at_revision ? at_revision.id : 9007199254740991 // ugh TODO replace this
+          }
         },
         order: [["id", "ASC"]]
       })
@@ -194,18 +207,18 @@ exports.create_routes = function(app) {
     // of the path, then only return that part of the document. A JSON document
     // is returned.
     authz_document_content(req, res, false, function(user, owner, doc) {
-      get_document_content(doc, req.params.pointer, function(err, revision_id, content) {
+      get_document_content(doc, req.params.pointer, null, function(err, revision_id, content) {
         if (err)
           res.status(404).send(err);
         else {
-          res.header("revision-id", revision_id)
+          res.header("Revision-Id", revision_id)
           res.json(content);
         }
       });
     })
   })
 
-  function make_revision_from_new_content(user, doc, pointer, old_content, new_content, res) {
+  function make_revision_from_new_content(user, doc, pointer, old_content, new_content, base_revision, comment, res) {
     // Parse the pointer.
     if (pointer) {
       res.status(404).send("pointer in PUT not implemented");
@@ -223,14 +236,42 @@ exports.create_routes = function(app) {
       return;
     }
 
-    // Make a revision.
-    models.Revision.create({
-      ownerId: user.id,
-      documentId: doc.id,
-      op: op.toJsonableObject()
-    }).then(function(rev) {
-      res.status(201).json(make_revision_response(rev));
-    });
+    // Rebase against all of the subsequent operations after the base revision to
+    // the current revision.
+    models.Revision.findAll({
+      where: {
+        documentId: doc.id,
+        id: {
+          "$gt": base_revision == "singularity" ? 0 : base_revision.id,
+        }
+      },
+      order: [["id", "ASC"]]
+    }).then(function(revs) {
+      // Load the JOT operations as a LIST.
+      var base_ops = jot.LIST(revs.map(function(rev) {
+        return jot.opFromJsonableObject(JSON.parse(rev.op));
+      })).simplify();
+
+      // Rebase.
+      op = op.rebase(base_ops, true);
+      if (op === null) {
+        res.status(409).send("The document was modified. Changes could not be applied.")
+        return;
+      }
+      if (op instanceof NO_OP) {
+        res.status(200).send("no change");
+        return;
+      }
+
+      // Make a revision.
+      models.Revision.create({
+        ownerId: user.id,
+        documentId: doc.id,
+        op: op.toJsonableObject()
+      }).then(function(rev) {
+        res.status(201).json(make_revision_response(rev));
+      });
+    })
   }
 
   function make_revision_response(rev) {
@@ -252,17 +293,43 @@ exports.create_routes = function(app) {
         return;
       }
 
-      // Get the current content of the document.
-      get_document_content(doc, null, function(err, revision_id, content) {
-        if (err) {
-          res.status(404).send(err);
-        } else if (req.headers['parent-revision-id'] && req.headers['parent-revision-id'] != revision_id) {
-          // TODO: Rebase the changes.
-          res.status(409).send("The document was modified.");
-        } else {
-          // Make a new revision.
-          make_revision_from_new_content(user, doc, req.params.pointer, content, req.body, res);
+      // Find the base revision. If not specified, it's the current revision.
+      // If specified, we compute the changes from the base, then rebase them
+      // against subsequent changes, and then commit that.
+      var where = { documentId: doc.id };
+      if (req.headers['base-revision-id'])
+        where.uuid = req.headers['base-revision-id'];
+      models.Revision.findOne({
+        where: where,
+        order: [["id", "DESC"]] // if no uuid filter, find most recent revision
+      })
+      .then(function(base_revision) {
+        // Pass the special "singularity" value forward - it remembers before
+        // the first Revision.
+        if (req.headers['base-revision-id'] == "singularity")
+          base_revision = "singularity";
+        else if (!base_revision) {
+          res.status(400).send("Invalid base revision ID.");
+          return;
         }
+
+        // Get the content of the document as of the base revision.
+        get_document_content(doc, req.params.pointer, base_revision, function(err, revision_id, content) {
+          if (err) {
+            res.status(404).send(err);
+            return;
+          }
+
+          // Make a new revision.
+          make_revision_from_new_content(
+            user,
+            doc, req.params.pointer,
+            content, req.body,
+            base_revision,
+            req.headers['revision-comment'],
+            res);
+        });
+
       });
     })
   })

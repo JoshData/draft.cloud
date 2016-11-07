@@ -92,6 +92,9 @@ exports.initialize_database = function(connection_uri) {
       op: {
         type: Sequelize.JSON
       },
+      comment: {
+        type: Sequelize.TEXT
+      },
       cached_document: {
         type: Sequelize.JSON,
         defaultValue: null
