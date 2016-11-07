@@ -220,10 +220,10 @@ exports.create_routes = function(app) {
     })
   })
 
-  function make_revision_from_new_content(user, doc, pointer, old_content, new_content, base_revision, comment, res) {
+  function make_operation_from_new_content(pointer, old_content, new_content, cb) {
     // Parse the pointer.
     if (pointer) {
-      res.status(404).send("pointer in PUT not implemented");
+      cb("pointer in PUT not implemented");
       return;
     }
 
@@ -234,12 +234,17 @@ exports.create_routes = function(app) {
     // Don't make a revision if there was no change.
     var NO_OP = require('./jot/values.js').NO_OP;
     if (op instanceof NO_OP) {
-      res.status(200).send("no change");
+      cb();
       return;
     }
 
+    // Callback.
+    cb(null, op);
+  }
+
+  function make_revision(user, doc, base_revision, op, comment, res) {
     // Rebase against all of the subsequent operations after the base revision to
-    // the current revision.
+    // the current revision. Find all of the subsequent operations.
     models.Revision.findAll({
       where: {
         documentId: doc.id,
@@ -260,6 +265,7 @@ exports.create_routes = function(app) {
         res.status(409).send("The document was modified. Changes could not be applied.")
         return;
       }
+      var NO_OP = require('./jot/values.js').NO_OP;
       if (op instanceof NO_OP) {
         res.status(200).send("no change");
         return;
@@ -332,14 +338,22 @@ exports.create_routes = function(app) {
             return;
           }
 
-          // Make a new revision.
-          make_revision_from_new_content(
-            user,
-            doc, req.params.pointer,
-            content, req.body,
-            base_revision,
-            req.headers['revision-comment'],
-            res);
+          make_operation_from_new_content(req.params.pointer, content, req.body, function(err, op) {
+            if (err)
+              res.status(400).send(err);
+            else if (!op)
+              // The document wasn't changed - don't take any action.
+              res.status(200).send("no change");
+            else
+              // Make a new revision.
+              make_revision(
+                user,
+                doc,
+                base_revision,
+                op,
+                req.headers['revision-comment'],
+                res);
+          })
         });
 
       });
