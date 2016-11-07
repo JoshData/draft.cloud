@@ -12,7 +12,7 @@ exports.create_routes = function(app) {
   app.set("json spaces", 2);
 
 
-  var document_route = '/:owner/:document';
+  var document_route = '/api/v1/:owner/:document';
 
   // DOCUMENT CREATION/DELETION
 
@@ -43,7 +43,7 @@ exports.create_routes = function(app) {
 
       // does not even have READ, so we do not reveal whether or not the document exists
       else
-        res.status(404).send('Owner or document not found or you do not have permission to see it.');
+        res.status(404).send('User or document not found or you do not have permission to see it.');
     })
   }
 
@@ -53,12 +53,12 @@ exports.create_routes = function(app) {
     .json({
       uuid: doc.uuid,
       name: doc.name,
-      default_access_level: doc.default_access_level,
+      anon_access_level: doc.anon_access_level,
       owner: {
         uuid: owner.uuid,
         name: owner.name
       },
-      meta: doc.meta
+      userdata: doc.userdata
     })
   }
 
@@ -72,15 +72,17 @@ exports.create_routes = function(app) {
       if (!doc) {
         // Create document.
         models.Document.create({
-          ownerId: owner.id,
+          userId: owner.id,
           name: req.params.document,
-          meta: req.body
+          anon_access_level: req.body.anon_access_level,
+          userdata: req.body.userdata || { }
         }).then(function(doc) {
           make_document_response(201, res, owner, doc);
         });
       } else {
         // Document exists. Update its metadata.
-        doc.set("meta", req.body);
+        doc.set("anon_access_level", req.body.anon_access_level || "");
+        doc.set("userdata", req.body.userdata || { });
         doc.save().then(function() {
           make_document_response(200, res, owner, doc);
         })
@@ -265,7 +267,7 @@ exports.create_routes = function(app) {
 
       // Make a revision.
       models.Revision.create({
-        ownerId: user.id,
+        userId: user.id,
         documentId: doc.id,
         op: op.toJsonableObject()
       }).then(function(rev) {
@@ -279,7 +281,7 @@ exports.create_routes = function(app) {
       createdAt: rev.createdAt,
       uuid: rev.uuid,
       op: rev.op,
-      author: rev.ownerId
+      author: rev.userId
     };
   }
 
@@ -288,31 +290,41 @@ exports.create_routes = function(app) {
     // of the path, then replace that part of the document only. The PUT body must
     // be JSON.
     authz_document_content(req, res, true, function(user, owner, doc) {
-      if (!user) {
-        res.status(403).send("Not authenticated.");
-        return;
-      }
-
       // Find the base revision. If not specified, it's the current revision.
       // If specified, we compute the changes from the base, then rebase them
       // against subsequent changes, and then commit that.
-      var where = { documentId: doc.id };
-      if (req.headers['base-revision-id'])
-        where.uuid = req.headers['base-revision-id'];
-      models.Revision.findOne({
-        where: where,
-        order: [["id", "DESC"]] // if no uuid filter, find most recent revision
-      })
-      .then(function(base_revision) {
-        // Pass the special "singularity" value forward - it remembers before
-        // the first Revision.
+      function find_base_revision(cb) {
+        // If "singularity" is passed, pass it through as a specicial revision.
         if (req.headers['base-revision-id'] == "singularity")
-          base_revision = "singularity";
-        else if (!base_revision) {
-          res.status(400).send("Invalid base revision ID.");
-          return;
-        }
+          cb("singularity")
 
+        // Find the named revision.
+        else if (req.headers['base-revision-id'])
+          models.Revision.findOne({
+            where: { documentId: doc.id, uuid: req.headers['base-revision-id'] },
+          })
+          .then(function(base_revision) {
+            if (!base_revision)
+              res.status(400).send("Invalid base revision ID.");
+            else
+              cb(base_revision);
+          });
+
+        // Get the most recent revision. If there are no revisions yet,
+        // pass the spcial ID "singularity".
+        else
+          models.Revision.findOne({
+            where: { documentId: doc.id },
+            order: [["id", "DESC"]] // most recent
+          })
+          .then(function(base_revision) {
+            if (!base_revision)
+              cb("singularity");
+            else
+              cb(base_revision);
+          });
+      }
+      find_base_revision(function(base_revision) {
         // Get the content of the document as of the base revision.
         get_document_content(doc, req.params.pointer, base_revision, function(err, revision_id, content) {
           if (err) {
