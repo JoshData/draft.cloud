@@ -1,0 +1,30 @@
+{
+  "name": "draft.cloud",
+  "version": "0.0.1",
+  "description": "The draft.cloud website, a collaboration server for structure data.",
+  "dependencies": {
+    "body-parser": "^1.15.2",
+    "express": "^4.14.0",
+    "json-pointer": "^0.6.0",
+    "sequelize": "^3.24.8"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/joshdata/draft.cloud.git"
+  },
+  "author": "Joshua Tauberer",
+  "scripts": {
+    "test": "tap tests/*.js"
+  },
+  "devDependencies": {
+    "connect": "*",
+    "sqlite3": "*",
+    "tap": "~0.4.9"
+  },
+  "bugs": {
+    "url": "https://github.com/joshdata/draft.cloud/issues"
+  },
+  "homepage": "https://github.com/joshdata/draft.cloud#readme",
+  "main": "index.js",
+  "license": "GPL-3.0"
+}
