@@ -1,0 +1,206 @@
+# This is a description of the Draft.Cloud API in Swagger format.
+
+swagger: '2.0'
+basePath: /api/v1
+
+info:
+  version: "1"
+  title: Draft.Cloud API
+
+paths:
+  /{owner}/{document}:
+    get:
+      description: |
+        Gets `Document` metadata.
+      parameters:
+        - name: owner
+          in: path
+          description: The name of a `User` who owns the document.
+          required: true
+          type: string
+        - name: document
+          in: path
+          description: The name of a `Document` owned by  `owner`.
+          required: true
+          type: string
+        - name: Authentication
+          in: header
+          type: string
+          description: An API key that has READ access to the document. Optional if the document's anonymous access level is READ.
+      responses:
+        200:
+          description: The document metadata is returned as JSON.
+          headers:
+            Content-Type:
+              description: Always `application/json`.
+              type: string
+          schema:
+            title: Document
+            type: object
+        404:
+          description: Document does not exist or caller does not have permission to see the document.
+    put:
+      description: |
+        Creates a `Document` or updates an existing `Document`'s metadata. The response is as in GET.
+      parameters:
+        - name: owner
+          in: path
+          description: The name of a `User` who owns the document.
+          required: true
+          type: string
+        - name: document
+          in: path
+          description: The name of a `Document` owned by  `owner`, or the name of a new document to create.
+          required: true
+          type: string
+        - name: Content-Type
+          in: header
+          type: string
+          description: Must be `application/json`.
+        - name: Authentication
+          in: header
+          type: string
+          description: An API key that has WRITE access to the document.
+          required: true
+      responses:
+        200:
+          description: The (existing) document was updated. The response body is as in GET.
+        201:
+          description: A new document was created. The response body is as in GET.
+        403:
+          description: The caller has permission to see the document but not make changes to its metadata.
+        404:
+          description: Document does not exist or caller does not have permission to see the document.
+    delete:
+      description: |
+        Deletes a `Document`.
+      parameters:
+        - name: owner
+          in: path
+          description: The name of a `User` who owns the document.
+          required: true
+          type: string
+        - name: document
+          in: path
+          description: The name of a `Document` owned by  `owner`.
+          required: true
+          type: string
+        - name: Authentication
+          in: header
+          type: string
+          description: An API key that has WRITE access to the document.
+          required: true
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      responses:
+        200:
+          description: The document was deleted.
+        403:
+          description: The caller has permission to see the document but not delete it.
+        404:
+          description: Document does not exist or caller does not have permission to see the document.
+  /{owner}/{document}/content[/pointer/to/subpart]:
+    get:
+      description: |
+        Gets `Document` content. If a pointer to a subpart of the document is given at the end of the URL, then only a part of the document is returned. The pointer is in [JSON Pointer](https://tools.ietf.org/html/rfc6901) syntax.
+      parameters:
+        - name: owner
+          in: path
+          description: The name of a `User` who owns the document.
+          required: true
+          type: string
+        - name: document
+          in: path
+          description: The name of a `Document` owned by  `owner`.
+          required: true
+          type: string
+        - name: Authentication
+          in: header
+          type: string
+          description: An API key that has READ access to the document. Optional if the document's anonymous access level is READ.
+      responses:
+        200:
+          description: Document content is returned as JSON.
+          headers:
+            Revision-Id:
+              description: The UUID of the document's current `Revision`. May be `singularity` to indicate that the document has not yet had any revisions yet. (Such documents always have `null` content.)
+              type: string
+            Content-Type:
+              description: Always `application/json`.
+              type: string
+        404:
+          description: Document does not exist or caller does not have permission to see the document
+    put:
+      description: |
+        Updates `Document` content. Document content is arbitrary JSON data provided in the request body. The content will be compared to existing document content (at the time of the base revision) and changes will be stored as a new `Revision`. If the document has had changes subsequent to the base revision, the changes are "rebased" against those revisions before they are committed. The response is the `Revsion`.
+      parameters:
+        - name: owner
+          in: path
+          description: The name of a `User` who owns the document.
+          required: true
+          type: string
+        - name: document
+          in: path
+          description: The name of a `Document` owned by  `owner`.
+          required: true
+          type: string
+        - name: Base-Revision-Id
+          in: header
+          type: string
+          description: An optional `Revision` UUID that the new document content is based on. May be `singularity` indicating that the base revision is the implicit revision that exists when a document is first created. If not specified, the base revision is the document's current revision.
+        - name: Content-Type
+          in: header
+          type: string
+          description: Must be `application/json`.
+        - name: Authentication
+          in: header
+          type: string
+          description: An API key that has WRITE access to the document.
+          required: true
+      responses:
+        200:
+          description: The request body does not differ from the document's content at the base revision.
+        201:
+          description: A `Revision` was saved. The response is the new `Revision`.
+          headers:
+            Content-Type:
+              description: Always `application/json`.
+              type: string
+        400:
+          description: The base revision specified is not valid.
+        403:
+          description: The caller has permission to see the document but not edit it.
+        404:
+          description: Document does not exist or caller does not have permission to see the document
+        409:
+          description: The document was modified after the base revision and a rebase of the changes was not possible.
+  /{owner}/{document}/history:
+    get:
+      description: |
+        Gets the revision history of a `Document`, which is an array of `Revision` objects.
+      parameters:
+        - name: owner
+          in: path
+          description: The name of a `User` who owns the document.
+          required: true
+          type: string
+        - name: document
+          in: path
+          description: The name of a `Document` owned by  `owner`.
+          required: true
+          type: string
+        - name: Authentication
+          in: header
+          type: string
+          description: An API key that has READ access to the document. Optional if the document's anonymous access level is READ.
+      responses:
+        200:
+          description: Revision history is returned as JSON.
+          headers:
+            Content-Type:
+              description: Always `application/json`.
+              type: string
+        404:
+          description: Document does not exist or caller does not have permission to see the document

@@ -125,7 +125,7 @@ exports.create_routes = function(app) {
     })
   }
 
-  var document_content_route = document_route + '/document:pointer(/[\\w\\W]*)?';
+  var document_content_route = document_route + '/content:pointer(/[\\w\\W]*)?';
 
   function get_document_content(doc, pointer, at_revision, cb) {
     if (at_revision == "singularity") {
