@@ -217,12 +217,40 @@ exports.create_routes = function(app) {
     // is returned. READ access is required.
     authz_document_content(req, res, "READ", function(user, owner, doc) {
       get_document_content(doc, req.params.pointer, null, function(err, revision_id, content) {
-        if (err)
+        if (err) {
           res.status(404).send(err);
-        else {
-          res.header("Revision-Id", revision_id)
-          res.json(content);
+          return;
         }
+
+        // Send a header with the ID of the revision that this content came from,
+        // so that if the user submits new content we know what the base revision was.
+        res.header("Revision-Id", revision_id)
+
+        // What content type should be used for the response? Get the preferred
+        // content type from the Accept: header, of the content types that we recognize.
+        var format = req.accepts(["json", "text"])
+        if (!format) {
+          // No recognized content type provided.
+          res.status(406).send("Invalid content type in Accept: header.");
+          return;
+        }
+
+        // If the content is not plain text and JSON is acceptable too, then we must return JSON.
+        if (format == "text" && typeof content != "string") {
+          if (req.accepts(["json"]))
+            format = "json";
+          else {
+            // The document cannot be sent as plain text.
+            res.status(406).send("The document is not plain-text.");
+            return;
+          }
+        }
+
+        if (format == "json")
+          res.json(content);
+        else if (format == "text")
+          res.send(""+content);
+        
       });
     })
   })
@@ -301,14 +329,30 @@ exports.create_routes = function(app) {
 
   app.put(
     document_content_route,
-    bodyParser.json({
-      limit: "10MB", // maximum payload size
-      strict: false // allow documents that are just strings, numbers, or null
-    }),
+    [
+      // parse application/json bodies
+      bodyParser.json({
+        limit: "10MB", // maximum payload size
+        strict: false // allow documents that are just strings, numbers, or null
+      }),
+
+      // parse text/plain bodies
+      bodyParser.text({
+        limit: "10MB" // maximum payload size
+      })
+    ],
     function (req, res) {
     // Replace the document with new content. If a JSON Pointer is given at the end
     // of the path, then replace that part of the document only. The PUT body must
-    // be JSON. WRITE access is required.
+    // be JSON or plain text, with an appropriate Content-Type header.
+    // WRITE access is required.
+
+    if (!req._body) {
+      // _body is set when bodyparser parses a body. If it's not truthy, then
+      // we did not get a valid content-type header.
+      res.status(400).send("Invalid PUT body content type.");
+      return;
+    }
 
     var userdata;
     if (req.headers['revision-userdata']) {

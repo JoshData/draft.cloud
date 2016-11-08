@@ -2,7 +2,8 @@
 curl \
 	-D - \
 	-X $1 -d "$2" \
-	--header "Content-Type: application/json" \
+	--header "Content-Type: ${CONTENT_TYPE:-application/json}" \
+	--header "Accept: ${ACCEPT:-application/json}" \
 	--header "Authorization: $API_KEY" \
 	--header "Revision-Userdata: $USERDATA" \
 	http://localhost:8000/api/v1/$3

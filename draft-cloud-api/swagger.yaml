@@ -104,7 +104,7 @@ paths:
   /{owner}/{document}/content[/pointer/to/subpart]:
     get:
       description: |
-        Gets `Document` content. If a pointer to a subpart of the document is given at the end of the URL, then only a part of the document is returned. The pointer is in [JSON Pointer](https://tools.ietf.org/html/rfc6901) syntax.
+        Gets `Document` content. If a pointer to a subpart of the document is given at the end of the URL, then only a part of the document is returned. The pointer is in [JSON Pointer](https://tools.ietf.org/html/rfc6901) syntax. The document is returned either as JSON or as UTF-8 encoded plain text, depending on the Accept header you send in the request.
       parameters:
         - name: owner
           in: path
@@ -116,6 +116,10 @@ paths:
           description: The name of a `Document` owned by  `owner`.
           required: true
           type: string
+        - name: Accept
+          in: header
+          type: string
+          description: Either `text/plain` or `application/json`. (If the Accept header says both formats are accepted, you may get either format back.)
         - name: Authentication
           in: header
           type: string
@@ -128,13 +132,15 @@ paths:
               description: The UUID of the document's current `Revision`. May be `singularity` to indicate that the document has not yet had any revisions yet. (Such documents always have `null` content.)
               type: string
             Content-Type:
-              description: Always `application/json`.
+              description: `application/json` or `text/plain`, depending on the Accept header you send. (If the Accept header says both formats are accepted but text/plain is preferred, you may get application/json in the response if the document's content is not plain text.)
               type: string
         404:
-          description: Document does not exist or caller does not have permission to see the document
+          description: Document does not exist or caller does not have permission to see the document.
+        406:
+          description: The Accept header was set to `text/plain` but the document content is not plain text, or an invalid content type was sent in the Accept header.
     put:
       description: |
-        Updates `Document` content. Document content is arbitrary JSON data provided in the request body. The content will be compared to existing document content (at the time of the base revision) and changes will be stored as a new `Revision`. If the document has had changes subsequent to the base revision, the changes are "rebased" against those revisions before they are committed. The response is the `Revsion`.
+        Updates `Document` content. Document content is text or arbitrary JSON data provided in the request body (and distinguished by the request's Content-Type header). The content will be compared to existing document content (at the time of the base revision) and changes will be stored as a new `Revision`. If the document has had changes subsequent to the base revision, the changes are "rebased" against those revisions before they are committed. The response is the `Revsion`.
       parameters:
         - name: owner
           in: path
@@ -161,7 +167,7 @@ paths:
         - name: Content-Type
           in: header
           type: string
-          description: Must be `application/json`.
+          description: Either `text/plain` (if you are sending a plain text document) or `application/json` (if you are sending arbitrary JSON data as the document).
         - name: Authentication
           in: header
           type: string
