@@ -5,7 +5,7 @@ var json_pointer = require('json-pointer');
 var auth = require("./auth.js");
 var models = require("./models.js");
 
-var jot = require("./jot");
+var jot = require("../jot");
 
 exports.create_routes = function(app) {
   // Set defaults for JSON responses.
@@ -64,6 +64,9 @@ exports.create_routes = function(app) {
 
   app.put(document_route, bodyParser.json(), function (req, res) {
     // Create a document or update its metadata.
+    //
+    // See https://github.com/expressjs/body-parser#bodyparserjsonoptions for
+    // default restrictions on the request body payload.
     //
     // Requires WRITE permission on the document (or if the document doesn't exist yet,
     // then WRITE permission for the owner).
@@ -228,12 +231,10 @@ exports.create_routes = function(app) {
     }
 
     // Compute the JOT operation to transform the old content to the new content.
-    var diff = require("./jot/diff.js");
-    var op = diff.diff(old_content, new_content);
+    var op = jot.diff(old_content, new_content);
 
     // Don't make a revision if there was no change.
-    var NO_OP = require('./jot/values.js').NO_OP;
-    if (op instanceof NO_OP) {
+    if (op.isNoOp()) {
       cb();
       return;
     }
@@ -242,7 +243,7 @@ exports.create_routes = function(app) {
     cb(null, op);
   }
 
-  function make_revision(user, doc, base_revision, op, comment, res) {
+  function make_revision(user, doc, base_revision, op, comment, userdata, res) {
     // Rebase against all of the subsequent operations after the base revision to
     // the current revision. Find all of the subsequent operations.
     models.Revision.findAll({
@@ -265,8 +266,7 @@ exports.create_routes = function(app) {
         res.status(409).send("The document was modified. Changes could not be applied.")
         return;
       }
-      var NO_OP = require('./jot/values.js').NO_OP;
-      if (op instanceof NO_OP) {
+      if (op.isNoOp()) {
         res.status(200).send("no change");
         return;
       }
@@ -275,7 +275,9 @@ exports.create_routes = function(app) {
       models.Revision.create({
         userId: user.id,
         documentId: doc.id,
-        op: op.toJsonableObject()
+        op: op.toJsonableObject(),
+        comment: comment,
+        userdata: userdata
       }).then(function(rev) {
         res.status(201).json(make_revision_response(rev));
       });
@@ -287,11 +289,30 @@ exports.create_routes = function(app) {
       createdAt: rev.createdAt,
       uuid: rev.uuid,
       op: rev.op,
-      author: rev.userId
+      author: rev.userId,
+      comment: rev.comment,
+      userdata: rev.userdata
     };
   }
 
-  app.put(document_content_route, bodyParser.json(), function (req, res) {
+  app.put(
+    document_content_route,
+    bodyParser.json({
+      limit: "10MB", // maximum payload size
+      strict: false // allow documents that are just strings, numbers, or null
+    }),
+    function (req, res) {
+
+    var userdata;
+    if (req.headers['revision-userdata']) {
+      try {
+        userdata = JSON.parse(req.headers['revision-userdata']);
+      } catch(e) {
+        res.status(400).send("Invalid userdata: " + e);
+        return;
+      }
+    }
+
     // Replace the document with new content. If a JSON Pointer is given at the end
     // of the path, then replace that part of the document only. The PUT body must
     // be JSON.
@@ -352,6 +373,7 @@ exports.create_routes = function(app) {
                 base_revision,
                 op,
                 req.headers['revision-comment'],
+                userdata,
                 res);
           })
         });
@@ -382,6 +404,7 @@ exports.create_routes = function(app) {
       .then(function(revs) {
         res.json(revs.map(function(rev) {
           rev.op = JSON.parse(rev.op);
+          rev.userdata = JSON.parse(rev.userdata);
           return make_revision_response(rev);
         }))
       })

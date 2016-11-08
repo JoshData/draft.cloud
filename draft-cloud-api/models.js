@@ -22,6 +22,11 @@ exports.initialize_database = function(connection_uri) {
       uuid: {
         type: Sequelize.UUID,
         defaultValue: Sequelize.UUIDV4
+      },
+
+      // A JSON object containing user profile information.
+      profile: {
+        type: Sequelize.JSON
       }
     }, {
       paranoid: true, // rows are never deleted, just marked as deleted
@@ -195,7 +200,7 @@ exports.initialize_database = function(connection_uri) {
       // User-provided arbitrary metadata stored with the document.
       userdata: {
         type: Sequelize.JSON
-      },
+      }
     }, {
       paranoid: true, // rows are never deleted, just marked as deleted
       indexes: [
@@ -229,6 +234,11 @@ exports.initialize_database = function(connection_uri) {
       // A comment about the revision entered by the revision's author.
       comment: {
         type: Sequelize.TEXT
+      },
+
+      // User-provided arbitrary metadata stored with the revision.
+      userdata: {
+        type: Sequelize.JSON
       },
 
       // The document content as of this Revision, if has_cached_document is true.

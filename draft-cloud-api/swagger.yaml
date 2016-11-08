@@ -146,6 +146,14 @@ paths:
           description: The name of a `Document` owned by  `owner`.
           required: true
           type: string
+        - name: Revision-Comment
+          in: header
+          type: string
+          description: An optional comment (typically explaining the purpose of the Revision) that is stored with the Revision.
+        - name: Revision-Userdata
+          in: header
+          type: json
+          description: JSON-encoded arbitrary user data stored with the Revision.
         - name: Base-Revision-Id
           in: header
           type: string
