@@ -2,6 +2,9 @@ var express = require('express');
 
 var app = express();
 
+// General expresss settings.
+app.use(require('helmet')())
+
 // Initialize the back-end.
 require("./draft-cloud-api/routes.js")
 	.create_routes(app);

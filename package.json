@@ -6,6 +6,7 @@
     "argon2": "^0.14.1",
     "body-parser": "^1.15.2",
     "express": "^4.14.0",
+    "helmet": "^3.1.0",
     "json-pointer": "^0.6.0",
     "sequelize": "^3.24.8",
     "uuid": "^2.0.3"
