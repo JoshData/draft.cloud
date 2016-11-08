@@ -1,7 +1,5 @@
 const Sequelize = require('sequelize');
-const uuid = require('uuid');
-const argon2 = require('argon2');
-const zlib = require('zlib');
+const credential = require('credential');
 
 var db;
 
@@ -91,26 +89,38 @@ exports.initialize_database = function(connection_uri) {
           // instance and the API key itself as arguments. We forget the API
           // key immediately and only store a hash. The caller should increase
           // the access level and/or set a comment.
-          var key = uuid.v4();
-          argon2.generateSalt().then(function(salt) {
-            argon2.hash(key, salt).then(function(key_hash) {
+
+          // Generate the random key and convert to Base64.
+          require('crypto').randomBytes(24, function(err, buffer) {
+            if (err) { throw err; }
+            var key = buffer.toString('base64');
+
+            // Hash it...
+            credential().hash(key, function(err, key_hash) {
+              if (err) { throw err; }
+
+              // Store the hash in the database...
               exports.UserApiKey.create({
                 userId: user.id,
                 access_level: "",
                 resource_acess_levels: { },
                 key_hash: key_hash
               }).then(function(obj) {
+
                 // From the user's point of view, the API key is an opaque
                 // string that contains both the key's UUID and the key itself.
                 // Having the UUID be in it allows us to quickly find the key
-                // on an indexed column.
-                var api_key = "uak1:" + obj.uuid + ":" + key;
-                zlib.deflateRaw(api_key, (err, buffer) => {
-                  api_key = buffer.toString('base64');
-                  cb(obj, api_key);
-                });
-              })
-            });
+                // on an indexed column. Base64-encoding the UUID is shorter
+                // than putting the UUID in in the usual UUID format.
+                var api_key =
+                  new Buffer(require('node-uuid').parse(obj.uuid)).toString('base64')
+                  + "." + key
+                  + ".0"; // end with a key schema version
+
+                // Send the UserApiKey instance and the clear-text API key to the callback.
+                cb(obj, api_key);
+              });
+            });          
           });
         },
 
@@ -119,58 +129,52 @@ exports.initialize_database = function(connection_uri) {
           // User and UserApiKey object instances, or with undefineds
           // if the key did not validate.
 
-          // Base64-decode the api_key, returning a Buffer.
-          try {
-            buffer = new Buffer(api_key, 'base64');
-          } catch (e) {
+          // Split on a colon, verify schema version at the end.
+          key_parts = api_key.split(/\./);
+          if (key_parts.length != 3 || key_parts[2] != "0") {
             cb();
             return;
           }
 
-          // Inflate it.
-          zlib.inflateRaw(
-            buffer,
-            (err, buffer) => {
-              if (err) {
+          var uuid = key_parts[0];
+          var key = key_parts[1];
+
+          // Decode the Base64 UUID of the key, which is the first component.
+          try {
+            uuid = require('uuid').unparse(new Buffer(uuid, 'base64'));
+          } catch (e) {
+            cb();
+            return;             
+          }
+
+          // Look up the key record using the UUID.
+          exports.UserApiKey.findOne({
+            where: {
+              uuid: uuid,
+            }})
+          .then(function(userapikey) {
+            if (!userapikey) {
+              cb();
+              return;
+            }
+
+            // Verify the key itself.
+            credential().verify(userapikey.key_hash, key, function(err, isValid) {
+              if (err) { throw err; }
+              if (!isValid) {
                 cb();
                 return;
               }
 
-              // Turn it back to a string.
-              api_key = buffer.toString('ascii');
-
-              // Split on a colon.
-              key_parts = api_key.split(/:/);
-              if (key_parts.length != 3 || key_parts[0] != "uak1") {
-                cb();
-                return;
-              }
-
-              // Fetch the object.
-              exports.UserApiKey.findOne({
+              // TODO: Merge this database query with the previous query.
+              exports.User.findOne({
                 where: {
-                  uuid: key_parts[1]
+                  id: userapikey.userId
                 }})
-              .then(function(userapikey) {
-                if (!userapikey) {
-                  cb();
-                  return;
-                }
-
-                // Verify the key.
-                argon2.verify(userapikey.key_hash, key_parts[2]).then(match => {
-                  if (match) {
-                    // TODO: Merge this with the previous query.
-                    exports.User.findOne({
-                      where: {
-                        id: userapikey.userId
-                      }})
-                    .then(function(user) {
-                      cb(user, userapikey);
-                    });
-                  }
-                });
+              .then(function(user) {
+                cb(user, userapikey);
               });
+            });
           });
         }
       }
