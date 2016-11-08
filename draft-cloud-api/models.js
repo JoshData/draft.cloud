@@ -104,7 +104,7 @@ exports.initialize_database = function(connection_uri) {
                 // string that contains both the key's UUID and the key itself.
                 // Having the UUID be in it allows us to quickly find the key
                 // on an indexed column.
-                var api_key = obj.uuid + ":" + key;
+                var api_key = "uak1:" + obj.uuid + ":" + key;
                 zlib.deflateRaw(api_key, (err, buffer) => {
                   api_key = buffer.toString('base64');
                   cb(obj, api_key);
@@ -119,7 +119,7 @@ exports.initialize_database = function(connection_uri) {
           // User and UserApiKey object instances, or with undefineds
           // if the key did not validate.
 
-          // Base64-decode the API key to get a Buffer.
+          // Base64-decode the api_key, returning a Buffer.
           try {
             buffer = new Buffer(api_key, 'base64');
           } catch (e) {
@@ -136,12 +136,12 @@ exports.initialize_database = function(connection_uri) {
                 return;
               }
 
-              // Turn it back to a string. TODO: Error handling?
+              // Turn it back to a string.
               api_key = buffer.toString('ascii');
 
               // Split on a colon.
               key_parts = api_key.split(/:/);
-              if (key_parts.length != 2) {
+              if (key_parts.length != 3 || key_parts[0] != "uak1") {
                 cb();
                 return;
               }
@@ -149,7 +149,7 @@ exports.initialize_database = function(connection_uri) {
               // Fetch the object.
               exports.UserApiKey.findOne({
                 where: {
-                  uuid: key_parts[0]
+                  uuid: key_parts[1]
                 }})
               .then(function(userapikey) {
                 if (!userapikey) {
@@ -158,7 +158,7 @@ exports.initialize_database = function(connection_uri) {
                 }
 
                 // Verify the key.
-                argon2.verify(userapikey.key_hash, key_parts[1]).then(match => {
+                argon2.verify(userapikey.key_hash, key_parts[2]).then(match => {
                   if (match) {
                     // TODO: Merge this with the previous query.
                     exports.User.findOne({
