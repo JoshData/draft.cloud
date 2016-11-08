@@ -95,12 +95,14 @@ exports.get_document_authz = function(req, owner_name, document_name, cb) {
 
         // The API key may specify a lower access level either for particular
         // resources or for all resources.
-        if (document && typeof user_api_key.resource_acess_levels[document.uuid] != "undefined")
-          // Limit to the access level for this particular resource.
-          access = max(access, user_api_key.resource_acess_levels[document.uuid]);
-        else
-          // Limit to the access level given in the key for all resources.
-          access = max(access, user_api_key.access_level);
+        if (user_api_key) {
+          if (document && typeof user_api_key.resource_acess_levels[document.uuid] != "undefined")
+            // Limit to the access level for this particular resource.
+            access = max(access, user_api_key.resource_acess_levels[document.uuid]);
+          else
+            // Limit to the access level given in the key for all resources.
+            access = max(access, user_api_key.access_level);
+        }
 
         cb(user, owner, document, access);
       });
