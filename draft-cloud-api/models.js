@@ -195,10 +195,11 @@ exports.initialize_database = function(connection_uri) {
         defaultValue: Sequelize.UUIDV4
       },
 
-      // The access level granted to all (including anonymous) users.
+      // The access level granted to all (including anonymous) users
+      // (default no access to anyone but the owner).
       anon_access_level: {
         type: Sequelize.STRING(16),
-        defaultValue: "READ"
+        defaultValue: ""
       },
 
       // User-provided arbitrary metadata stored with the document.
@@ -271,8 +272,8 @@ exports.initialize_database = function(connection_uri) {
           name: 'josh'
         }).then(function(user) {
           exports.UserApiKey.createApiKey(user, function(obj, api_key) {
-            // Give the key WRITE access.
-            obj.set("access_level", "WRITE");
+            // Give the key ADMIN access to the user's account.
+            obj.set("access_level", "ADMIN");
             obj.save();
             exports.UserApiKey.validateApiKey(api_key, function(user, key) {
               console.log(user.name + " your key is " + api_key)

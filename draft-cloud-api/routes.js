@@ -16,35 +16,38 @@ exports.create_routes = function(app) {
 
   // DOCUMENT CREATION/DELETION
 
-  function authz_document(req, res, must_exist, needs_write, cb) {
+  function authz_document(req, res, must_exist, min_level, cb) {
     // Checks authorization for document URLs. The callback is called
     // as: cb(user, owner, document) where user is the user making the
     // request, owner is the owner of the document, and document is the
     // document.
-    auth.get_document_authz(req, req.params.owner, req.params.document, function(user, owner, doc, perm) {
-      // WRITE permission -> great!
-      if (perm == "WRITE" && (!must_exist || doc))
-        cb(user, owner, doc);
+    if (!(min_level == "READ" || min_level == "WRITE" || min_level == "ADMIN")) throw "invalid argument";
+    auth.get_document_authz(req, req.params.owner, req.params.document, function(user, owner, doc, level) {
+      // Check permission level.
+      if (auth.min_access(min_level, level) != min_level) {
+        // The user's access level if lower than the minimum access level required.
+        if (auth.min_access("READ", level) == "READ")
+          // The user has READ access but a higher level was required.
+          res.status(403).send('You do not have ' +  min_level + ' permission on this document. You have ' + level + '.');
+        else
+          // The user does not have READ access, so we do not reveal whether or not
+          // a document exists here.
+          res.status(404).send('User or document not found or you do not have permission to see it.');
+        return;
+      }
 
-      // WRITE permission but the document doesn't exist
-      else if (perm == "WRITE")
-        res.status(404).send('Document not found.');
+      // Check if document exists.
+      if (must_exist && !doc) {
+        // Document doesn't exist but must. Since the user would at least have READ access
+        // if the document existed, or else we would have given a different error above,
+        // we can reveal that the document doesn't exist.
+        res.status(404).send('Document does not exist.');
+        return;
+      }
 
-      // READ permission and only READ was needed -> great!
-      else if (perm == "READ" && !needs_write && (!must_exist || doc))
-        cb(user, owner, doc);
-
-      // READ permission but either WRITE was needed or the document was needed
-      // but it doesn't exist
-      else if (perm == "READ" && !doc)
-        res.status(404).send('Document not found.');
-      else if (perm == "READ")
-        res.status(403).send('You do not have permission to modify this document.');
-
-      // does not even have READ, so we do not reveal whether or not the document exists
-      else
-        res.status(404).send('User or document not found or you do not have permission to see it.');
-    })
+      // All good.
+      cb(user, owner, doc);
+    });
   }
 
   function make_document_response(status_code, res, owner, doc) {
@@ -68,10 +71,11 @@ exports.create_routes = function(app) {
     // See https://github.com/expressjs/body-parser#bodyparserjsonoptions for
     // default restrictions on the request body payload.
     //
-    // Requires WRITE permission on the document (or if the document doesn't exist yet,
-    // then WRITE permission for the owner).
+    // Requires ADMIN permission on the document. (If the document doesn't yet
+    // exist, we can still have ADMIN permission in virtue of being the same
+    // user as the intended owner.)
     if (!req.body) return res.sendStatus(400);
-    authz_document(req, res, false, true, function(user, owner, doc) {
+    authz_document(req, res, false, "ADMIN", function(user, owner, doc) {
       if (!doc) {
         // Create document.
         models.Document.create({
@@ -97,7 +101,7 @@ exports.create_routes = function(app) {
     // Fetch metadata about a document.
     //
     // Requires READ permission on the document (and the document must exist).
-    authz_document(req, res, true, false, function(user, owner, doc) {
+    authz_document(req, res, true, "READ", function(user, owner, doc) {
       make_document_response(200, res, owner, doc);
     })
   })
@@ -107,7 +111,7 @@ exports.create_routes = function(app) {
     //
     // Requires WRITE permission on the document (or if the document doesn't exist yet,
     // then WRITE permission for the owner).
-    authz_document(req, res, true, true, function(user, owner, doc) {
+    authz_document(req, res, true, "ADMIN", function(user, owner, doc) {
       // First clear the document's name so that it cannot cause uniqueness
       // constraint violations with a new document of the same name.
       doc.set("name", null);
@@ -121,9 +125,9 @@ exports.create_routes = function(app) {
 
   // DOCUMENT CONTENT AND HISTORY
 
-  function authz_document_content(req, res, needs_write, cb) {
+  function authz_document_content(req, res, min_level, cb) {
     // Checks authorization for document content URLs.
-    authz_document(req, res, true, needs_write, function(user, owner, doc) {
+    authz_document(req, res, true, min_level, function(user, owner, doc) {
       cb(user, owner, doc);
     })
   }
@@ -210,8 +214,8 @@ exports.create_routes = function(app) {
   app.get(document_content_route, function (req, res) {
     // Fetch (the content of) a document. If a JSON Pointer is given at the end
     // of the path, then only return that part of the document. A JSON document
-    // is returned.
-    authz_document_content(req, res, false, function(user, owner, doc) {
+    // is returned. READ access is required.
+    authz_document_content(req, res, "READ", function(user, owner, doc) {
       get_document_content(doc, req.params.pointer, null, function(err, revision_id, content) {
         if (err)
           res.status(404).send(err);
@@ -302,6 +306,9 @@ exports.create_routes = function(app) {
       strict: false // allow documents that are just strings, numbers, or null
     }),
     function (req, res) {
+    // Replace the document with new content. If a JSON Pointer is given at the end
+    // of the path, then replace that part of the document only. The PUT body must
+    // be JSON. WRITE access is required.
 
     var userdata;
     if (req.headers['revision-userdata']) {
@@ -313,10 +320,7 @@ exports.create_routes = function(app) {
       }
     }
 
-    // Replace the document with new content. If a JSON Pointer is given at the end
-    // of the path, then replace that part of the document only. The PUT body must
-    // be JSON.
-    authz_document_content(req, res, true, function(user, owner, doc) {
+    authz_document_content(req, res, "WRITE", function(user, owner, doc) {
       // Find the base revision. If not specified, it's the current revision.
       // If specified, we compute the changes from the base, then rebase them
       // against subsequent changes, and then commit that.
@@ -385,15 +389,15 @@ exports.create_routes = function(app) {
   app.patch(document_content_route, function (req, res) {
     // Apply changes to a document. The changes are given as JSON-serialized JOT
     // operations. If a JSON Pointer is given at the end of the path, the operations
-    // are relative to that location in the document.
-    authz_document_content(req, res, true, function(user, owner, doc) {
+    // are relative to that location in the document. WRITE access is required.
+    authz_document_content(req, res, "WRITE", function(user, owner, doc) {
       res.send('apply patch ' + JSON.stringify(req.params))
     })
   })
 
   app.get(document_route + '/history', function (req, res) {
     // Gets the history of a document. The response is a list of changes.
-    authz_document(req, res, true, false, function(user, owner, doc) {
+    authz_document(req, res, true, "READ", function(user, owner, doc) {
       models.Revision.findAll({
         where: {
           documentId: doc.id

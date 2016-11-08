@@ -60,7 +60,7 @@ paths:
         - name: Authentication
           in: header
           type: string
-          description: An API key that has WRITE access to the document.
+          description: An API key that has ADMIN access to the document, or for a new document and API key for the owner of the new document.
           required: true
       responses:
         200:
@@ -88,7 +88,7 @@ paths:
         - name: Authentication
           in: header
           type: string
-          description: An API key that has WRITE access to the document.
+          description: An API key that has ADMIN access to the document.
           required: true
       consumes:
         - application/json
