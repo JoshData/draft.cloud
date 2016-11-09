@@ -101,10 +101,10 @@ paths:
           description: The caller has permission to see the document but not delete it.
         404:
           description: Document does not exist or caller does not have permission to see the document.
-  /{owner}/{document}/content[/pointer/to/subpart]:
+  /{owner}/{document}/content{pointer}:
     get:
       description: |
-        Gets `Document` content. If a pointer to a subpart of the document is given at the end of the URL, then only a part of the document is returned. The pointer is in [JSON Pointer](https://tools.ietf.org/html/rfc6901) syntax. The document is returned either as JSON or as UTF-8 encoded plain text, depending on the Accept header you send in the request.
+        Gets `Document` content. If a pointer to a subpart of the document is given at the end of the URL, then only a part of the document is returned. The document is returned either as JSON or as UTF-8 encoded plain text, depending on the Accept header you send in the request.
       parameters:
         - name: owner
           in: path
@@ -116,6 +116,12 @@ paths:
           description: The name of a `Document` owned by  `owner`.
           required: true
           type: string
+        - name: pointer
+          in: path
+          description: A [JSON Pointer](https://tools.ietf.org/html/rfc6901), which looks like `/x/y/15`. 
+          type: string
+          format: binary
+          default: ""
         - name: Accept
           in: header
           type: string
@@ -132,7 +138,7 @@ paths:
               description: The UUID of the document's current `Revision`. May be `singularity` to indicate that the document has not yet had any revisions yet. (Such documents always have `null` content.)
               type: string
             Content-Type:
-              description: `application/json` or `text/plain`, depending on the Accept header you send. (If the Accept header says both formats are accepted but text/plain is preferred, you may get application/json in the response if the document's content is not plain text.)
+              description: "`application/json` or `text/plain`, depending on the Accept header you send. (If the Accept header says both formats are accepted but text/plain is preferred, you may get application/json in the response if the document's content is not plain text.)"
               type: string
         404:
           description: Document does not exist or caller does not have permission to see the document.

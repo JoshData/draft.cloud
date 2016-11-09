@@ -1,0 +1,8 @@
+#!/bin/bash
+
+rm -rf /tmp/swagger-ui
+git clone https://github.com/swagger-api/swagger-ui /tmp/swagger-ui
+mv /tmp/swagger-ui/dist public_html/apidocs
+rm -rf /tmp/swagger-ui
+cp draft-cloud-api/swagger.html public_html/apidocs/index.html
+cp draft-cloud-api/swagger.yaml public_html/apidocs/swagger.yaml
