@@ -1,6 +1,6 @@
 var bodyParser = require('body-parser')
 
-var json_pointer = require('json-pointer');
+var json_ptr = require('json-ptr');
 
 var auth = require("./auth.js");
 var models = require("./models.js");
@@ -139,7 +139,7 @@ exports.create_routes = function(app) {
       // This is a special flag that signals the state of the document
       // prior to the first Revision. The document is always a null value
       // at that state.
-      cb(null, at_revision, null);
+      cb(null, at_revision, null, []);
       return;
     }
 
@@ -196,17 +196,34 @@ exports.create_routes = function(app) {
           })
         }
 
-        // Execute the JSON Pointer given in the URL.
+        // Execute the JSON Pointer given in the URL. We could use
+        // json_ptr.get(content, pointer). But the PUT function needs
+        // to know whether the pointer passes through arrays or objects
+        // in order to create the correct JOT operations that represent
+        // the change.
         if (pointer) {
-          try {
-            content = json_pointer.get(result, pointer);
-          } catch(e) {
-            cb('Document path ' + pointer + ' not found.');
+          var op_path = [ ];
+          for (let item of json_ptr.decodePointer(pointer)) {
+            if (Array.isArray(content))
+              // This item on the path is an array index. Turn the item
+              // into a number.
+              op_path.push(parseInt(item));
+            else
+              // This item is an Object key, so we keep it as a string.
+              op_path.push(item)
+
+            // Use json-ptr to process just this part of the path. This way
+            // we get its error handling.
+            content = json_ptr.get(content, json_ptr.encodePointer([item]));
+            if (typeof content == "undefined") {
+              cb('Document path ' + pointer + ' not found.');
+              return;
+            }
           }
         }
 
         // Callback.
-        cb(null, revision_id, content);
+        cb(null, revision_id, content, op_path);
       });
     });
   }
@@ -256,12 +273,6 @@ exports.create_routes = function(app) {
   })
 
   function make_operation_from_new_content(pointer, old_content, new_content, cb) {
-    // Parse the pointer.
-    if (pointer) {
-      cb("pointer in PUT not implemented");
-      return;
-    }
-
     // Compute the JOT operation to transform the old content to the new content.
     var op = jot.diff(old_content, new_content);
 
@@ -275,7 +286,15 @@ exports.create_routes = function(app) {
     cb(null, op);
   }
 
-  function make_revision(user, doc, base_revision, op, comment, userdata, res) {
+  function make_revision(user, doc, base_revision, op, op_path, comment, userdata, res) {
+    // If this operation occurred at a sub-path on the document, then wrap the
+    // operation within APPLY operations to get down to that path. op_path has been
+    // constructed so that the elements are either numbers or strings, and jot.APPLY
+    // will use that distinction to select whether it is the APPLY for sequences
+    // (the element is a number, an index) or objects (the element is a string, a key).
+    for (var i = op_path.length-1; i >= 0; i--)
+      op = jot.APPLY(op_path[i], op);
+
     // Rebase against all of the subsequent operations after the base revision to
     // the current revision. Find all of the subsequent operations.
     models.Revision.findAll({
@@ -401,7 +420,7 @@ exports.create_routes = function(app) {
       }
       find_base_revision(function(base_revision) {
         // Get the content of the document as of the base revision.
-        get_document_content(doc, req.params.pointer, base_revision, function(err, revision_id, content) {
+        get_document_content(doc, req.params.pointer, base_revision, function(err, revision_id, content, op_path) {
           if (err) {
             res.status(404).send(err);
             return;
@@ -420,6 +439,7 @@ exports.create_routes = function(app) {
                 doc,
                 base_revision,
                 op,
+                op_path,
                 req.headers['revision-comment'],
                 userdata,
                 res);

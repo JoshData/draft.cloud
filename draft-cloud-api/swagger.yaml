@@ -140,7 +140,17 @@ paths:
           description: The Accept header was set to `text/plain` but the document content is not plain text, or an invalid content type was sent in the Accept header.
     put:
       description: |
-        Updates `Document` content. Document content is text or arbitrary JSON data provided in the request body (and distinguished by the request's Content-Type header). The content will be compared to existing document content (at the time of the base revision) and changes will be stored as a new `Revision`. If the document has had changes subsequent to the base revision, the changes are "rebased" against those revisions before they are committed. The response is the `Revsion`.
+        Updates the content of a `Document` with content provided in the request body.
+        Document content is text or arbitrary JSON data provided in the request body
+        (see the request Content-Type header parameter).
+        If a [JSON Pointer](https://tools.ietf.org/html/rfc6901) to a subpart of the document is given at the end of the URL (see GET),
+        then the content provided in this PUT request replaces the content at the location in the
+        document that the pointer points to.
+        If a base revision is specified with the Base-Revision-Id header, then the changes made
+        relative to the base revision will be merged with the changes made in any Revisions that
+        were made after the base revision (probably by other users acting simultaneously).
+        The response is a new `Revsion` object (or an empty 200 OK response if the document did
+        not change).
       parameters:
         - name: owner
           in: path
@@ -167,7 +177,7 @@ paths:
         - name: Content-Type
           in: header
           type: string
-          description: Either `text/plain` (if you are sending a plain text document) or `application/json` (if you are sending arbitrary JSON data as the document).
+          description: Either `text/plain` if you are sending a plain text document (it is converted to a JSON string) or `application/json` if you are sending arbitrary JSON data as the document.
         - name: Authentication
           in: header
           type: string
