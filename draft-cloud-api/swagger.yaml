@@ -122,6 +122,11 @@ paths:
           type: string
           format: binary
           default: ""
+        - name: Revision-Id
+          in: header
+          type: string
+          description: A Revision UUID. If specified, gets the content of the document at the indicated revision. Otherwise the document's content at the most recent revision is returned.
+          default: ""
         - name: Accept
           in: header
           type: string
@@ -135,7 +140,7 @@ paths:
           description: Document content is returned as JSON.
           headers:
             Revision-Id:
-              description: The UUID of the document's current `Revision`. May be `singularity` to indicate that the document has not yet had any revisions yet. (Such documents always have `null` content.)
+              description: The UUID of the document's current `Revision`, or the revision specified in the Revision-Id header if the header is given. May be `singularity` to indicate that the document has not yet had any revisions yet. (Such documents always have `null` content.)
               type: string
             Content-Type:
               description: "`application/json` or `text/plain`, depending on the Accept header you send. (If the Accept header says both formats are accepted but text/plain is preferred, you may get application/json in the response if the document's content is not plain text.)"
@@ -221,13 +226,17 @@ paths:
           description: The name of a `Document` owned by  `owner`.
           required: true
           type: string
+        - name: since
+          in: query
+          description: An optional `Revision` UUID. If not specified, the full history of the document is returned. Otherwise only the changes made after the given revision are returned.
+          type: string
         - name: Authentication
           in: header
           type: string
           description: An API key that has READ access to the document. Optional if the document's anonymous access level is READ.
       responses:
         200:
-          description: Revision history is returned as JSON.
+          description: Revision history is returned as JSON, in chronological order (oldest first).
           headers:
             Content-Type:
               description: Always `application/json`.

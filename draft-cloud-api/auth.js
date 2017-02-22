@@ -2,6 +2,12 @@ var models = require("./models.js");
 
 var ACCESS_LEVELS = ["", "READ", "WRITE", "ADMIN"];
 
+exports.DEFAULT_NEW_DOCUMENT_ANON_ACCESS_LEVEL = ""; // i.e. no access
+
+exports.is_access_level = function(level) {
+  return typeof level == "string" && ACCESS_LEVELS.indexOf(level) >= 0;
+}
+
 exports.min_access = function(level1, level2) {
   if (ACCESS_LEVELS.indexOf(level1) < ACCESS_LEVELS.indexOf(level2))
     return level1;

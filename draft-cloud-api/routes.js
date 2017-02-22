@@ -7,10 +7,11 @@ var models = require("./models.js");
 
 var jot = require("../jot");
 
+// Export a function that creates routes.
+
 exports.create_routes = function(app) {
   // Set defaults for JSON responses.
   app.set("json spaces", 2);
-
 
   var document_route = '/api/v1/:owner/:document';
 
@@ -25,7 +26,7 @@ exports.create_routes = function(app) {
     auth.get_document_authz(req, req.params.owner, req.params.document, function(user, owner, doc, level) {
       // Check permission level.
       if (auth.min_access(min_level, level) != min_level) {
-        // The user's access level if lower than the minimum access level required.
+        // The user's access level is lower than the minimum access level required.
         if (auth.min_access("READ", level) == "READ")
           // The user has READ access but a higher level was required.
           res.status(403).send('You do not have ' +  min_level + ' permission on this document. You have ' + level + '.');
@@ -51,6 +52,7 @@ exports.create_routes = function(app) {
   }
 
   function make_document_response(status_code, res, owner, doc) {
+    // Form an HTTP response for a document.
     res
     .status(status_code)
     .json({
@@ -74,22 +76,29 @@ exports.create_routes = function(app) {
     // Requires ADMIN permission on the document. (If the document doesn't yet
     // exist, we can still have ADMIN permission in virtue of being the same
     // user as the intended owner.)
+
+    // Validate/sanitize input.
     if (!req.body) return res.sendStatus(400);
+    if (!req.body.anon_access_level) req.body.anon_access_level = "";
+    if (!auth.is_access_level(req.body.anon_access_level)) return res.sendStatus(400);
+    if (req.body.anon_access_level == "ADMIN") return res.sendStatus(400); // can't make a document world-adminable
+    if (!req.body.userdata) req.body.userdata = { }; // change null to empty object
+
     authz_document(req, res, false, "ADMIN", function(user, owner, doc) {
       if (!doc) {
-        // Create document.
+        // Create a new document.
         models.Document.create({
           userId: owner.id,
           name: req.params.document,
           anon_access_level: req.body.anon_access_level,
-          userdata: req.body.userdata || { }
+          userdata: req.body.userdata
         }).then(function(doc) {
           make_document_response(201, res, owner, doc);
         });
       } else {
         // Document exists. Update its metadata.
-        doc.set("anon_access_level", req.body.anon_access_level || "");
-        doc.set("userdata", req.body.userdata || { });
+        doc.set("anon_access_level", req.body.anon_access_level);
+        doc.set("userdata", req.body.userdata);
         doc.save().then(function() {
           make_document_response(200, res, owner, doc);
         })
@@ -109,8 +118,7 @@ exports.create_routes = function(app) {
   app.delete(document_route, function (req, res) {
     // Delete a document.
     //
-    // Requires WRITE permission on the document (or if the document doesn't exist yet,
-    // then WRITE permission for the owner).
+    // Requires ADMIN permission on the document.
     authz_document(req, res, true, "ADMIN", function(user, owner, doc) {
       // First clear the document's name so that it cannot cause uniqueness
       // constraint violations with a new document of the same name.
@@ -135,8 +143,23 @@ exports.create_routes = function(app) {
   var document_content_route = document_route + '/content:pointer(/[\\w\\W]*)?';
 
   function get_document_content(doc, pointer, at_revision, cb) {
+    // Get the content of a document (or part of a document) at a particular revision.
+    //
+    // pointer is null or a string containing a JSON Pointer indicating the part of
+    // the document to retrieve.
+    //
+    // at_revision is null to get the most recent document content, a Revision instance,
+    // or "singularity", which represents the state of the document prior to the first
+    // Revision.
+    //
+    // Calls cb(error) or cb(null, revision_id, content, path), where revision_id
+    // is "singularity" or a Revision UUID, content is the document content, and
+    // path is a data structure similar to the pointer that is used to create
+    // JOT operations at that path --- unlike pointer, it distinguishes Array and
+    // Object accesses.
+
     if (at_revision == "singularity") {
-      // This is a special flag that signals the state of the document
+      // This is a special value that signals the state of the document
       // prior to the first Revision. The document is always a null value
       // at that state.
       cb(null, at_revision, null, []);
@@ -148,24 +171,31 @@ exports.create_routes = function(app) {
     var content = null;
 
     // Find the most recent Revision with cached content, but no later
-    // than the base_revision.
+    // than at_revision (if at_revision is not null).
+    var id_filter = null;
+    if (at_revision)
+      id_filter = { "$lte": at_revision.id };
     models.Revision.findOne({
       where: {
         documentId: doc.id,
-        id: { "$lte": at_revision ? at_revision.id : 9007199254740991 }, // ugh TODO replace this
+        id: id_filter,
         has_cached_document: true
       },
       order: [["id", "DESC"]]
     })
     .then(function(peg_revision) {
-      // Load all subsequent revisions.
+      // Load all subsequent revisions. Add to the id filter to only get
+      // revisions after the peg revision. The peg_revision may be null
+      // if there are no revisions with cached content --- in which case
+      // we load all revisions from the beginning.
+      if (peg_revision) {
+        if (id_filter) id_filter = { };
+        id_filter["$gt"] = peg_revision.id;
+      }
       models.Revision.findAll({
         where: {
           documentId: doc.id,
-          id: {
-            "$gt": peg_revision ? peg_revision.id : 0,
-            "$lte": at_revision ? at_revision.id : 9007199254740991 // ugh TODO replace this
-          }
+          id: id_filter,
         },
         order: [["id", "ASC"]]
       })
@@ -200,9 +230,11 @@ exports.create_routes = function(app) {
         // json_ptr.get(content, pointer). But the PUT function needs
         // to know whether the pointer passes through arrays or objects
         // in order to create the correct JOT operations that represent
-        // the change.
+        // the change. So we have to step through each part and record
+        // whether we are passing through an Object or Array.
+        var op_path = null;
         if (pointer) {
-          var op_path = [ ];
+          op_path = [ ];
           for (let item of json_ptr.decodePointer(pointer)) {
             if (Array.isArray(content))
               // This item on the path is an array index. Turn the item
@@ -231,9 +263,14 @@ exports.create_routes = function(app) {
   app.get(document_content_route, function (req, res) {
     // Fetch (the content of) a document. If a JSON Pointer is given at the end
     // of the path, then only return that part of the document. A JSON document
-    // is returned. READ access is required.
+    // is returned. READ access is required. The Revision-Id header can be used
+    // to 
     authz_document_content(req, res, "READ", function(user, owner, doc) {
-      get_document_content(doc, req.params.pointer, null, function(err, revision_id, content) {
+      get_document_content(doc,
+        req.params.pointer,
+        req.headers['Revision-Id'],
+        function(err, revision_id, content) {
+
         if (err) {
           res.status(404).send(err);
           return;
@@ -263,8 +300,12 @@ exports.create_routes = function(app) {
           }
         }
 
+        // Send content - as JSON if JSON is the preferred accepted format.
         if (format == "json")
           res.json(content);
+
+        // Or as text, if text is the preferred accepted format. Coerce the
+        // data to a string.
         else if (format == "text")
           res.send(""+content);
         
@@ -272,7 +313,7 @@ exports.create_routes = function(app) {
     })
   })
 
-  function make_operation_from_new_content(pointer, old_content, new_content, cb) {
+  function make_operation_from_diff(pointer, old_content, new_content, cb) {
     // Compute the JOT operation to transform the old content to the new content.
     var op = jot.diff(old_content, new_content);
 
@@ -346,6 +387,42 @@ exports.create_routes = function(app) {
     };
   }
 
+  function load_revision_from_id(doc, revision_id, cb) {
+    // Gets a Revision instance from a revision UUID. If revision_id is
+    // "singularity", then "singularity" is passed to the callback. If
+    // revision_id is otherwise not valid, null is passed to the callback.
+
+    // If "singularity" is passed, pass it through as a specicial revision.
+    if (revision_id == "singularity")
+      cb("singularity")
+
+    // Find the named revision.
+    else if (revision_id)
+      models.Revision.findOne({
+        where: { documentId: doc.id, uuid: revision_id },
+      })
+      .then(function(revision) {
+        if (!revision)
+          cb(null);
+        else
+          cb(revision);
+      });
+
+    // Get the most recent revision. If there are no revisions yet,
+    // pass forward the spcial ID "singularity".
+    else
+      models.Revision.findOne({
+        where: { documentId: doc.id },
+        order: [["id", "DESC"]] // most recent
+      })
+      .then(function(revision) {
+        if (!revision)
+          cb("singularity");
+        else
+          cb(revision);
+      });
+  }
+
   app.put(
     document_content_route,
     [
@@ -366,6 +443,8 @@ exports.create_routes = function(app) {
     // be JSON or plain text, with an appropriate Content-Type header.
     // WRITE access is required.
 
+    // Validate/parse input.
+
     if (!req._body) {
       // _body is set when bodyparser parses a body. If it's not truthy, then
       // we did not get a valid content-type header.
@@ -373,7 +452,7 @@ exports.create_routes = function(app) {
       return;
     }
 
-    var userdata;
+    var userdata = null;
     if (req.headers['revision-userdata']) {
       try {
         userdata = JSON.parse(req.headers['revision-userdata']);
@@ -383,42 +462,16 @@ exports.create_routes = function(app) {
       }
     }
 
+    // Get the current content and revision of the document.
     authz_document_content(req, res, "WRITE", function(user, owner, doc) {
       // Find the base revision. If not specified, it's the current revision.
-      // If specified, we compute the changes from the base, then rebase them
-      // against subsequent changes, and then commit that.
-      function find_base_revision(cb) {
-        // If "singularity" is passed, pass it through as a specicial revision.
-        if (req.headers['base-revision-id'] == "singularity")
-          cb("singularity")
+      load_revision_from_id(doc, req.headers['base-revision-id'], function(base_revision) {
+        // Invalid ID.
+        if (!base_revision) {
+          res.status(400).send("Invalid base revision ID.")
+          return;
+        }
 
-        // Find the named revision.
-        else if (req.headers['base-revision-id'])
-          models.Revision.findOne({
-            where: { documentId: doc.id, uuid: req.headers['base-revision-id'] },
-          })
-          .then(function(base_revision) {
-            if (!base_revision)
-              res.status(400).send("Invalid base revision ID.");
-            else
-              cb(base_revision);
-          });
-
-        // Get the most recent revision. If there are no revisions yet,
-        // pass the spcial ID "singularity".
-        else
-          models.Revision.findOne({
-            where: { documentId: doc.id },
-            order: [["id", "DESC"]] // most recent
-          })
-          .then(function(base_revision) {
-            if (!base_revision)
-              cb("singularity");
-            else
-              cb(base_revision);
-          });
-      }
-      find_base_revision(function(base_revision) {
         // Get the content of the document as of the base revision.
         get_document_content(doc, req.params.pointer, base_revision, function(err, revision_id, content, op_path) {
           if (err) {
@@ -426,11 +479,14 @@ exports.create_routes = function(app) {
             return;
           }
 
-          make_operation_from_new_content(req.params.pointer, content, req.body, function(err, op) {
+          // Diff the base content and the content in the request body to generate a JOT
+          // operation.
+          make_operation_from_diff(req.params.pointer, content, req.body, function(err, op) {
             if (err)
               res.status(400).send(err);
             else if (!op)
               // The document wasn't changed - don't take any action.
+              // (There is a similar response if the result of the rebase is a no-op too.)
               res.status(200).send("no change");
             else
               // Make a new revision.
@@ -460,22 +516,37 @@ exports.create_routes = function(app) {
   })
 
   app.get(document_route + '/history', function (req, res) {
-    // Gets the history of a document. The response is a list of changes.
+    // Gets the history of a document. The response is a list of changes, in
+    // chronological order (oldest first). If ?since= is in the URL, then the
+    // revisions are only returned after that revision.
     authz_document(req, res, true, "READ", function(user, owner, doc) {
-      models.Revision.findAll({
-        where: {
-          documentId: doc.id
-          //id: { "$gt": ? }
-        },
-        order: [["id", "DESC"]]
-      })
-      .then(function(revs) {
-        res.json(revs.map(function(rev) {
-          rev.op = JSON.parse(rev.op);
-          rev.userdata = JSON.parse(rev.userdata);
-          return make_revision_response(rev);
-        }))
-      })
+      // Get the base revision.
+      load_revision_from_id(doc, req.query['since'], function(base_revision) {
+        // Invalid ID.
+        if (!base_revision) {
+          res.status(400).send("Invalid base revision ID.")
+          return;
+        }
+
+        // Fetch revisions.
+        var id_filter = null;
+        if (base_revision != "singularity")
+          id_filter = { "$gt": base_revision.id };
+        models.Revision.findAll({
+          where: {
+            documentId: doc.id,
+            id: id_filter
+          },
+          order: [["id", "ASC"]]
+        })
+        .then(function(revs) {
+          res.json(revs.map(function(rev) {
+            rev.op = JSON.parse(rev.op);
+            rev.userdata = JSON.parse(rev.userdata);
+            return make_revision_response(rev);
+          }))
+        })
+      });
     })
   })
 }
