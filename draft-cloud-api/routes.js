@@ -172,15 +172,14 @@ exports.create_routes = function(app) {
 
     // Find the most recent Revision with cached content, but no later
     // than at_revision (if at_revision is not null).
-    var id_filter = null;
+    var where = {
+      documentId: doc.id,
+      has_cached_document: true
+    };
     if (at_revision)
-      id_filter = { "$lte": at_revision.id };
+      where['id'] = { "$lte": at_revision.id };
     models.Revision.findOne({
-      where: {
-        documentId: doc.id,
-        id: id_filter,
-        has_cached_document: true
-      },
+      where: where,
       order: [["id", "DESC"]]
     })
     .then(function(peg_revision) {
@@ -188,15 +187,17 @@ exports.create_routes = function(app) {
       // revisions after the peg revision. The peg_revision may be null
       // if there are no revisions with cached content --- in which case
       // we load all revisions from the beginning.
-      if (peg_revision) {
-        if (id_filter) id_filter = { };
-        id_filter["$gt"] = peg_revision.id;
-      }
+      var where = {
+        documentId: doc.id,
+      };
+      if (at_revision || peg_revision)
+        where["id"] = { };
+      if (at_revision)
+        where['id']["$lte"] = at_revision.id;
+      if (peg_revision)
+        where['id']["$gt"] = peg_revision.id;
       models.Revision.findAll({
-        where: {
-          documentId: doc.id,
-          id: id_filter,
-        },
+        where: where,
         order: [["id", "ASC"]]
       })
       .then(function(revs) {
@@ -232,9 +233,8 @@ exports.create_routes = function(app) {
         // in order to create the correct JOT operations that represent
         // the change. So we have to step through each part and record
         // whether we are passing through an Object or Array.
-        var op_path = null;
+        var op_path = [ ];
         if (pointer) {
-          op_path = [ ];
           for (let item of json_ptr.decodePointer(pointer)) {
             if (Array.isArray(content))
               // This item on the path is an array index. Turn the item
