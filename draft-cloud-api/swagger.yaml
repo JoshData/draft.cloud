@@ -101,10 +101,10 @@ paths:
           description: The caller has permission to see the document but not delete it.
         404:
           description: Document does not exist or caller does not have permission to see the document.
-  /{owner}/{document}/content{pointer}:
+  /{owner}/{document}/content{path}:
     get:
       description: |
-        Gets `Document` content. If a pointer to a subpart of the document is given at the end of the URL, then only a part of the document is returned. The document is returned either as JSON or as UTF-8 encoded plain text, depending on the Accept header you send in the request.
+        Gets `Document` content. If a path to a subpart of the document is given at the end of the URL, then only a part of the document is returned. The document is returned either as JSON or as UTF-8 encoded plain text, depending on the Accept header you send in the request.
       parameters:
         - name: owner
           in: path
@@ -116,7 +116,7 @@ paths:
           description: The name of a `Document` owned by  `owner`.
           required: true
           type: string
-        - name: pointer
+        - name: path
           in: path
           description: A [JSON Pointer](https://tools.ietf.org/html/rfc6901), which looks like `/x/y/15`. 
           type: string
@@ -156,7 +156,8 @@ paths:
         (see the request Content-Type header parameter).
         If a [JSON Pointer](https://tools.ietf.org/html/rfc6901) to a subpart of the document is given at the end of the URL (see GET),
         then the content provided in this PUT request replaces the content at the location in the
-        document that the pointer points to.
+        document that the pointer points to and the operation in the revision in the response body is
+        relative to that part of the document.
         If a base revision is specified with the Base-Revision-Id header, then the changes made
         relative to the base revision will be merged with the changes made in any Revisions that
         were made after the base revision (probably by other users acting simultaneously).
@@ -230,13 +231,17 @@ paths:
           in: query
           description: An optional `Revision` UUID. If not specified, the full history of the document is returned. Otherwise only the changes made after the given revision are returned.
           type: string
+        - name: path
+          in: query
+          description: A [JSON Pointer](https://tools.ietf.org/html/rfc6901), which looks like `/x/y/15`, to a part of the document to get the history of, ignoring changes to other parts of the document. The path must exist in the document at the revision specified by `since`. If `since` is omitted (the full document history is returned), then `path` cannot be specified.
+          type: string
         - name: Authentication
           in: header
           type: string
           description: An API key that has READ access to the document. Optional if the document's anonymous access level is READ.
       responses:
         200:
-          description: Revision history is returned as JSON, in chronological order (oldest first).
+          description: Revision history is returned as JSON, in chronological order (oldest first). If the `path` parameter is specified, the revisions are relative to that location in the document.
           headers:
             Content-Type:
               description: Always `application/json`.

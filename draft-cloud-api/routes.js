@@ -162,7 +162,10 @@ exports.create_routes = function(app) {
       // This is a special value that signals the state of the document
       // prior to the first Revision. The document is always a null value
       // at that state.
-      cb(null, at_revision, null, []);
+      if (pointer)
+        cb('Document path ' + pointer + ' cannot exist before the document is started.');
+      else
+        cb(null, at_revision, null, []);
       return;
     }
 
@@ -233,31 +236,49 @@ exports.create_routes = function(app) {
         // in order to create the correct JOT operations that represent
         // the change. So we have to step through each part and record
         // whether we are passing through an Object or Array.
-        var op_path = [ ];
-        if (pointer) {
-          for (let item of json_ptr.decodePointer(pointer)) {
-            if (Array.isArray(content))
-              // This item on the path is an array index. Turn the item
-              // into a number.
-              op_path.push(parseInt(item));
-            else
-              // This item is an Object key, so we keep it as a string.
-              op_path.push(item)
-
-            // Use json-ptr to process just this part of the path. This way
-            // we get its error handling.
-            content = json_ptr.get(content, json_ptr.encodePointer([item]));
-            if (typeof content == "undefined") {
-              cb('Document path ' + pointer + ' not found.');
-              return;
-            }
-          }
-        }
+        var x = parse_json_pointer_path(pointer, content);
+        if (!x)
+          cb('Document path ' + pointer + ' not found.');
+        op_path = x[0];
+        content = x[1];
 
         // Callback.
         cb(null, revision_id, content, op_path);
       });
     });
+  }
+
+  function parse_json_pointer_path(pointer, content) {
+    // The path is a JSON Pointer which we parse with json-ptr.
+    // Unfortunately the path components are all strings, but
+    // we need to distinguish array index accessses from object
+    // property accesses. We'll distinguish by turning the pointer
+    // into an array of strings (for objects) and integers (for
+    // arrays). We can only know the difference by looking at
+    // an actual document. So we'll step through the path and
+    // see if we are passing through arrays or objects.
+
+    var op_path = [ ];
+    if (!pointer)
+      return [op_path, content];
+
+    for (let item of json_ptr.decodePointer(pointer)) {
+      if (Array.isArray(content))
+        // This item on the path is an array index. Turn the item
+        // into a number.
+        op_path.push(parseInt(item));
+      else
+        // This item is an Object key, so we keep it as a string.
+        op_path.push(item)
+
+      // Use json-ptr to process just this part of the path. This way
+      // we get its error handling.
+      content = json_ptr.get(content, json_ptr.encodePointer([item]));
+      if (typeof content == "undefined")
+        return null;
+    }
+
+    return [op_path, content];
   }
 
   app.get(document_content_route, function (req, res) {
@@ -371,16 +392,25 @@ exports.create_routes = function(app) {
         comment: comment,
         userdata: userdata
       }).then(function(rev) {
-        res.status(201).json(make_revision_response(rev));
+        res.status(201).json(make_revision_response(rev, op_path));
       });
     })
   }
 
-  function make_revision_response(rev) {
+  function drill_down_operation(op, op_path) {
+    // Drill down and unwrap the operation.
+    op = jot.opFromJsonableObject(op);
+    op_path.forEach(function(key) {
+      op = jot.UNAPPLY(op, key);
+    });
+    return op.toJsonableObject();
+  }
+
+  function make_revision_response(rev, op_path) {
     return {
       createdAt: rev.createdAt,
       uuid: rev.uuid,
-      op: rev.op,
+      op: drill_down_operation(rev.op, op_path),
       author: rev.userId,
       comment: rev.comment,
       userdata: rev.userdata
@@ -388,9 +418,12 @@ exports.create_routes = function(app) {
   }
 
   function load_revision_from_id(doc, revision_id, cb) {
-    // Gets a Revision instance from a revision UUID. If revision_id is
-    // "singularity", then "singularity" is passed to the callback. If
-    // revision_id is otherwise not valid, null is passed to the callback.
+    // Gets a Revision instance from a revision UUID. If revision_id is...
+    //   "singularity", then "singularity"
+    //   "", then the most recent revision
+    //   a revision id, then the revision object
+    //   not valid, then null
+    // ... is passed to the callback.
 
     // If "singularity" is passed, pass it through as a specicial revision.
     if (revision_id == "singularity")
@@ -520,31 +553,60 @@ exports.create_routes = function(app) {
     // chronological order (oldest first). If ?since= is in the URL, then the
     // revisions are only returned after that revision.
     authz_document(req, res, true, "READ", function(user, owner, doc) {
-      // Get the base revision.
-      load_revision_from_id(doc, req.query['since'], function(base_revision) {
+      // Get the base revision. If not specified, it's the start of
+      // the document history.
+      load_revision_from_id(doc, req.query['since'] || "singularity", function(base_revision) {
         // Invalid ID.
         if (!base_revision) {
           res.status(400).send("Invalid base revision ID.")
           return;
         }
 
-        // Fetch revisions.
-        var id_filter = null;
+        // Fetch revisions since the base revision.
+        var where = {
+          documentId: doc.id,
+        };
         if (base_revision != "singularity")
-          id_filter = { "$gt": base_revision.id };
+          where['id'] = { "$gt": base_revision.id };
         models.Revision.findAll({
-          where: {
-            documentId: doc.id,
-            id: id_filter
-          },
+          where: where,
           order: [["id", "ASC"]]
         })
         .then(function(revs) {
-          res.json(revs.map(function(rev) {
-            rev.op = JSON.parse(rev.op);
-            rev.userdata = JSON.parse(rev.userdata);
-            return make_revision_response(rev);
-          }))
+          // Parse the "pointer" parameter, which is a JSON Pointer to the
+          // part of the document that the caller wants the history for.
+          // The only way to get a path we can process is to get the
+          // actual document content at a revision.
+          var get_op_path = function(cb) { cb([]); }
+          if (revs.length > 0 && req.query['path']) {
+            get_op_path = function(cb) {
+              get_document_content(doc, req.query['path'], base_revision, function(err, revision_id, content, op_path) {
+                if (err) {
+                  res.status(400).send(err)
+                  return;
+                }
+                cb(op_path);
+              });
+            }
+          }
+
+          get_op_path(function(op_path) {
+            // Decode JSON and re-map to the API output format.
+            revs = revs.map(function(rev) {
+              rev.op = JSON.parse(rev.op);
+              rev.userdata = JSON.parse(rev.userdata);
+              return make_revision_response(rev, op_path);
+            });
+
+            // Filter out no-op revisions, which are operations
+            // that only applied to parts of the document outside
+            // of the specified path.
+            revs = revs.filter(function(rev) {
+              return rev.op._type.class != "NO_OP";
+            })
+
+            res.json(revs);
+          })
         })
       });
     })
