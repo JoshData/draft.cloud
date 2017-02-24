@@ -236,7 +236,7 @@ exports.create_routes = function(app) {
         // in order to create the correct JOT operations that represent
         // the change. So we have to step through each part and record
         // whether we are passing through an Object or Array.
-        var x = parse_json_pointer_path(pointer, content);
+        var x = parse_json_pointer_path_with_content(pointer, content);
         if (!x)
           cb('Document path ' + pointer + ' not found.');
         op_path = x[0];
@@ -248,7 +248,7 @@ exports.create_routes = function(app) {
     });
   }
 
-  function parse_json_pointer_path(pointer, content) {
+  function parse_json_pointer_path_with_content(pointer, content) {
     // The path is a JSON Pointer which we parse with json-ptr.
     // Unfortunately the path components are all strings, but
     // we need to distinguish array index accessses from object
@@ -279,6 +279,23 @@ exports.create_routes = function(app) {
     }
 
     return [op_path, content];
+  }
+
+  function parse_json_pointer_path(doc, pointer, base_revision, cb) {
+    // Parse the "pointer", which is a JSON Pointer to a part of a
+    // document. The only way to get a path we can process is to get
+    // actual document content at a revision and see if the components
+    // of the path are through arrays or objects.
+    if (!pointer) {
+      // If there is no pointer path, just provide an empty op path.
+      cb(null, [])
+      return;
+    }
+
+    // Parse the path via get_document_content.
+    get_document_content(doc, pointer, base_revision, function(err, revision_id, content, op_path) {
+      cb(err, op_path);
+    });
   }
 
   app.get(document_content_route, function (req, res) {
@@ -485,6 +502,7 @@ exports.create_routes = function(app) {
       return;
     }
 
+    // parse the userdata, same as in the PATCH route
     var userdata = null;
     if (req.headers['revision-userdata']) {
       try {
@@ -539,14 +557,74 @@ exports.create_routes = function(app) {
     })
   })
 
-  app.patch(document_content_route, function (req, res) {
-    // Apply changes to a document. The changes are given as JSON-serialized JOT
-    // operations. If a JSON Pointer is given at the end of the path, the operations
-    // are relative to that location in the document. WRITE access is required.
-    authz_document_content(req, res, "WRITE", function(user, owner, doc) {
-      res.send('apply patch ' + JSON.stringify(req.params))
-    })
-  })
+  app.patch(
+    document_content_route,
+    [
+      // parse application/json bodies
+      bodyParser.json({
+        limit: "10MB", // maximum payload size
+        strict: true // allow only JSON objects
+      }),
+    ],
+    function (req, res) {
+      // Apply changes to a document. The changes are given as JSON-serialized JOT
+      // operations. If a JSON Pointer is given at the end of the path, the operations
+      // are relative to that location in the document. WRITE access is required.
+
+      // Parse the operation.
+      var op;
+      try {
+        op = jot.opFromJsonableObject(req.body);
+      } catch (err) {
+        res.status(400).send(err)
+      }
+
+      // parse the userdata, same as in the PUT route
+      var userdata = null;
+      if (req.headers['revision-userdata']) {
+        try {
+          userdata = JSON.parse(req.headers['revision-userdata']);
+        } catch(e) {
+          res.status(400).send("Invalid userdata: " + e);
+          return;
+        }
+      }
+
+      // check authz
+      authz_document_content(req, res, "WRITE", function(user, owner, doc) {
+        // Find the base revision. If not specified, it's the current revision.
+        load_revision_from_id(doc, req.headers['base-revision-id'], function(base_revision) {
+          // Invalid base revision ID.
+          if (!base_revision) {
+            res.status(400).send("Invalid base revision ID.")
+            return;
+          }
+
+          // Parse the JSON Pointer path. If there's a path, the operation
+          // applies to the value at that path only. The pointer must exist
+          // at the base revision.
+          parse_json_pointer_path(doc, req.params.pointer, base_revision, function(err, op_path) {
+            // Error parsng path.
+            if (err) {
+              res.status(400).send(err)
+              return;
+            }
+
+            // Make a new revision.
+            make_revision(
+              user,
+              doc,
+              base_revision,
+              op,
+              op_path,
+              req.headers['revision-comment'],
+              userdata,
+              res);
+          });
+        });
+      })
+    }
+  )
 
   app.get(document_route + '/history', function (req, res) {
     // Gets the history of a document. The response is a list of changes, in
@@ -577,20 +655,24 @@ exports.create_routes = function(app) {
           // part of the document that the caller wants the history for.
           // The only way to get a path we can process is to get the
           // actual document content at a revision.
-          var get_op_path = function(cb) { cb([]); }
-          if (revs.length > 0 && req.query['path']) {
-            get_op_path = function(cb) {
-              get_document_content(doc, req.query['path'], base_revision, function(err, revision_id, content, op_path) {
-                if (err) {
-                  res.status(400).send(err)
-                  return;
-                }
-                cb(op_path);
-              });
-            }
-          }
+          parse_json_pointer_path(
+            doc,
 
-          get_op_path(function(op_path) {
+            // no need to actually parse a path if there are no revisions
+            // to return - parsing a path is expensive
+            revs.length > 0 ? req.query['path'] : null,
+
+            // revision at a point the path exists
+            base_revision,
+
+            function(err, op_path) {
+
+            // Error parsng path.
+            if (err) {
+              res.status(400).send(err)
+              return;
+            }
+
             // Decode JSON and re-map to the API output format.
             revs = revs.map(function(rev) {
               rev.op = JSON.parse(rev.op);
