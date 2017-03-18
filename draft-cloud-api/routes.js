@@ -1,5 +1,5 @@
 var bodyParser = require('body-parser')
-const uuid = require('uuid');
+var randomstring = require("randomstring");
 var json_ptr = require('json-ptr');
 
 var auth = require("./auth.js");
@@ -120,7 +120,10 @@ exports.create_routes = function(app) {
 
     // Check authorization to create the document.
     authz_document(req, res, false, "ADMIN", function(user, owner, doc) {
-      req.body.name = uuid.v4();
+      req.body.name = randomstring.generate({
+        length: 48,
+        charset: 'alphanumeric'
+      });
       create_document(owner, req.body, function(doc) {
         res.redirect(document_route
           .replace(/:owner/, encodeURIComponent(owner.name))
