@@ -279,7 +279,7 @@ exports.create_routes = function(app) {
 
         // Apply all later revisions' operations (if any).
         for (var i = 0; i < revs.length; i++) {
-          var op = jot.opFromJsonableObject(JSON.parse(revs[i].op));
+          var op = jot.opFromJSON(JSON.parse(revs[i].op));
           content = op.apply(content);
           revision_id = revs[i].uuid;
         }
@@ -454,7 +454,7 @@ exports.create_routes = function(app) {
     }).then(function(revs) {
       // Load the JOT operations as a LIST.
       var base_ops = jot.LIST(revs.map(function(rev) {
-        return jot.opFromJsonableObject(JSON.parse(rev.op));
+        return jot.opFromJSON(JSON.parse(rev.op));
       })).simplify();
 
       // Rebase.
@@ -472,7 +472,7 @@ exports.create_routes = function(app) {
       models.Revision.create({
         userId: user.id,
         documentId: doc.id,
-        op: op.toJsonableObject(),
+        op: op.toJSON(),
         comment: comment,
         userdata: userdata
       }).then(function(rev) {
@@ -483,11 +483,11 @@ exports.create_routes = function(app) {
 
   function drill_down_operation(op, op_path) {
     // Drill down and unwrap the operation.
-    op = jot.opFromJsonableObject(op);
+    op = jot.opFromJSON(op);
     op_path.forEach(function(key) {
       op = jot.UNAPPLY(op, key);
     });
-    return op.toJsonableObject();
+    return op.toJSON();
   }
 
   function make_revision_response(rev, op_path) {
@@ -641,7 +641,7 @@ exports.create_routes = function(app) {
       // Parse the operation.
       var op;
       try {
-        op = jot.opFromJsonableObject(req.body);
+        op = jot.opFromJSON(req.body);
       } catch (err) {
         res.status(400).send(err)
       }
