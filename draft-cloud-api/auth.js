@@ -57,6 +57,51 @@ function validate_api_key(req, cb) {
     models.UserApiKey.validateApiKey(req.headers['authorization'], cb);
 }
 
+exports.get_user_authz = function(req, user_name, cb) {
+  // Gets the access level of the user to a user account.
+  //
+  // cb(requestor, target, level), where requestor is the User that is
+  // making the request, target is the User whose resources are
+  // being requested, and level is the access level the requestor has
+  // on target.
+
+  // Get the user that owns the document.
+  get_user(user_name, function(target) {
+    if (!target) {
+      // the target does not exist, so nothing is possible
+      cb();
+      return;
+    }
+
+    // Get the user making the request.
+    validate_api_key(req, function(requestor, requestor_api_key) {
+      // Compute the access level in order of precedence.
+      var level;
+
+      // A User is an ADMIN to their own account.
+      if (requestor && requestor.id == target.id)
+        level = "ADMIN";
+
+      else
+        level = "NONE";
+
+      // The API key may specify a lower access level either for particular
+      // resources or for all resources.
+      if (requestor_api_key) {
+        if (typeof requestor_api_key.resource_acess_levels[target.uuid] != "undefined")
+          // Limit to the access level for this particular resource.
+          level = exports.min_access(level, requestor_api_key.resource_acess_levels[target.uuid]);
+        else
+          // Limit to the access level given in the key for all resources.
+          level = exports.min_access(level, requestor_api_key.access_level);
+      }
+
+      cb(requestor, target, level);
+    });
+
+  });
+}
+
 exports.get_document_authz = function(req, owner_name, document_name, cb) {
   // Gets the access level of the user making a request to a document.
   //

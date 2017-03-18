@@ -8,7 +8,7 @@ var db;
 var valid_name_regex = /^[A-Za-z0-9_-]{5,64}$/;
 var valid_name_text = "Names may only contain the characters A-Z, a-z, 0-9, underscore, and hyphen and must be between 5 and 64 characters inclusive.";
 
-exports.initialize_database = function(connection_uri) {
+exports.initialize_database = function(connection_uri, ready) {
   db = new Sequelize(connection_uri);
 
   // CREATE MODELS
@@ -47,7 +47,7 @@ exports.initialize_database = function(connection_uri) {
     });
 
   // API KEYs.
-  exports.UserApiKey = db.define('owner_api_key',
+  exports.UserApiKey = db.define('user_api_key',
     {
       // A UUID to identify the API key. It is for identification only
       // and is not secret.
@@ -84,12 +84,12 @@ exports.initialize_database = function(connection_uri) {
       indexes: [
         {
           unique: true,
-          fields: ['key_hash']
+          fields: ['uuid']
         },
       ],
       freezeTableName: true, // Model tableName will be the same as the model name
       classMethods: {
-        createApiKey: function(user, cb) {
+        createApiKey: function(user, password_hash_work, cb) {
           // Create a new API key. The callback is called with the UserApiKey
           // instance and the API key itself as arguments. We forget the API
           // key immediately and only store a hash. The caller should increase
@@ -101,7 +101,8 @@ exports.initialize_database = function(connection_uri) {
             var key = buffer.toString('base64');
 
             // Hash it...
-            credential().hash(key, function(err, key_hash) {
+            credential({ work: password_hash_work || 1 })
+            .hash(key, function(err, key_hash) {
               if (err) { throw err; }
 
               // Store the hash in the database...
@@ -134,7 +135,7 @@ exports.initialize_database = function(connection_uri) {
           // User and UserApiKey object instances, or with undefineds
           // if the key did not validate.
 
-          // Split on a colon, verify schema version at the end.
+          // Split on a dot, verify schema version at the end.
           key_parts = api_key.split(/\./);
           if (key_parts.length != 3 || key_parts[2] != "0") {
             cb();
@@ -301,25 +302,6 @@ exports.initialize_database = function(connection_uri) {
   exports.Revision.belongsTo(exports.Document);
 
   // Synchronize models to database tables.
-  db.sync().then(function() {
-    // On first use create a user and dump its API key.
-    exports.User.count().then(function(count) {
-      if (count == 0) {
-        exports.User.create({
-          name: 'josh'
-        }).then(function(user) {
-          exports.UserApiKey.createApiKey(user, function(obj, api_key) {
-            // Give the key ADMIN access to the user's account.
-            obj.set("access_level", "ADMIN");
-            obj.save();
-            exports.UserApiKey.validateApiKey(api_key, function(user, key) {
-              console.log(user.name + " your key is " + api_key)
-            })
-          });
-        });
-      }
-    });
-
-  });
+  db.sync().then(ready);
 
 }

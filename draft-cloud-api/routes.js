@@ -16,9 +16,74 @@ exports.create_routes = function(app) {
   var api_public_base_url = "https://draft.cloud";
   var api_path_root = "/api/v1";
 
-  var document_route = api_path_root + '/documents/:owner/:document';
+  // USER CREATION
+
+  var user_route = api_path_root + '/users/:user';
+
+  app.post(api_path_root + '/users', function (req, res) {
+    // Create a new User with an initial, strong API key. Return a
+    // redirect to the User's API url but include the API key in a
+    // response header.
+    models.User.create({
+      name: randomstring.generate({
+        length: 48,
+        charset: 'alphanumeric'
+      })
+    }).then(function(user) {
+      models.UserApiKey.createApiKey(user, 1, function(obj, api_key) {
+        // Give the key ADMIN access to the User's own account.
+        obj.set("access_level", "ADMIN");
+        obj.save();
+
+        res.header("X-Api-Key", api_key);
+        res.redirect(user_route
+          .replace(/:user/, encodeURIComponent(user.name)));
+      });
+    });
+  });
+
+  function authz_user(req, res, min_level, cb) {
+    // Checks authorization for user URLs. The callback is called
+    // as: cb(requestor, target) where requestor is the User making the
+    // request and target is User about which the request is being made.
+    if (!(min_level == "READ" || min_level == "WRITE" || min_level == "ADMIN")) throw "invalid argument";
+    auth.get_user_authz(req, req.params.user, function(requestor, target, level) {
+      // Check permission level.
+      if (auth.min_access(min_level, level) != min_level) {
+        // The user's access level is lower than the minimum access level required.
+        if (auth.min_access("READ", level) == "READ")
+          // The user has READ access but a higher level was required.
+          res.status(403).send('You do not have ' +  min_level + ' permission for this user. You have ' + level + '.');
+        else
+          // The user does not have READ access, so we do not reveal whether or not
+          // a document exists here.
+          res.status(404).send('User not found or you do not have permission to see it.');
+        return;
+      }
+
+      // All good.
+      cb(requestor, target);
+    });
+  }
+
+  app.get(user_route, function (req, res) {
+    // Gets information about the user. The requesting user must have READ
+    // permission on the user.
+    authz_user(req, res, "READ", function(requestor, target) {
+      res
+      .status(200)
+      .json({
+        id: target.uuid,
+        name: target.name,
+        profile: target.profile,
+        created: target.createdAt,
+      });
+    });
+  });  
 
   // DOCUMENT CREATION/DELETION
+
+  var document_route = api_path_root + '/documents/:owner/:document';
 
   function authz_document(req, res, must_exist, min_level, cb) {
     // Checks authorization for document URLs. The callback is called
@@ -66,11 +131,11 @@ exports.create_routes = function(app) {
 
   function make_document_json(owner, doc) {
     return {
-      uuid: doc.uuid,
+      id: doc.uuid,
       name: doc.name,
       anon_access_level: doc.anon_access_level,
       owner: {
-        uuid: owner.uuid,
+        id: owner.uuid,
         name: owner.name
       },
       userdata: doc.userdata,
@@ -496,7 +561,7 @@ exports.create_routes = function(app) {
   function make_revision_response(rev, op_path) {
     return {
       createdAt: rev.createdAt,
-      uuid: rev.uuid,
+      id: rev.uuid,
       op: drill_down_operation(rev.op, op_path),
       author: rev.userId,
       comment: rev.comment,
