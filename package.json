@@ -29,6 +29,5 @@
     "url": "https://github.com/joshdata/draft.cloud/issues"
   },
   "homepage": "https://github.com/joshdata/draft.cloud#readme",
-  "main": "index.js",
-  "license": "GPL-3.0"
+  "main": "index.js"
 }
