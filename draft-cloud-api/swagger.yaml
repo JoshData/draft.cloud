@@ -8,7 +8,61 @@ info:
   title: Draft.Cloud API
 
 paths:
-  /{owner}/{document}:
+  /documents/{owner}:
+    get:
+      description: |
+        Gets all `Document`s owned by a user (that the requestor has permission to see).
+      parameters:
+        - name: owner
+          in: path
+          description: The name of a `User` who owns the document.
+          required: true
+          type: string
+        - name: Authentication
+          in: header
+          type: string
+          description: An API key that has READ access to the document. Optional if the document's anonymous access level is READ.
+      responses:
+        200:
+          description: The documents are returned as a JSON array.
+          headers:
+            Content-Type:
+              description: Always `application/json`.
+              type: string
+        404:
+          description: User does not exist or caller does not have permission to see the user.
+    post:
+      description: |
+        Creates a `Document` with a unique name. A successful response is a 302 response with a Location header
+        that has a URL pointing to the new document.
+      parameters:
+        - name: owner
+          in: path
+          description: The name of a `User` who owns the document.
+          required: true
+          type: string
+        - name: Content-Type
+          in: header
+          type: string
+          description: Must be `application/json`.
+        - name: Authentication
+          in: header
+          type: string
+          description: An API key that has ADMIN access to the document, or for a new document and API key for the owner of the new document.
+          required: true
+      responses:
+        302:
+          description: A new document was created. The response has no body but has a Location header pointing to the API URL for the document,
+           from which the document's name and other metadata can be retrieved.
+          headers:
+            Location:
+              description: The API GET URL for the newly created document.
+              type: string
+        403:
+          description: The caller has permission to see the owner but not create documents.
+        404:
+          description: Owner does not exist or caller does not have permission to see it.
+  /documents/{owner}/{document}:
     get:
       description: |
         Gets `Document` metadata.
@@ -38,7 +92,7 @@ paths:
             title: Document
             type: object
         404:
-          description: Document does not exist or caller does not have permission to see the document.
+          description: The owner or document does not exist or caller does not have permission to see the owner or document.
     put:
       description: |
         Creates a `Document` or updates an existing `Document`'s metadata. The response is as in GET.
@@ -101,7 +155,7 @@ paths:
           description: The caller has permission to see the document but not delete it.
         404:
           description: Document does not exist or caller does not have permission to see the document.
-  /{owner}/{document}/content{path}:
+  /documents/{owner}/{document}/content{path}:
     get:
       description: |
         Gets `Document` content. If a path to a subpart of the document is given at the end of the URL, then only a part of the document is returned. The document is returned either as JSON or as UTF-8 encoded plain text, depending on the Accept header you send in the request.
@@ -281,7 +335,7 @@ paths:
           description: Document does not exist or caller does not have permission to see the document
         409:
           description: The document was modified after the base revision and a rebase of the operation was not possible.
-  /{owner}/{document}/history:
+  /documents/{owner}/{document}/history:
     get:
       description: |
         Gets the revision history of a `Document`, which is an array of `Revision` objects.

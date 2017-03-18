@@ -1,8 +1,8 @@
 var models = require("./models.js");
 
-var ACCESS_LEVELS = ["", "READ", "WRITE", "ADMIN"];
+var ACCESS_LEVELS = ["NONE", "READ", "WRITE", "ADMIN"];
 
-exports.DEFAULT_NEW_DOCUMENT_ANON_ACCESS_LEVEL = ""; // i.e. no access
+exports.DEFAULT_NEW_DOCUMENT_ANON_ACCESS_LEVEL = "NONE"; // i.e. no access
 
 exports.is_access_level = function(level) {
   return typeof level == "string" && ACCESS_LEVELS.indexOf(level) >= 0;
@@ -29,9 +29,14 @@ function get_user(user_name, cb) {
 
 function get_document(owner, document_name, cb) {
   // Gets a document given its owner (a User) and a document name.
+  if (!document_name) {
+    cb(null);
+    return;
+  }
   models.Document.findOne({
     where: {
-      userId: owner.id
+      userId: owner.id,
+      name: document_name
     },
     paranoid: true // only return non-deleted rows
   })
@@ -54,7 +59,6 @@ function validate_api_key(req, cb) {
 
 exports.get_document_authz = function(req, owner_name, document_name, cb) {
   // Gets the access level of the user making a request to a document.
-  // Access levels are "" (no access), READ, WRITE, and ADMIN.
   //
   // cb(user, owner, document, level), where user is the User that is
   // making the request, owner is the User whose resources are
@@ -103,7 +107,7 @@ exports.get_document_authz = function(req, owner_name, document_name, cb) {
         
         } else {
           // Default to no level.
-          level = "";
+          level = "NONE";
 
         }
 

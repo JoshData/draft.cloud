@@ -1,5 +1,5 @@
 var bodyParser = require('body-parser')
-
+const uuid = require('uuid');
 var json_ptr = require('json-ptr');
 
 var auth = require("./auth.js");
@@ -13,7 +13,10 @@ exports.create_routes = function(app) {
   // Set defaults for JSON responses.
   app.set("json spaces", 2);
 
-  var document_route = '/api/v1/:owner/:document';
+  var api_public_base_url = "https://draft.cloud";
+  var api_path_root = "/api/v1";
+
+  var document_route = api_path_root + '/documents/:owner/:document';
 
   // DOCUMENT CREATION/DELETION
 
@@ -51,11 +54,18 @@ exports.create_routes = function(app) {
     });
   }
 
-  function make_document_response(status_code, res, owner, doc) {
-    // Form an HTTP response for a document.
-    res
-    .status(status_code)
-    .json({
+  function create_document(owner, doc, cb) {
+    // Create a new document.
+    models.Document.create({
+      userId: owner.id,
+      name: doc.name,
+      anon_access_level: doc.anon_access_level || auth.DEFAULT_NEW_DOCUMENT_ANON_ACCESS_LEVEL,
+      userdata: doc.userdata || {}
+    }).then(cb);
+  }
+
+  function make_document_json(owner, doc) {
+    return {
       uuid: doc.uuid,
       name: doc.name,
       anon_access_level: doc.anon_access_level,
@@ -63,9 +73,61 @@ exports.create_routes = function(app) {
         uuid: owner.uuid,
         name: owner.name
       },
-      userdata: doc.userdata
-    })
+      userdata: doc.userdata,
+      "api_url": api_public_base_url
+        + document_route.replace(/:owner/, encodeURIComponent(owner.name))
+          .replace(/:document/, encodeURIComponent(doc.name))
+    };
   }
+
+  app.get(api_path_root + '/documents/:owner', function (req, res) {
+    // Get all documents owned by the owner.
+    //
+    // Check that the caller has a default READ permission on
+    // documents owned by this owner. That should mean that the caller
+    // must be the owner.
+    authz_document(req, res, false, "READ", function(user, owner, doc) {
+      var docs = models.Document.findAll({
+        where: {
+          userId: owner.id
+        },
+        paranoid: true // only return non-deleted rows
+      })
+      .then(function(docs) {
+        // Turn the documents into API JSON.
+        docs = docs.map(function(item) { return make_document_json(owner, item); });
+
+        // Emit response.
+        res
+        .status(200)
+        .json(docs);
+      });
+    })
+  });
+
+  app.post(api_path_root + '/documents/:owner', bodyParser.json(), function (req, res) {
+    // Create a document. A document name may not be specified in the request body ---
+    // a unique, random, unguessable name is assigned.
+    //
+    // See https://github.com/expressjs/body-parser#bodyparserjsonoptions for
+    // default restrictions on the request body payload.
+    //
+    // Requires ADMIN permission on the hypothetical document.
+    // Validate/sanitize input.
+    req.body = models.Document.clean_document_dict(req.body);
+    if (typeof req.body == "string")
+      return res.status(400).send(req.body);
+
+    // Check authorization to create the document.
+    authz_document(req, res, false, "ADMIN", function(user, owner, doc) {
+      req.body.name = uuid.v4();
+      create_document(owner, req.body, function(doc) {
+        res.redirect(document_route
+          .replace(/:owner/, encodeURIComponent(owner.name))
+          .replace(/:document/, encodeURIComponent(doc.name)));
+      });
+    })
+  });
 
   app.put(document_route, bodyParser.json(), function (req, res) {
     // Create a document or update its metadata.
@@ -78,30 +140,33 @@ exports.create_routes = function(app) {
     // user as the intended owner.)
 
     // Validate/sanitize input.
-    if (!req.body) return res.sendStatus(400);
-    if (!req.body.anon_access_level) req.body.anon_access_level = "";
-    if (!auth.is_access_level(req.body.anon_access_level)) return res.sendStatus(400);
-    if (req.body.anon_access_level == "ADMIN") return res.sendStatus(400); // can't make a document world-adminable
-    if (!req.body.userdata) req.body.userdata = { }; // change null to empty object
+    req.body = models.Document.clean_document_dict(req.body);
+    if (typeof req.body == "string")
+      return res.status(400).send(req.body);
 
+    // Check authorization to create/update the document.
     authz_document(req, res, false, "ADMIN", function(user, owner, doc) {
       if (!doc) {
-        // Create a new document.
-        models.Document.create({
-          userId: owner.id,
-          name: req.params.document,
-          anon_access_level: req.body.anon_access_level,
-          userdata: req.body.userdata
-        }).then(function(doc) {
-          make_document_response(201, res, owner, doc);
-        });
+        // Create a document.
+        req.body.name = req.params.document;
+        create_document(owner, req.body, finish_request);
       } else {
-        // Document exists. Update its metadata.
-        doc.set("anon_access_level", req.body.anon_access_level);
-        doc.set("userdata", req.body.userdata);
+        // Document exists. Update its metadata from any keys provided.
+        if (typeof req.body.name != "undefined")
+          doc.set("name", req.body.name);
+        if (typeof req.body.anon_access_level != "undefined")
+          doc.set("anon_access_level", req.body.anon_access_level);
+        if (typeof req.body.userdata != "undefined")
+          doc.set("userdata", req.body.userdata);
         doc.save().then(function() {
-          make_document_response(200, res, owner, doc);
+          finish_request(doc);
         })
+      }
+
+      function finish_request(doc) {
+        res
+        .status(200)
+        .json(make_document_json(owner, doc));
       }
     })
   })
@@ -111,7 +176,9 @@ exports.create_routes = function(app) {
     //
     // Requires READ permission on the document (and the document must exist).
     authz_document(req, res, true, "READ", function(user, owner, doc) {
-      make_document_response(200, res, owner, doc);
+      res
+      .status(200)
+      .json(make_document_json(owner, doc));
     })
   })
 

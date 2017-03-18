@@ -1,7 +1,12 @@
 const Sequelize = require('sequelize');
 const credential = require('credential');
 
+const auth = require('./auth.js');
+
 var db;
+
+var valid_name_regex = /^[A-Za-z0-9_-]{5,64}$/;
+var valid_name_text = "Names may only contain the characters A-Z, a-z, 0-9, underscore, and hyphen and must be between 5 and 64 characters inclusive.";
 
 exports.initialize_database = function(connection_uri) {
   db = new Sequelize(connection_uri);
@@ -102,7 +107,7 @@ exports.initialize_database = function(connection_uri) {
               // Store the hash in the database...
               exports.UserApiKey.create({
                 userId: user.id,
-                access_level: "",
+                access_level: "NONE",
                 resource_acess_levels: { },
                 key_hash: key_hash
               }).then(function(obj) {
@@ -221,6 +226,38 @@ exports.initialize_database = function(connection_uri) {
       freezeTableName: true // Model tableName will be the same as the model name
     });
   exports.Document.belongsTo(exports.User);
+
+  exports.Document.clean_document_dict = function(doc) {
+    // Validate that user-supplied fields are valid.
+
+    // Did we get an object?
+    if (!doc || typeof doc != "object")
+      return "Must supply a document object.";
+
+    // Name must be at least a subset of what express routes will
+    // recognize as a parameter.
+    if (typeof doc.name != "undefined") {
+      if (typeof doc.name != "string" || !valid_name_regex.test(doc.name))
+        return "Invalid document name. " + valid_name_text;
+    }
+
+    // Acess level must be valid.
+    if (typeof doc.anon_access_level != "undefined") {
+      if (!auth.is_access_level(doc.anon_access_level))
+        return "Invalid access level.";
+
+      // Document cannot be world-ADMINable.
+      if (doc.anon_access_level == "ADMIN")
+        return "Invalid document access level.";
+    }
+
+    // Userdata, if specified, must be an object.
+    if ((typeof doc.userdata != "undefined" && typeof doc.userdata != "object") || doc.userdata === null)
+      return "Invalid document userdata."
+
+    // Return cleaned object.
+    return doc;
+  }
 
   // REVISIONs.
   exports.Revision = db.define('revision',
