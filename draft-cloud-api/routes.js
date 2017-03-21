@@ -1,3 +1,4 @@
+var fs = require('fs')
 var bodyParser = require('body-parser')
 var randomstring = require("randomstring");
 var json_ptr = require('json-ptr');
@@ -30,7 +31,7 @@ exports.create_routes = function(app) {
         charset: 'alphanumeric'
       })
     }).then(function(user) {
-      models.UserApiKey.createApiKey(user, 1, function(obj, api_key) {
+      models.UserApiKey.createApiKey(user, .001, function(obj, api_key) {
         // Give the key ADMIN access to the User's own account.
         obj.set("access_level", "ADMIN");
         obj.save();
@@ -115,7 +116,7 @@ exports.create_routes = function(app) {
       }
 
       // All good.
-      cb(user, owner, doc);
+      cb(user, owner, doc, level);
     });
   }
 
@@ -129,7 +130,7 @@ exports.create_routes = function(app) {
     }).then(cb);
   }
 
-  function make_document_json(owner, doc) {
+  exports.make_document_json = function(owner, doc) {
     return {
       id: doc.uuid,
       name: doc.name,
@@ -160,7 +161,7 @@ exports.create_routes = function(app) {
       })
       .then(function(docs) {
         // Turn the documents into API JSON.
-        docs = docs.map(function(item) { return make_document_json(owner, item); });
+        docs = docs.map(function(item) { return exports.make_document_json(owner, item); });
 
         // Emit response.
         res
@@ -234,7 +235,7 @@ exports.create_routes = function(app) {
       function finish_request(doc) {
         res
         .status(200)
-        .json(make_document_json(owner, doc));
+        .json(exports.make_document_json(owner, doc));
       }
     })
   })
@@ -246,7 +247,7 @@ exports.create_routes = function(app) {
     authz_document(req, res, true, "READ", function(user, owner, doc) {
       res
       .status(200)
-      .json(make_document_json(owner, doc));
+      .json(exports.make_document_json(owner, doc));
     })
   })
 
@@ -270,14 +271,14 @@ exports.create_routes = function(app) {
 
   function authz_document_content(req, res, min_level, cb) {
     // Checks authorization for document content URLs.
-    authz_document(req, res, true, min_level, function(user, owner, doc) {
-      cb(user, owner, doc);
+    authz_document(req, res, true, min_level, function(user, owner, doc, access_level) {
+      cb(user, owner, doc, access_level);
     })
   }
 
   var document_content_route = document_route + '/content:pointer(/[\\w\\W]*)?';
 
-  function get_document_content(doc, pointer, at_revision, cb) {
+  exports.get_document_content = function(doc, pointer, at_revision, cb) {
     // Get the content of a document (or part of a document) at a particular revision.
     //
     // pointer is null or a string containing a JSON Pointer indicating the part of
@@ -428,7 +429,7 @@ exports.create_routes = function(app) {
     }
 
     // Parse the path via get_document_content.
-    get_document_content(doc, pointer, base_revision, function(err, revision_id, content, op_path) {
+    exports.get_document_content(doc, pointer, base_revision, function(err, revision_id, content, op_path) {
       cb(err, op_path);
     });
   }
@@ -438,8 +439,8 @@ exports.create_routes = function(app) {
     // of the path, then only return that part of the document. A JSON document
     // is returned. READ access is required. The Revision-Id header can be used
     // to 
-    authz_document_content(req, res, "READ", function(user, owner, doc) {
-      get_document_content(doc,
+    authz_document_content(req, res, "READ", function(user, owner, doc, access_level) {
+      exports.get_document_content(doc,
         req.params.pointer,
         req.headers['Revision-Id'],
         function(err, revision_id, content) {
@@ -452,6 +453,7 @@ exports.create_routes = function(app) {
         // Send a header with the ID of the revision that this content came from,
         // so that if the user submits new content we know what the base revision was.
         res.header("Revision-Id", revision_id)
+        res.header("Access-Level", access_level)
 
         // What content type should be used for the response? Get the preferred
         // content type from the Accept: header, of the content types that we recognize.
@@ -500,7 +502,7 @@ exports.create_routes = function(app) {
     cb(null, op);
   }
 
-  function make_revision(user, doc, base_revision, op, op_path, comment, userdata, res) {
+  exports.make_revision = function(user, doc, base_revision, op, op_path, comment, userdata, res) {
     // If this operation occurred at a sub-path on the document, then wrap the
     // operation within APPLY operations to get down to that path. op_path has been
     // constructed so that the elements are either numbers or strings, and jot.APPLY
@@ -544,7 +546,8 @@ exports.create_routes = function(app) {
         comment: comment,
         userdata: userdata
       }).then(function(rev) {
-        res.status(201).json(make_revision_response(rev, op_path));
+        res.status(201).json(exports.make_revision_response(rev, op_path));
+        require("../draft-cloud-api/live.js").emit_revision(doc, rev);
       });
     })
   }
@@ -558,7 +561,7 @@ exports.create_routes = function(app) {
     return op.toJSON();
   }
 
-  function make_revision_response(rev, op_path) {
+  exports.make_revision_response = function(rev, op_path) {
     return {
       createdAt: rev.createdAt,
       id: rev.uuid,
@@ -569,7 +572,7 @@ exports.create_routes = function(app) {
     };
   }
 
-  function load_revision_from_id(doc, revision_id, cb) {
+  exports.load_revision_from_id = function(doc, revision_id, cb) {
     // Gets a Revision instance from a revision UUID. If revision_id is...
     //   "singularity", then "singularity"
     //   "", then the most recent revision
@@ -651,7 +654,7 @@ exports.create_routes = function(app) {
     // Get the current content and revision of the document.
     authz_document_content(req, res, "WRITE", function(user, owner, doc) {
       // Find the base revision. If not specified, it's the current revision.
-      load_revision_from_id(doc, req.headers['base-revision-id'], function(base_revision) {
+      exports.load_revision_from_id(doc, req.headers['base-revision-id'], function(base_revision) {
         // Invalid ID.
         if (!base_revision) {
           res.status(400).send("Invalid base revision ID.")
@@ -659,7 +662,7 @@ exports.create_routes = function(app) {
         }
 
         // Get the content of the document as of the base revision.
-        get_document_content(doc, req.params.pointer, base_revision, function(err, revision_id, content, op_path) {
+        exports.get_document_content(doc, req.params.pointer, base_revision, function(err, revision_id, content, op_path) {
           if (err) {
             res.status(404).send(err);
             return;
@@ -676,7 +679,7 @@ exports.create_routes = function(app) {
               res.status(200).send("no change");
             else
               // Make a new revision.
-              make_revision(
+              exports.make_revision(
                 user,
                 doc,
                 base_revision,
@@ -728,7 +731,7 @@ exports.create_routes = function(app) {
       // check authz
       authz_document_content(req, res, "WRITE", function(user, owner, doc) {
         // Find the base revision. If not specified, it's the current revision.
-        load_revision_from_id(doc, req.headers['base-revision-id'], function(base_revision) {
+        exports.load_revision_from_id(doc, req.headers['base-revision-id'], function(base_revision) {
           // Invalid base revision ID.
           if (!base_revision) {
             res.status(400).send("Invalid base revision ID.")
@@ -746,7 +749,7 @@ exports.create_routes = function(app) {
             }
 
             // Make a new revision.
-            make_revision(
+            exports.make_revision(
               user,
               doc,
               base_revision,
@@ -768,7 +771,7 @@ exports.create_routes = function(app) {
     authz_document(req, res, true, "READ", function(user, owner, doc) {
       // Get the base revision. If not specified, it's the start of
       // the document history.
-      load_revision_from_id(doc, req.query['since'] || "singularity", function(base_revision) {
+      exports.load_revision_from_id(doc, req.query['since'] || "singularity", function(base_revision) {
         // Invalid ID.
         if (!base_revision) {
           res.status(400).send("Invalid base revision ID.")
@@ -812,7 +815,7 @@ exports.create_routes = function(app) {
             revs = revs.map(function(rev) {
               rev.op = JSON.parse(rev.op);
               rev.userdata = JSON.parse(rev.userdata);
-              return make_revision_response(rev, op_path);
+              return exports.make_revision_response(rev, op_path);
             });
 
             // Filter out no-op revisions, which are operations
@@ -826,6 +829,21 @@ exports.create_routes = function(app) {
           })
         })
       });
+    })
+  })
+
+  var debug_template = fs.readFileSync("templates/document_debug.html", "utf8");
+  app.get(document_route + "/debug", function (req, res) {
+    // Show a debug page for the document.
+    //
+    // Requires READ permission on the document (and the document must exist).
+    authz_document(req, res, true, "READ", function(user, owner, doc) {
+      var mustache = require("mustache");
+      res.status(200).send(mustache.render(debug_template, {
+        "user": user,
+        "owner": owner,
+        "document": doc
+      }))
     })
   })
 }

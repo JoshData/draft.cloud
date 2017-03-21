@@ -1,3 +1,4 @@
 public_html/apidocs/
 db.sqlite
 node_modules
+public_html/draftdotcloud.js

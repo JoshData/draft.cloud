@@ -196,6 +196,9 @@ paths:
             Revision-Id:
               description: The UUID of the document's current `Revision`, or the revision specified in the Revision-Id header if the header is given. May be `singularity` to indicate that the document has not yet had any revisions yet. (Such documents always have `null` content.)
               type: string
+            Access-Level:
+              description: The access level that the user has on this document. Either READ, WRITE, or ADMIN.
+              type: string
             Content-Type:
               description: "`application/json` or `text/plain`, depending on the Accept header you send. (If the Accept header says both formats are accepted but text/plain is preferred, you may get application/json in the response if the document's content is not plain text.)"
               type: string

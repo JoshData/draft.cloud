@@ -1,0 +1,60 @@
+<html>
+	<head>
+		<title>{{owner.name}}/{{document.name}} - Draft.cloud Debugger</title>
+
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous">
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css" integrity="sha256-VBrFgheoreGl4pKmWgZh3J23pJrhNlSUOBek+8Z2Gv0=" crossorigin="anonymous">
+
+        <style type="text/css">
+        	body {
+        		padding: 15px;
+        	}
+
+        	h1 { /* long owner or document name */
+        		word-break: break-all;
+        		font-size: 20px;
+        		font-weight: bold;
+        	}
+
+        	h2 {
+        		font-size: 16px;
+        		font-weight: bold;
+        	}
+        </style>
+	</head>
+	<body>
+		<p>This is the Draft.cloud debugger!</p>
+
+		<h1>{{owner.name}}/{{document.name}}</h1>
+
+		<div class="row">
+			<div class="col-sm-6">
+				<h2>Document Content</h2>
+				<textarea
+					data-draftdotcloud-owner="{{owner.name}}"
+					data-draftdotcloud-document="{{document.name}}"
+					style="width: 100%; height: 80%;"
+					></textarea>
+			</div>
+			<div class="col-sm-6">
+				<h2>Live Change Log</h2>
+				<div id="change_log">
+				</div>
+			</div>
+		</div>
+
+        <script src="https://code.jquery.com/jquery-3.1.1.min.js" integrity="sha256-hVVnYaiADRTO2PzUGmuLJr8BLUSjGIZsDYGmIJLv2b8=" crossorigin="anonymous"></script>
+        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+        <script src="/socket.io/socket.io.js"> </script>
+        <script src="/draftdotcloud.js"> </script>
+
+		<script>
+		draft_cloud_on_event(function(doc, msg) {
+			var node = $("<div/>").text(msg);
+			$('#change_log').prepend(node);
+		})
+		</script>
+	</body>
+</html>
