@@ -3,7 +3,6 @@ var jot = require("../jot");
 exports.textarea_widget = function(textarea) {
   // Set the textarea's UI to a holding state before initial content is loaded.
   textarea.value = "";
-  textarea.placeholder = "Loading the document...";
   textarea.readOnly = true;
 
   // Track the base content to see when changes are made.
@@ -11,6 +10,26 @@ exports.textarea_widget = function(textarea) {
 
   // The callback to the client for any changes.
   var pushfunc;
+
+  // Make a widget that shows saved status.
+  var saved_status_badge_style = "position: absolute; border: 1px solid #AAA; background-color: rgba(255,255,255,.85); padding: 2px; font-size: 11px; border-radius: 5px; cursor: default";
+  var saved_status_badge = document.createElement("div");
+  saved_status_badge.setAttribute("class", "draftdotcloud-saved-status");
+  saved_status_badge.setAttribute("style", "display: none; " + saved_status_badge_style);
+  document.getElementsByTagName("body")[0].append(saved_status_badge);
+  function update_saved_status_badge(message) {
+    if (!message) {
+      saved_status_badge.setAttribute("style", "display: none; " + saved_status_badge_style);
+      return;
+    }
+    saved_status_badge.innerHTML = message;
+    saved_status_badge.setAttribute("style", saved_status_badge_style); // force display to get dimensions
+    var bbox = textarea.getBoundingClientRect();
+    var dims = saved_status_badge.getBoundingClientRect();
+    var top = bbox.top + bbox.height - dims.height - 2;
+    var left = bbox.left + bbox.width - dims.width - 2 - 15; // 15 is for a righthand scrollbar
+    saved_status_badge.setAttribute("style", saved_status_badge_style + "; top: " + top + "px; left: " + left + "px");
+  }
 
   function poll_for_changes() {
     // Has the document changed locally since the last fetched content?
@@ -35,7 +54,6 @@ exports.textarea_widget = function(textarea) {
       textarea.value = typeof state.content === "string" ? state.content : "";
       textarea.selectionStart = 0; // Chrome likes to put the cursor at the end
       textarea.selectionEnd = 0;
-      textarea.placeholder = "";
       if (!state.readonly) {
         textarea.readOnly = false;
         textarea.focus();
@@ -73,7 +91,8 @@ exports.textarea_widget = function(textarea) {
       textarea.selectionStart = selection[0];
       textarea.selectionEnd = selection[1];
       base_content = new_content;
-    }
+    },
+    status: update_saved_status_badge
   };
 }
 

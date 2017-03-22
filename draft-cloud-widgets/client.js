@@ -31,6 +31,8 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
 
   log("opening document using", channel.name);
 
+  widget.status("Loading...");
+
   // Open the channel and start receiving remote changes.
   channel.open(owner_name, document_name, api_key, {
     error: function(msg) {
@@ -59,6 +61,9 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
       function(patch) {
         local_changes.push(patch);
       });
+
+      // Once the widget is initialized, there is no status.
+      widget.status();
 
       // Begin periodically pulling new remote changes and pushing
       // new local changes.
@@ -235,6 +240,7 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
       log("pushing local changes", patch);
       if (logger)
         logger(owner_name + "/" + document_name, "sent " + patch.inspect());
+      widget.status("Saving...");
       channel_push_func(base_revision, patch, function(err, revision) {
         // Remember the revision information of the last push.
         pushing = false;
@@ -242,6 +248,11 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
           log("got local changes revision", revision);
           last_push_revision = revision.id;
           last_push_patch = patch;
+
+          // Let the widget know we are in a saved state now, if there are
+          // no new local changes.
+          if (local_changes.length == 0)
+            widget.status("Saved.");
         }
         if (err) {
           // TODO: Restore state to try again later.
@@ -251,6 +262,11 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
 
       // Clear the queue of local changes.
       local_changes = [];
+    
+    } else if (local_changes.length > 0) {
+      // If there are unsaved changes that we can't push right now, warn
+      // the user.
+      widget.status("Not Saved");
     }
     
     // Push again soon.
