@@ -69,8 +69,7 @@ exports.textarea_widget = function(textarea) {
     get_document: function() {
       return textarea.value; 
     },
-    update_document: function(patch) {
-      var current_content = textarea.value;
+    update_document: function(current_content, patch) {
       var new_content = patch.apply(current_content);
 
       // Get the current selection state, revise the textarea,
@@ -96,6 +95,109 @@ exports.textarea_widget = function(textarea) {
   };
 }
 
+exports.textarea_cursor_widget = function(textarea) {
+  // Track the base content to see when changes are made.
+  var base_content;
+
+  // The callback to the client for any changes.
+  var pushfunc;
+
+  // ugh a hack
+  var myId = Math.random().toString(36).slice(2);
+
+  // dom elements
+  var carets = { };
+
+  function draw_cursors(content) {
+    var bbox = textarea.getBoundingClientRect();
+    var getCaretCoordinates = require('textarea-caret');
+    Object.keys(content).forEach(function(userid) {
+      var cursor = content[userid];
+
+      // Skip ourself.
+      if (userid == myId)
+        return;
+
+      // Skip stale cursors.
+      if (Date.now() - cursor[0] > 1000*60)
+        return;
+
+      // Draw it.
+      var pos = getCaretCoordinates(textarea, cursor[1]);
+      var node;
+      if (!(userid in carets)) {
+        node = document.createElement("div");
+        document.getElementsByTagName("body")[0].append(node);
+        carets[userid] = node;
+      } else {
+        node = carets[userid];
+      }
+      node.setAttribute("style", "position: absolute; background-color: red; width: 1.5px; height: 1em; "
+        + "left: " + (bbox.left+pos.left) + "px; top: " + (bbox.top+pos.top) + "px")
+
+    });
+  }
+
+  function get_current_document() {
+    // Update my cursor position.
+    var content = { };
+    if (typeof base_content == "object" && base_content !== null) {
+      for (var key in base_content)
+        content[key] = base_content[key];
+    }
+    content[myId] = [
+      (myId in content) ? content[myId][0] : null,
+      textarea.selectionStart,
+      (textarea.selectionEnd==textarea.selectionStart) ? null : textarea.selectionEnd
+    ];
+    return content;
+  }
+
+  function poll_for_changes() {
+    // Has the document changed locally since the last fetched content?
+
+    // Get the structured document content.
+    var current_content = get_current_document();
+
+    // Check for changes.
+    var deepEqual = require("deep-equal");
+    if (!deepEqual(base_content, current_content)) {
+      // add a timer just when it changes
+      current_content[myId][0] = Date.now();
+
+      var patch = jot.diff(base_content, current_content);
+      pushfunc(patch);
+      base_content = current_content;
+      draw_cursors(base_content);
+    }
+
+    // Run again in a little while.
+    setTimeout(poll_for_changes, 333);
+  }
+
+  return {
+    initialize: function(state, pushfunccb) {
+      base_content = state.content;
+
+      // Start polling for changes.
+      pushfunc = pushfunccb;
+      poll_for_changes();
+    },
+    nonfatal_error: function(message) {
+      alert(message);
+    },
+    get_document: get_current_document,
+    update_document: function(current_content, patch) {
+      var new_content = patch.apply(current_content);
+
+      draw_cursors(new_content);
+
+      // From here on, diffs of content are compared against this new content.
+      base_content = new_content;
+    },
+    status: function() { }
+  };
+}
 
 
 

@@ -181,7 +181,7 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
     if (!widget_patch.isNoOp()) {
       if (logger)
         logger(owner_name + "/" + document_name, "received " + widget_patch.inspect());
-      widget.update_document(widget_patch);
+      widget.update_document(current_content, widget_patch);
     }
 
     // Update Pending Local Changes

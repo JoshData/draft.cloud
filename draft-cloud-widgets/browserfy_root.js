@@ -31,6 +31,25 @@ function init() {
           })
         }
       );
+
+      var cursor_document_name = elem.getAttribute("data-draftdotcloud-cursordocument");
+      if (cursor_document_name) {
+        console.log("...with cursors");
+        var cursorwidget = require("./textarea.js").textarea_cursor_widget(elem);
+        var cursorclient = require("./client.js").Client(
+          owner_name,
+          cursor_document_name,
+          api_key,
+          channel,
+          cursorwidget,
+          function(doc, msg) {
+            log_receivers.forEach(function(recip) {
+              recip(doc, msg);
+            })
+          }
+        );
+
+      }
     }
   }
 }
