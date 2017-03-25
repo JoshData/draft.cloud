@@ -18,7 +18,8 @@ function init() {
     var api_key = elem.getAttribute("data-draftdotcloud-apikey");
     if (owner_name && document_name) {
       console.log("attaching draft.cloud widget to", elem);
-      var widget = require("./textarea.js").textarea_widget(elem);
+      var widget = require("./textarea.js").textarea;
+      widget = new widget(elem);
       var client = require("./client.js").Client(
         owner_name,
         document_name,
@@ -35,7 +36,8 @@ function init() {
       var cursor_document_name = elem.getAttribute("data-draftdotcloud-cursordocument");
       if (cursor_document_name) {
         console.log("...with cursors");
-        var cursorwidget = require("./textarea.js").textarea_cursor_widget(elem);
+        var cursorwidget = require("./textarea.js").textarea_cursors;
+        cursorwidget = new cursorwidget(elem);
         var cursorclient = require("./client.js").Client(
           owner_name,
           cursor_document_name,

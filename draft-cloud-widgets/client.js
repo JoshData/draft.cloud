@@ -11,7 +11,6 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
   var closed = false;
 
   // Document state.
-  var base_content;
   var base_revision;
 
   // Channel state.
@@ -22,16 +21,8 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
   var last_push_patch = null;
   var last_push_revision = null;
 
-  // Widget state.
-  var local_changes = [];
-
-  function log(a1, a2, a3, a4) {
-    console.debug("Draft.cloud", { owner: owner_name, document: document_name }, a1, a2, a3, a4);
-  }
-
-  log("opening document using", channel.name);
-
-  widget.status("Loading...");
+  if (logger)
+    logger("opening document using " + channel.name);
 
   // Open the channel and start receiving remote changes.
   channel.open(owner_name, document_name, api_key, {
@@ -43,32 +34,26 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
       // The document was successfully opened. We've now got
       // its current content and the corresponding revision id.
       if (closed) { doc.closefunc(); return; } // closed before calledback
-      base_content = doc.content;
       base_revision = doc.revision;
       channel_push_func = doc.pushfunc;
       channel_close_func = doc.closefunc;
 
       // Let the caller know the initial content and that
       // the document is open.
-      log("document opened at", base_revision, doc.access_level);
       if (logger)
         logger(owner_name + "/" + document_name, "document opened with " + doc.access_level + " access");
+      var readonly = !(doc.access_level == "WRITE" || doc.access_level == "ADMIN");
       widget.initialize({
-        content: base_content,
+        content: doc.content,
         revision: base_revision,
-        readonly: !(doc.access_level == "WRITE" || doc.access_level == "ADMIN")
-      },
-      function(patch) {
-        local_changes.push(patch);
+        readonly: readonly
       });
-
-      // Once the widget is initialized, there is no status.
-      widget.status();
 
       // Begin periodically pulling new remote changes and pushing
       // new local changes.
       pull_remote_changes();
-      push_local_changes();
+      if (!readonly)
+        push_local_changes();
     },
     pull: function(revisions) {
       // New changes have come in from the server. Append them
@@ -104,30 +89,30 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
   }
 
   function merge_remote_changes(history) {
-    log("document changed remotely", owner_name, document_name, history);
+    // We've received a list of new Revisions from the server that ocurred since
+    // base_revision. These revisions may come from one of three segments of
+    // time/state:
+    //
+    // * Before last_push_revision. They diverged from what we've sent at base_revision.
+    //   In order to update the widget, we must rebase these changes against our last
+    //   push. (We let the server handle merges when we push, so we are not aware of
+    //   concurrent remote changes at the time we push. This is the paired rebase
+    //   with the rebase that happens on the server to merge concurrent edits.)
+    //
+    // * The Revision might be last_push_revision itself, which is how we'll
+    //   know that we've caught up to what we submitted. (We don't push any local
+    //   changes while local changes are in flight and we're waiting to see
+    //   last_push_revision come back.)
+    //
+    // * After last_push_revision (if last_push_revision is set). This will only occur
+    //   if this is the first time we're receiving new remote changes after seeing
+    //   our last change come back. So what we do here to them is parallel to what we
+    //   do to revisions that come in on the next iteration --- i.e. last_push_revision
+    //   is no longer set and no rebase is necessary.
 
-    // Update the widget
-    // =================
-    //
-    // The widget may have local changes that have not even been submitted
-    // to the server yet. The incoming changes must be rebased against
-    // anything done in the widget.
-    //
-    // Divide the history into two segments:
-    // 1) Changes made after our last pull but before our last push.
-    //    These changes diverged at base_content/base_revision, so
-    //    we'll rebase them on the difference between that point and
-    //    the current local state of the document.
-    // 2) Changes made after our last push. These changes diverged at
-    //    the point of our last push, so we'll rebase them against the
-    //    difference between what we last pushed and the current local
-    //    state of the document.
-    // We need to divide the history because we should not apply our
-    // own revision a second time -- we need to take our own revision
-    // out of the history.
-    var history_1 = [];
+    var history_before_push = [];
     var our_revision = null;
-    var history_2 = [];
+    var history_after_push = [];
     history.forEach(function(revision) {
       // Deserialize.
       revision.op = jot.opFromJSON(revision.op);
@@ -136,87 +121,47 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
       if (revision.id == last_push_revision)
         our_revision = revision.op;
       else if (our_revision === null)
-        history_1.push(revision.op);
+        history_before_push.push(revision.op);
       else
-        history_2.push(revision.op);
+        history_after_push.push(revision.op);
 
-      // Remember the most recent ID.
+      // Remember the most recent ID for updating state at the end.
       last_revision_id = revision.id;
     });
 
     // Turn the history arrays into jot operations.
-    history_1 = new jot.LIST(history_1).simplify();
-    history_2 = new jot.LIST(history_2).simplify();
+    history_before_push = new jot.LIST(history_before_push).simplify();
+    history_after_push = new jot.LIST(history_after_push).simplify();
 
-    // history_1 diverged from our current state at base_content/base_revision.
-    // Rebase against everything that has happened locally since then, and then
-    // apply it.
-    var current_content = widget.get_document();
-    var history_1_rebased = new jot.NO_OP();
-    if (!history_1.isNoOp()) {
-      var local_changes_1 = jot.diff(base_content, current_content);
-      history_1_rebased = history_1.rebase(local_changes_1, true);
-      if (history_1_rebased === null) {
-        alert("There was an unresolvable conflict (1).");
-        return;
-      }
+    // Before we pass the remote history to the widget, we have to bring it
+    // up to speed with the changes the widget has already told us about.
+    // They requires rebasing history_before_push on the local changes we
+    // last submitted. Then we shimmy the last_push_patch forward as if
+    // acknowledging that we've received those changes, in case we receive
+    // more Revisions before our push in a later call. history_after_push
+    // does not need to be rebased because it follows our push.
+    var widget_patch = history_before_push;
+    if (last_push_patch) {
+      // Rebase history_before_push.
+      widget_patch = history_before_push.rebase(last_push_patch, true);
+      last_push_patch = last_push_patch.rebase(history_before_push, true);
+
+      // Compose with history_2. (nb. compose() may return null if an atomic
+      // compose is not possible, so we use a LIST to ensure we get a valid
+      // composition object.)
+      widget_patch = new jot.LIST([widget_patch, history_after_push]).simplify();
     }
 
-    // history_2 diverged from our current state as of last_push_content/last_push_revision.
-    // Rebase against everything that has happened since our last push.
-    var history_2_rebased = new jot.NO_OP();
-    if (!history_2.isNoOp()) {
-      var last_push_content = last_push_patch.apply(base_content);
-      var local_changes_2 = jot.diff(last_push_content, current_content);
-      history_2_rebased = history_2.rebase(local_changes_2, true);
-      if (history_2_rebased === null) {
-        alert("There was an unresolvable conflict (2).");
-        return;
-      }
-    }
-
-    // Apply the rebased histories, without our revision, to the current
-    // document content.
-    var widget_patch = new jot.LIST([history_1_rebased, history_2_rebased]).simplify();
+    // Send the history to the widget.
     if (!widget_patch.isNoOp()) {
       if (logger)
         logger(owner_name + "/" + document_name, "received " + widget_patch.inspect());
-      widget.update_document(current_content, widget_patch);
-    }
-
-    // Update Pending Local Changes
-    // ============================
-    // If there are local changes queued up, those changes must be rebased because we
-    // are about to change the state that determines what their base revision is.
-    //
-    // A) If !last_push_revision, then the changes are queued up against
-    //    base_revision and must be rebased against history_1. our_revision and history_2
-    //    will be empty.
-    //
-    // If pushing is true, then we have some changes in flight, but this function
-    // won't be called in that case. It'll be called after the push is done and
-    // last_push_revision is set.
-    //
-    // B) If last_push_revision is set, then the local changes acumulated after
-    //    we last sent changes to the server, which corresponds with last_push_revision.
-    //    The changes must be rebased against history_2.
-    if (local_changes.length > 0) {
-      local_changes = [
-        new jot.LIST(local_changes).simplify()
-          .rebase(
-            (!last_push_revision)
-              ? history_1
-              : history_2
-          )
-      ];
+      widget.merge_remote_changes(widget_patch);
     }
 
     // Update Document State
     // =====================
-    // Use the actual history we received from the server,
-    // without rebases.
-    base_content = new jot.LIST([history_1, our_revision ? our_revision : new jot.NO_OP(), history_2])
-      .apply(base_content);
+    // Apply the total history we saw to the 
     base_revision = last_revision_id;
     last_push_patch = null;
     last_push_revision = null;
@@ -230,43 +175,34 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
     // Don't push while another push is in progress or while
     // we're waiting to see our own revision come back as a
     // remote change because the document has changed and we
-    // only have the base_revision as a peg.
-    if (!pushing && !last_push_revision && local_changes.length > 0
-      && channel_push_func) {
+    // only have the base_revision as a peg. Also don't push
+    // if we don't have a channel to push to.
+    if (!pushing && !last_push_revision && channel_push_func) {
       // Push the local changes --- everything queued up as
       // a single revision.
-      pushing = true;
-      var patch = new jot.LIST(local_changes).simplify();
-      log("pushing local changes", patch);
-      if (logger)
-        logger(owner_name + "/" + document_name, "sent " + patch.inspect());
-      widget.status("Saving...");
-      channel_push_func(base_revision, patch, function(err, revision) {
-        // Remember the revision information of the last push.
-        pushing = false;
-        if (revision) {
-          log("got local changes revision", revision);
-          last_push_revision = revision.id;
-          last_push_patch = patch;
+      var patch = widget.pop_changes();
+      if (!patch.isNoOp()) {
+        pushing = true;
+        if (logger)
+          logger(owner_name + "/" + document_name, "sent " + patch.inspect());
+        widget.status("saving");
+        channel_push_func(base_revision, patch, function(err, revision) {
+          // Remember the revision information of the last push.
+          pushing = false;
+          if (revision) {
+            last_push_revision = revision.id;
+            last_push_patch = patch;
 
-          // Let the widget know we are in a saved state now, if there are
-          // no new local changes.
-          if (local_changes.length == 0)
-            widget.status("Saved.");
-        }
-        if (err) {
-          // TODO: Restore state to try again later.
-          widget.nonfatal_error(err);
-        }
-      })
-
-      // Clear the queue of local changes.
-      local_changes = [];
-    
-    } else if (local_changes.length > 0) {
-      // If there are unsaved changes that we can't push right now, warn
-      // the user.
-      widget.status("Not Saved");
+            // Let the widget know we are in a saved state now, if there are
+            // no new local changes.
+            widget.status("saved");
+          }
+          if (err) {
+            // TODO: Restore state to try again later.
+            widget.nonfatal_error(err);
+          }
+        })
+      }
     }
     
     // Push again soon.
