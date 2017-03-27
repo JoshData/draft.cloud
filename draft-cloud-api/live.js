@@ -1,5 +1,7 @@
 // Websocket API.
 
+var expressCookieParser = require('cookie-parser');
+
 var jot = require("../jot");
 var auth = require("./auth.js");
 var models = require("./models.js");
@@ -25,8 +27,39 @@ var document_watchers = {
   }
 };
 
-exports.init = function(io) {
+exports.init = function(io, sessionStore, settings) {
+
+  // Pull express session information from the connection request.
+  // Adapted from https://github.com/leeroybrun/socketio-express-sessions/blob/master/server.js.
+  var cookieParser = expressCookieParser(settings.secret_key);
+  var EXPRESS_SID_KEY = 'connect.sid';
+  io.use(function(socket, next) {
+    var request = socket.request;
+    if (!request.headers.cookie)
+      return next();
+    cookieParser(request, {}, function(parseErr) {
+      if (parseErr) return next();
+      var sidCookie = (request.secureCookies && request.secureCookies[EXPRESS_SID_KEY]) ||
+                      (request.signedCookies && request.signedCookies[EXPRESS_SID_KEY]) ||
+                      (request.cookies && request.cookies[EXPRESS_SID_KEY]);
+      sessionStore.load(sidCookie, function(err, session) {
+        if (err) return next();
+        if (session && session.passport && session.passport.user) {
+          models.User.findById(session.passport.user)
+            .then(function(user) {
+              socket.handshake.user = user;
+              next();
+          });
+          return;
+        }
+        return next();
+      });
+    });
+  });
+
+
   io.sockets.on('connection', function (socket) {
+    // Set state.
     socket.open_documents = { };
     
     // The open-document message begins a connection to monitor a document for

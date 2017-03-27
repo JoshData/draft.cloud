@@ -1,3 +1,4 @@
+local
 public_html/apidocs/
 db.sqlite
 node_modules

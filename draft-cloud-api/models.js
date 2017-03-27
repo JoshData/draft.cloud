@@ -187,6 +187,41 @@ exports.initialize_database = function(connection_uri, ready) {
     });
   exports.UserApiKey.belongsTo(exports.User);
 
+  // SOCIAL LOGINS.
+  exports.UserExternalAccount = db.define('user_external_account',
+    {
+      // The name of the account provider.
+      provider: {
+        type: Sequelize.STRING(64)
+      },
+
+      // The user's identifier provided by the provider.
+      identifier: {
+        type: Sequelize.STRING(128)
+      },
+
+      // Access tokens provided by the provider.
+      tokens: {
+        type: Sequelize.JSON
+      },
+
+      // Profile information provided by the provider.
+      profile: {
+        type: Sequelize.JSON
+      }
+    }, {
+      indexes: [
+        {
+          unique: true,
+          fields: ['provider', 'identifier']
+        },
+      ],
+      freezeTableName: true, // Model tableName will be the same as the model name
+      classMethods: {
+      }
+    });
+  exports.UserExternalAccount.belongsTo(exports.User);
+
   // DOCUMENTs.
   exports.Document = db.define('document',
     {

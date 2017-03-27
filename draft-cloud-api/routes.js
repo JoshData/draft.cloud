@@ -8,9 +8,9 @@ var models = require("./models.js");
 
 var jot = require("../jot");
 
-// Export a function that creates routes.
+// Export a function that creates routes on the express app.
 
-exports.create_routes = function(app) {
+exports.create_routes = function(app, settings) {
   // Set defaults for JSON responses.
   app.set("json spaces", 2);
 
@@ -25,6 +25,10 @@ exports.create_routes = function(app) {
     // Create a new User with an initial, strong API key. Return a
     // redirect to the User's API url but include the API key in a
     // response header.
+    if (!settings.allow_anonymous_user_creation) {
+      res.status(403).send('New users cannot be created through the API.');
+      return;
+    }
     models.User.create({
       name: randomstring.generate({
         length: 48,
@@ -120,11 +124,14 @@ exports.create_routes = function(app) {
     });
   }
 
-  function create_document(owner, doc, cb) {
+  exports.create_document = function(owner, doc, cb) {
     // Create a new document.
     models.Document.create({
       userId: owner.id,
-      name: doc.name,
+      name: doc.name || randomstring.generate({
+        length: 48,
+        charset: 'alphanumeric'
+      }),
       anon_access_level: doc.anon_access_level || auth.DEFAULT_NEW_DOCUMENT_ANON_ACCESS_LEVEL,
       userdata: doc.userdata || {}
     }).then(cb);
@@ -186,11 +193,7 @@ exports.create_routes = function(app) {
 
     // Check authorization to create the document.
     authz_document(req, res, false, "ADMIN", function(user, owner, doc) {
-      req.body.name = randomstring.generate({
-        length: 48,
-        charset: 'alphanumeric'
-      });
-      create_document(owner, req.body, function(doc) {
+      exports.create_document(owner, req.body, function(doc) {
         res.redirect(document_route
           .replace(/:owner/, encodeURIComponent(owner.name))
           .replace(/:document/, encodeURIComponent(doc.name)));
@@ -218,7 +221,7 @@ exports.create_routes = function(app) {
       if (!doc) {
         // Create a document.
         req.body.name = req.params.document;
-        create_document(owner, req.body, finish_request);
+        exports.create_document(owner, req.body, finish_request);
       } else {
         // Document exists. Update its metadata from any keys provided.
         if (typeof req.body.name != "undefined")

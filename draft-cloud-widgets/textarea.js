@@ -36,6 +36,8 @@ exports.textarea.prototype.get_document = function() {
 
 exports.textarea.prototype.set_readonly = function(readonly) {
   this.textarea.readOnly = readonly;
+  if (!readonly)
+    this.textarea.focus();
 }
 
 exports.textarea.prototype.set_document = function(document, patch) {

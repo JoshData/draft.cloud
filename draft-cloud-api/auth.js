@@ -47,14 +47,20 @@ function get_document(owner, document_name, cb) {
   });
 }
 
-function validate_api_key(req, cb) {
+function check_request_authorization(req, cb) {
   // Is the request authenticated? If an Authorization header contains
   // a valid API key, then the callback is called with a User and an
   // UserApiKey instance.
-  if (!req.headers['authorization'])
-    cb() // not authorized
-  else
+  if (req.headers['authorization'])
     models.UserApiKey.validateApiKey(req.headers['authorization'], cb);
+
+  // If the request already has a user set from a passport session,
+  // use that (with no explicit API key).
+  else if (req.user)
+    cb(req.user, null);
+
+  else
+    cb() // not authorized
 }
 
 exports.get_user_authz = function(req, user_name, cb) {
@@ -74,7 +80,7 @@ exports.get_user_authz = function(req, user_name, cb) {
     }
 
     // Get the user making the request.
-    validate_api_key(req, function(requestor, requestor_api_key) {
+    check_request_authorization(req, function(requestor, requestor_api_key) {
       // Compute the access level in order of precedence.
       var level;
 
@@ -122,7 +128,7 @@ exports.get_document_authz = function(req, owner_name, document_name, cb) {
     // to create a new document.)
     get_document(owner, document_name, function(document) {
       // Get the user making the request.
-      validate_api_key(req, function(user, user_api_key) {
+      check_request_authorization(req, function(user, user_api_key) {
         //console.log(owner, document, user)
 
         // Compute the access level in order of precedence.
