@@ -8,6 +8,27 @@ info:
   title: Draft.Cloud API
 
 paths:
+  /users:
+    post:
+      description: |
+        Creates a new user, responding with a username, an API key, and the API base URL for the user's documents.
+        An API key is not needed for this API call.
+
+        This route is only available if the Draft.Cloud backend is configured to allow the creation of users.
+      responses:
+        200:
+          description: A user was created. The user's username and other information besides the API key
+            are returned in the JSON response body. The user's API key is returned in the `X-Api-Key` header.
+          headers:
+            X-Api-Key:
+              description: The user's API key.
+              type: string
+            Location:
+              description: The API base URL to the user's documents.
+              type: string
+        403:
+          description: The Draft.Cloud backend does not allow the creation of new users through the API.
+
   /documents/{owner}:
     get:
       description: |
@@ -18,7 +39,7 @@ paths:
           description: The name of a `User` who owns the document.
           required: true
           type: string
-        - name: Authentication
+        - name: Authorization
           in: header
           type: string
           description: An API key that has READ access to the document. Optional if the document's anonymous access level is READ.
@@ -45,18 +66,17 @@ paths:
           in: header
           type: string
           description: Must be `application/json`.
-        - name: Authentication
+        - name: Authorization
           in: header
           type: string
           description: An API key that has ADMIN access to the document, or for a new document and API key for the owner of the new document.
           required: true
       responses:
-        302:
-          description: A new document was created. The response has no body but has a Location header pointing to the API URL for the document,
-           from which the document's name and other metadata can be retrieved.
+        200:
+          description: A new document was created. The response JSON body contains the new document's name and other metadata.
           headers:
-            Location:
-              description: The API GET URL for the newly created document.
+            Content-Type:
+              description: Always `application/json`.
               type: string
         403:
           description: The caller has permission to see the owner but not create documents.
@@ -77,7 +97,7 @@ paths:
           description: The name of a `Document` owned by  `owner`.
           required: true
           type: string
-        - name: Authentication
+        - name: Authorization
           in: header
           type: string
           description: An API key that has READ access to the document. Optional if the document's anonymous access level is READ.
@@ -111,7 +131,7 @@ paths:
           in: header
           type: string
           description: Must be `application/json`.
-        - name: Authentication
+        - name: Authorization
           in: header
           type: string
           description: An API key that has ADMIN access to the document, or for a new document and API key for the owner of the new document.
@@ -139,7 +159,7 @@ paths:
           description: The name of a `Document` owned by  `owner`.
           required: true
           type: string
-        - name: Authentication
+        - name: Authorization
           in: header
           type: string
           description: An API key that has ADMIN access to the document.
@@ -185,7 +205,7 @@ paths:
           in: header
           type: string
           description: Either `text/plain` or `application/json`. (If the Accept header says both formats are accepted, you may get either format back.)
-        - name: Authentication
+        - name: Authorization
           in: header
           type: string
           description: An API key that has READ access to the document. Optional if the document's anonymous access level is READ.
@@ -253,7 +273,7 @@ paths:
           in: header
           type: string
           description: Either `text/plain` if you are sending a plain text document (it is converted to a JSON string) or `application/json` if you are sending arbitrary JSON data as the document.
-        - name: Authentication
+        - name: Authorization
           in: header
           type: string
           description: An API key that has WRITE access to the document.
@@ -318,7 +338,7 @@ paths:
           in: header
           type: string
           description: Must be `application/json`.
-        - name: Authentication
+        - name: Authorization
           in: header
           type: string
           description: An API key that has WRITE access to the document.
@@ -361,7 +381,7 @@ paths:
           in: query
           description: A [JSON Pointer](https://tools.ietf.org/html/rfc6901), which looks like `/x/y/15`, to a part of the document to get the history of, ignoring changes to other parts of the document. The path must exist in the document at the revision specified by `since`. If `since` is omitted (the full document history is returned), then `path` cannot be specified.
           type: string
-        - name: Authentication
+        - name: Authorization
           in: header
           type: string
           description: An API key that has READ access to the document. Optional if the document's anonymous access level is READ.

@@ -87,9 +87,10 @@ exports.initialize_database = function(connection_uri, ready) {
           fields: ['uuid']
         },
       ],
-      freezeTableName: true, // Model tableName will be the same as the model name
-      classMethods: {
-        createApiKey: function(user, password_hash_work, cb) {
+      freezeTableName: true // Model tableName will be the same as the model name
+    });
+  exports.UserApiKey.belongsTo(exports.User);
+  exports.UserApiKey.createApiKey = function(user, password_hash_work, cb) {
           // Create a new API key. The callback is called with the UserApiKey
           // instance and the API key itself as arguments. We forget the API
           // key immediately and only store a hash. The caller should increase
@@ -112,25 +113,15 @@ exports.initialize_database = function(connection_uri, ready) {
                 resource_acess_levels: { },
                 key_hash: key_hash
               }).then(function(obj) {
-
-                // From the user's point of view, the API key is an opaque
-                // string that contains both the key's UUID and the key itself.
-                // Having the UUID be in it allows us to quickly find the key
-                // on an indexed column. Base64-encoding the UUID is shorter
-                // than putting the UUID in in the usual UUID format.
-                var api_key =
-                  new Buffer(require('node-uuid').parse(obj.uuid)).toString('base64')
-                  + "." + key
-                  + ".0"; // end with a key schema version
-
                 // Send the UserApiKey instance and the clear-text API key to the callback.
+                var api_key = obj.uuid + "." + key + ".0"; // end with a key schema version
                 cb(obj, api_key);
               });
             });          
           });
-        },
+        };
 
-        validateApiKey: function(api_key, cb) {
+  exports.UserApiKey.validateApiKey = function(api_key, cb) {
           // Validates an API key and executes the callback with the
           // User and UserApiKey object instances, or with undefineds
           // if the key did not validate.
@@ -144,14 +135,6 @@ exports.initialize_database = function(connection_uri, ready) {
 
           var uuid = key_parts[0];
           var key = key_parts[1];
-
-          // Decode the Base64 UUID of the key, which is the first component.
-          try {
-            uuid = require('uuid').unparse(new Buffer(uuid, 'base64'));
-          } catch (e) {
-            cb();
-            return;             
-          }
 
           // Look up the key record using the UUID.
           exports.UserApiKey.findOne({
@@ -183,9 +166,6 @@ exports.initialize_database = function(connection_uri, ready) {
             });
           });
         }
-      }
-    });
-  exports.UserApiKey.belongsTo(exports.User);
 
   // SOCIAL LOGINS.
   exports.UserExternalAccount = db.define('user_external_account',
@@ -216,9 +196,7 @@ exports.initialize_database = function(connection_uri, ready) {
           fields: ['provider', 'identifier']
         },
       ],
-      freezeTableName: true, // Model tableName will be the same as the model name
-      classMethods: {
-      }
+      freezeTableName: true // Model tableName will be the same as the model name
     });
   exports.UserExternalAccount.belongsTo(exports.User);
 

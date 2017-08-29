@@ -41,8 +41,6 @@ function get_document(owner, document_name, cb) {
     paranoid: true // only return non-deleted rows
   })
   .then(function(doc) {
-    if (doc)
-      doc.userdata = JSON.parse(doc.userdata);
     cb(doc);
   });
 }

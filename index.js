@@ -24,7 +24,9 @@ require("./draft-cloud-api/models.js")
     .create_routes(app, sessionStore, settings);
 
   // Start listening.
-  var io = require('socket.io').listen(app.listen(settings.port || 8000));
+  var io = require('socket.io')
+    .listen(app
+      .listen(settings.port || 8000, "0.0.0.0"));
 
   // Initialize the back-end websocket handler, which must be
   // after we start listening.

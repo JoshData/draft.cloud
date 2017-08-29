@@ -95,7 +95,7 @@ exports.create_routes = function(app, sessionStore, settings) {
       apiroutes.create_document(
         req.user,
         {
-          // make the document public by default since it will get an unguessable address
+          // make the document public by default since it will get an unguessable address anyway
           anon_access_level: "READ"
         },
         function(doc) {

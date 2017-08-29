@@ -14,7 +14,7 @@ exports.create_routes = function(app, settings) {
   // Set defaults for JSON responses.
   app.set("json spaces", 2);
 
-  var api_public_base_url = "https://draft.cloud";
+  var api_public_base_url = settings.url;
   var api_path_root = "/api/v1";
 
   // USER CREATION
@@ -40,9 +40,10 @@ exports.create_routes = function(app, settings) {
         obj.set("access_level", "ADMIN");
         obj.save();
 
-        res.header("X-Api-Key", api_key);
-        res.redirect(user_route
-          .replace(/:user/, encodeURIComponent(user.name)));
+        res
+          .header("X-Api-Key", api_key)
+          .status(200)
+          .json(form_user_response_body(user));
       });
     });
   });
@@ -77,18 +78,28 @@ exports.create_routes = function(app, settings) {
     authz_user(req, res, "READ", function(requestor, target) {
       res
       .status(200)
-      .json({
-        id: target.uuid,
-        name: target.name,
-        profile: target.profile,
-        created: target.createdAt,
-      });
+      .json(form_user_response_body(target));
     });
-  });  
+  });
 
-  // DOCUMENT CREATION/DELETION
+  function form_user_response_body(user) {
+    return {
+        id: user.uuid,
+        name: user.name,
+        profile: user.profile,
+        created: user.createdAt,
+        api_urls: {
+          profile: api_public_base_url + user_route.replace(/:user/, encodeURIComponent(user.name)),
+          documents: api_public_base_url + document_list_route.replace(/:owner/, encodeURIComponent(user.name))
+        }
+      }   
+  }
 
-  var document_route = api_path_root + '/documents/:owner/:document';
+
+  // DOCUMENT LIST/CREATION/DELETION
+
+  var document_list_route = api_path_root + '/documents/:owner';
+  var document_route = document_list_route + '/:document';
 
   function authz_document(req, res, must_exist, min_level, cb) {
     // Checks authorization for document URLs. The callback is called
@@ -142,18 +153,20 @@ exports.create_routes = function(app, settings) {
       id: doc.uuid,
       name: doc.name,
       anon_access_level: doc.anon_access_level,
-      owner: {
-        id: owner.uuid,
-        name: owner.name
-      },
+      owner: form_user_response_body(owner),
       userdata: doc.userdata,
-      "api_url": api_public_base_url
-        + document_route.replace(/:owner/, encodeURIComponent(owner.name))
+      api_urls: {
+        document: api_public_base_url + document_route.replace(/:owner/, encodeURIComponent(owner.name))
           .replace(/:document/, encodeURIComponent(doc.name))
+      },
+      web_urls: {
+        document: api_public_base_url + "/:owner/:document".replace(/:owner/, encodeURIComponent(owner.name))
+          .replace(/:document/, encodeURIComponent(doc.name))
+      }
     };
   }
 
-  app.get(api_path_root + '/documents/:owner', function (req, res) {
+  app.get(document_list_route, function (req, res) {
     // Get all documents owned by the owner.
     //
     // Check that the caller has a default READ permission on
@@ -178,14 +191,14 @@ exports.create_routes = function(app, settings) {
     })
   });
 
-  app.post(api_path_root + '/documents/:owner', bodyParser.json(), function (req, res) {
+  app.post(document_list_route, bodyParser.json(), function (req, res) {
     // Create a document. A document name may not be specified in the request body ---
     // a unique, random, unguessable name is assigned.
     //
     // See https://github.com/expressjs/body-parser#bodyparserjsonoptions for
     // default restrictions on the request body payload.
     //
-    // Requires ADMIN permission on the hypothetical document.
+    // Requires default ADMIN permission on documents owned by the owner user.
     // Validate/sanitize input.
     req.body = models.Document.clean_document_dict(req.body);
     if (typeof req.body == "string")
@@ -194,9 +207,7 @@ exports.create_routes = function(app, settings) {
     // Check authorization to create the document.
     authz_document(req, res, false, "ADMIN", function(user, owner, doc) {
       exports.create_document(owner, req.body, function(doc) {
-        res.redirect(document_route
-          .replace(/:owner/, encodeURIComponent(owner.name))
-          .replace(/:document/, encodeURIComponent(doc.name)));
+        res.status(200).json(exports.make_document_json(owner, doc));
       });
     })
   });
@@ -345,13 +356,13 @@ exports.create_routes = function(app, settings) {
       .then(function(revs) {
         // Start with the peg revision, assuming there was one.
         if (peg_revision) {
-          content = JSON.parse(peg_revision.cached_document);
+          content = peg_revision.cached_document;
           revision_id = peg_revision.uuid;
         }
 
         // Apply all later revisions' operations (if any).
         for (var i = 0; i < revs.length; i++) {
-          var op = jot.opFromJSON(JSON.parse(revs[i].op));
+          var op = jot.opFromJSON(revs[i].op);
           content = op.apply(content);
           revision_id = revs[i].uuid;
         }
@@ -505,15 +516,7 @@ exports.create_routes = function(app, settings) {
     cb(null, op);
   }
 
-  exports.make_revision = function(user, doc, base_revision, op, op_path, comment, userdata, res) {
-    // If this operation occurred at a sub-path on the document, then wrap the
-    // operation within APPLY operations to get down to that path. op_path has been
-    // constructed so that the elements are either numbers or strings, and jot.APPLY
-    // will use that distinction to select whether it is the APPLY for sequences
-    // (the element is a number, an index) or objects (the element is a string, a key).
-    for (var i = op_path.length-1; i >= 0; i--)
-      op = jot.APPLY(op_path[i], op);
-
+  exports.make_revision = function(user, doc, base_revision, content, op, op_path, comment, userdata, res) {
     // Rebase against all of the subsequent operations after the base revision to
     // the current revision. Find all of the subsequent operations.
     models.Revision.findAll({
@@ -527,12 +530,17 @@ exports.create_routes = function(app, settings) {
     }).then(function(revs) {
       // Load the JOT operations as a LIST.
       var base_ops = jot.LIST(revs.map(function(rev) {
-        return jot.opFromJSON(JSON.parse(rev.op));
+        var op = jot.opFromJSON(rev.op);
+          op_path.forEach(function(key) {
+            op = op.drilldown(key);
+          });
+        return op;
       })).simplify();
 
-      // Rebase.
-      op = op.rebase(base_ops, true);
-      if (op === null) {
+      // Rebase. Pass the base document content to enable conflictless rebase.
+      try {
+        op = op.rebase(base_ops, { document: content });
+      } catch (e) {
         res.status(409).send("The document was modified. Changes could not be applied.")
         return;
       }
@@ -540,6 +548,14 @@ exports.create_routes = function(app, settings) {
         res.status(200).send("no change");
         return;
       }
+
+      // If this operation occurred at a sub-path on the document, then wrap the
+      // operation within APPLY operations to get down to that path. op_path has been
+      // constructed so that the elements are either numbers or strings, and jot.APPLY
+      // will use that distinction to select whether it is the APPLY for sequences
+      // (the element is a number, an index) or objects (the element is a string, a key).
+      for (var i = op_path.length-1; i >= 0; i--)
+        op = jot.APPLY(op_path[i], op);
 
       // Make a revision.
       models.Revision.create({
@@ -559,7 +575,7 @@ exports.create_routes = function(app, settings) {
     // Drill down and unwrap the operation.
     op = jot.opFromJSON(op);
     op_path.forEach(function(key) {
-      op = jot.UNAPPLY(op, key);
+      op = op.drilldown(key);
     });
     return op.toJSON();
   }
@@ -686,6 +702,7 @@ exports.create_routes = function(app, settings) {
                 user,
                 doc,
                 base_revision,
+                content,
                 op,
                 op_path,
                 req.headers['revision-comment'],
@@ -741,13 +758,9 @@ exports.create_routes = function(app, settings) {
             return;
           }
 
-          // Parse the JSON Pointer path. If there's a path, the operation
-          // applies to the value at that path only. The pointer must exist
-          // at the base revision.
-          parse_json_pointer_path(doc, req.params.pointer, base_revision, function(err, op_path) {
-            // Error parsng path.
+          exports.get_document_content(doc, req.params.pointer, base_revision, function(err, revision_id, content, op_path) {
             if (err) {
-              res.status(400).send(err)
+              res.status(404).send(err);
               return;
             }
 
@@ -756,6 +769,7 @@ exports.create_routes = function(app, settings) {
               user,
               doc,
               base_revision,
+              content,
               op,
               op_path,
               req.headers['revision-comment'],
@@ -808,7 +822,7 @@ exports.create_routes = function(app, settings) {
 
             function(err, op_path) {
 
-            // Error parsng path.
+            // Error parsing path.
             if (err) {
               res.status(400).send(err)
               return;
@@ -816,8 +830,6 @@ exports.create_routes = function(app, settings) {
 
             // Decode JSON and re-map to the API output format.
             revs = revs.map(function(rev) {
-              rev.op = JSON.parse(rev.op);
-              rev.userdata = JSON.parse(rev.userdata);
               return exports.make_revision_response(rev, op_path);
             });
 

@@ -54,12 +54,14 @@ exports.textarea.prototype.set_document = function(document, patch) {
   var selection = [this.textarea.selectionStart, this.textarea.selectionEnd];
   if (patch) {
     try {
-      var selectionMod = [
-        new jot.INS(selection[0], "!").rebase(patch).hunks[0].offset,
-        new jot.INS(selection[1], "!").rebase(patch).hunks[0].offset,
-      ];
-      selection = selectionMod; // if successful
+      var r = new jot.SPLICE(
+        selection[0],
+        selection[1]-selection[0],
+        document.slice(selection[0], selection[1]))
+        .rebase(patch);
+      selection = [r.hunks[0].offset, r.hunks[r.hunks.length-1].offset+r.hunks[r.hunks.length-1].length]; // if successful
     } catch (e) {
+      console.log("could not update cursor position", e);
     }
   }
   this.textarea.value = document;

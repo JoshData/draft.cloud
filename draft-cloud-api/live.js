@@ -113,6 +113,7 @@ exports.init = function(io, sessionStore, settings) {
             // to documents.
             socket.open_documents[doc.uuid] = {
               user: user, // who authenticated
+              op_pointer: data.path,
               op_path: op_path,
               last_revision_sent: revision_id
             };
@@ -144,27 +145,31 @@ exports.init = function(io, sessionStore, settings) {
 
         // Find the base revision. If not specified, it's the current revision.
         routes.load_revision_from_id(doc, data.base_revision, function(base_revision) {
-          routes.make_revision(
-            doc_state.user,
-            doc,
-            base_revision,
-            op,
-            doc_state.op_path,
-            data.comment,
-            data.userdata,
-            {
-              _status: null,
-              status: function(code) { this._status = code; return this; },
-              send: function(message) {
-                socket.emit('document-patch-received', { document: doc.uuid, error: message, code: this._status });
-              },
-              json: function(data) {
-                socket.emit('document-patch-received', {
-                  document: doc.uuid,
-                  revision: data
-                });
-              }
-            });
+          routes.get_document_content(doc, data.op_pointer, base_revision, function(err, revision_id, content, op_path) {
+            // TODO: check err
+            routes.make_revision(
+              doc_state.user,
+              doc,
+              base_revision,
+              content,
+              op,
+              doc_state.op_path,
+              data.comment,
+              data.userdata,
+              {
+                _status: null,
+                status: function(code) { this._status = code; return this; },
+                send: function(message) {
+                  socket.emit('document-patch-received', { document: doc.uuid, error: message, code: this._status });
+                },
+                json: function(data) {
+                  socket.emit('document-patch-received', {
+                    document: doc.uuid,
+                    revision: data
+                  });
+                }
+              });
+          });
         });
       })
     });
