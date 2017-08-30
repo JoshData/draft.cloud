@@ -26,6 +26,31 @@ exports.textarea = function(textarea) {
     var left = bbox.left + bbox.width - dims.width - 2 - 15; // 15 is for a righthand scrollbar
     saved_status_badge.setAttribute("style", saved_status_badge_style + "; top: " + top + "px; left: " + left + "px");
   }
+
+  var debug_random_op_interval = /#randomopinterval=(\d+)/.exec(window.location.hash);
+  if (debug_random_op_interval) {
+    setInterval(
+      function() {
+        var doc = textarea.value;
+
+        // Construct a random operation toward the beginning of the
+        // document and of a relatively short length.
+        var start = Math.floor(Math.random() * Math.random() * (doc.length+1));
+        var length = (start < doc.length) ? Math.floor(Math.random() * Math.random() * (doc.length - start + 1)) : 0;
+
+        // Construct a random operation on that part and mutate the text.
+        // Coerce to a string.
+        var rangetext = doc.slice(start, start+length);
+        rangetext = ""+jot.createRandomOp(rangetext).apply(rangetext);
+
+        // Apply it to the textarea.
+        var op = new jot.SPLICE(start, length, rangetext);
+        doc = op.apply(doc);
+        textarea.value = doc;
+      },
+      debug_random_op_interval[1]
+    )
+  }
 }
 
 exports.textarea.prototype = new simple_widget(); // inherit
