@@ -84,8 +84,8 @@ exports.textarea.prototype.set_document = function(document, patch) {
       var r = new jot.SPLICE(
         selection[0],
         selection[1]-selection[0],
-        document.slice(selection[0], selection[1]))
-        .rebase(patch);
+        (selection[1] != selection[0]) ? "" : "X") // any value that prevents it from becoming a no-op
+        .rebase(patch, { document: this.textarea.value });
       selection = [r.hunks[0].offset, r.hunks[r.hunks.length-1].offset+r.hunks[r.hunks.length-1].length]; // if successful
     } catch (e) {
       console.log("could not update cursor position", e);

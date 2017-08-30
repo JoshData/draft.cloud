@@ -89,79 +89,77 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
     // ID otherwise we might get back the local change as a
     // revision before we know its ID.
     if (waiting_for_local_change_to_save) {
-      logger("remote changes queued");
+      logger("remote changes queued during revision push");
       return;
     }
 
-    // We've got a list of new Revisions from the server that ocurred since
-    // widget_base_revision. These revisions may come from one of three segments of
-    // time/state:
+    // We expect to receive:
     //
-    // * Before the last local change. They diverged from what we've sent at widget_base_revision.
-    //   In order to update the widget, we must rebase these changes against our last
-    //   push. (We let the server handle merges when we push, so we are not aware of
-    //   concurrent remote changes at the time we push. This is the paired rebase
-    //   with the rebase that happens on the server to merge concurrent edits.)
+    // A) Revisions submitted by other clients to the server
+    //    after we sent one but before the server committed
+    //    ours, if we have one in flight.
     //
-    // * The Revision might be the last local change itself, which is how we'll
-    //   know that we've caught up to what we submitted. (We don't push any local
-    //   changes while local changes are in flight and we're waiting to see
-    //   it come back as a committed Revision.)
+    // B) Our own Revision, if we have one in flight.
     //
-    // * After our last local change. This will only occur
-    //   if this is the first time we're receiving new remote changes after seeing
-    //   our last change come back.
+    // C) Revisions submitted by other clients while we have
+    //    nothing in flight, or after our in flight Revision
+    //    was committed.
+    //
+    // Split the incoming Revisions into two arrays for (A)
+    // and (C).
 
-    var history_before_push = [];
-    var seen_our_revision = false;
-    var history_after_push = [];
+    var last_revision_id;
+    var revs_before_ours = [];
+    var seen_ours = false;
+    var revs_after_ours = [];
     remote_changes.forEach(function(revision) {
-      // Deserialize.
-      revision.op = jot.opFromJSON(revision.op);
-
-      // Split the revisions.
       if (waiting_for_local_change_to_return
           && revision.id == waiting_for_local_change_to_return.revision_id)
-        seen_our_revision = true;
-      else if (!seen_our_revision && waiting_for_local_change_to_return)
-        history_before_push.push(revision.op);
+        seen_ours = true;
+      else if (!seen_ours && waiting_for_local_change_to_return)
+        revs_before_ours.push(jot.opFromJSON(revision.op));
       else
-        history_after_push.push(revision.op);
+        revs_after_ours.push(jot.opFromJSON(revision.op));
 
       // Remember the most recent ID for updating state at the end.
       last_revision_id = revision.id;
     });
 
-    logger("received revisions "
+    // If we have a change in flight but don't see it yet, keep waiting.
+    if (waiting_for_local_change_to_return && !seen_ours) {
+      logger("remote changes queued waiting for our revision to commit");
+      return;
+    }
+
+    logger("received "
       + (!waiting_for_local_change_to_return
         ? ""
-        : (history_before_push.length
-           + "/" + seen_our_revision
-           + "/"))
-      + history_after_push.length);
+        : (revs_before_ours.length + "+" ))
+      + revs_after_ours.length
+      + " revisions");
 
     // Turn the history arrays into jot operations.
-    history_before_push = new jot.LIST(history_before_push).simplify();
-    history_after_push = new jot.LIST(history_after_push).simplify();
+    revs_before_ours = new jot.LIST(revs_before_ours).simplify();
+    revs_after_ours = new jot.LIST(revs_after_ours).simplify();
 
     if (waiting_for_local_change_to_return) {
-      // Since history_before_push diverged from the history at the
+      // Since revs_before_ours diverged from the history at the
       // same point as our last push, we need to rebase it against
       // what we sent to the server.
-      history_before_push = history_before_push.rebase(
+      revs_before_ours = revs_before_ours.rebase(
         waiting_for_local_change_to_return.op, 
         { document: widget_base_content }
       )
 
       // Advance the base content.
       widget_base_content = waiting_for_local_change_to_return.op.apply(widget_base_content);
-      widget_base_content = history_before_push.apply(widget_base_content);
+      widget_base_content = revs_before_ours.apply(widget_base_content);
     }
 
-    // Compose that with history_after_push, which occurred after
+    // Compose that with revs_after_ours, which occurred after
     // our last push so no rebase is necessary. Advance the base content.
-    var widget_patch = history_before_push.compose(history_after_push).simplify();
-    widget_base_content = history_after_push.apply(widget_base_content);
+    var widget_patch = revs_before_ours.compose(revs_after_ours).simplify();
+    widget_base_content = revs_after_ours.apply(widget_base_content);
 
     // Send the history to the widget.
     if (!widget_patch.isNoOp())
@@ -171,8 +169,7 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
     // =====================
     remote_changes = [];
     widget_base_revision = last_revision_id;
-    if (seen_our_revision)
-      waiting_for_local_change_to_return = null;
+    waiting_for_local_change_to_return = null;
   }
 
   // Run an async method to process outgoing local changes.
