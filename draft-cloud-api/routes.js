@@ -394,6 +394,9 @@ exports.create_routes = function(app, settings) {
 
         // Callback.
         cb(null, revision_id, content, op_path);
+      })
+      .catch(function(err) {
+        cb("There is an error with the document.");
       });
     });
   }

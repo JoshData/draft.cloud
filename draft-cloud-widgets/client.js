@@ -118,6 +118,7 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
       revision.op = jot.opFromJSON(revision.op);
 
       // Split the revisions.
+      if (!revision.id) throw ["invalid revision id", revision];
       if (revision.id == last_push_revision)
         our_revision = revision.op;
       else if (our_revision === null)
@@ -149,7 +150,7 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
       // Compose with history_2. (nb. compose() may return null if an atomic
       // compose is not possible, so we use a LIST to ensure we get a valid
       // composition object.)
-      widget_patch = new jot.LIST([widget_patch, history_after_push]).simplify();
+      widget_patch = widget_patch.compose(history_after_push).simplify();
     }
 
     // Send the history to the widget.
