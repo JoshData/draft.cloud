@@ -10,6 +10,7 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
   var closed = false;
 
   // Document state.
+  var widget_base_content;
   var widget_base_revision;
 
   // Channel state.
@@ -44,6 +45,7 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
       logger("document opened with " + doc.access_level + " access");
 
       // Set global state.
+      widget_base_content = doc.content;
       widget_base_revision = doc.revision;
       channel_push_func = doc.pushfunc;
       channel_close_func = doc.closefunc;
@@ -148,18 +150,22 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
       // what we sent to the server.
       history_before_push = history_before_push.rebase(
         waiting_for_local_change_to_return.op, 
-        true//TODO
+        { document: widget_base_content }
       )
+
+      // Advance the base content.
+      widget_base_content = waiting_for_local_change_to_return.op.apply(widget_base_content);
+      widget_base_content = history_before_push.apply(widget_base_content);
     }
 
     // Compose that with history_after_push, which occurred after
-    // our last push so no rebase is necessary.
+    // our last push so no rebase is necessary. Advance the base content.
     var widget_patch = history_before_push.compose(history_after_push).simplify();
+    widget_base_content = history_after_push.apply(widget_base_content);
 
     // Send the history to the widget.
-    if (!widget_patch.isNoOp()) {
+    if (!widget_patch.isNoOp())
       widget.merge_remote_changes(widget_patch);
-    }
 
     // Update Document State
     // =====================

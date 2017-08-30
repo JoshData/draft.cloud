@@ -14,23 +14,22 @@ var jot = require("../jot");
 exports.poll_interval = 333;
 
 exports.simple_widget = function() {
-  // Track the base content to see when changes are made.
-  this.base_content = null;
-
   // Track local changes.
+  this.changes_start_content = null;
   this.changes = [];
+  this.changes_last_content = null;
 }
 
 exports.simple_widget.prototype.compute_changes = function() {
   // Has the document changed locally since the last fetched content?
-  var current_content = this.get_document(this.base_content);
-  var patch = jot.diff(this.base_content, current_content);
+  var current_content = this.get_document();
+  var patch = jot.diff(this.changes_last_content, current_content);
   if (!patch.isNoOp()) {
     // There's been a change. Record it.
     this.changes.push(patch);
 
     // And make the current state the new base.
-    this.base_content = current_content;
+    this.changes_last_content = current_content;
   }
 }
 
@@ -39,7 +38,8 @@ exports.simple_widget.prototype.initialize = function(state) {
   this.logger(this.name + " initialized");
 
   // Start the base state off with the given document content.
-  this.base_content = state.content;
+  this.changes_start_content = state.content;
+  this.changes_last_content = state.content;
 
   // Provide the content to the document.
   this.set_readonly(state.readonly);
@@ -62,6 +62,7 @@ exports.simple_widget.prototype.pop_changes = function(state) {
   // Return the local changes as a jot operation and clear the list.
   var patch = new jot.LIST(this.changes).simplify()
   this.changes = [];
+  this.changes_start_content = this.changes_last_content;
   return patch;
 }
 
@@ -76,21 +77,26 @@ exports.simple_widget.prototype.merge_remote_changes = function(patch) {
   // * The widget itself must be updated.
 
   // Run compute_changes one last time so that
-  // base_content + changes == document.
+  // changes_start_content + changes == document.
   this.compute_changes();
-
-  // Bring any pending changes forward.
   var pending_changes = new jot.LIST(this.changes).simplify();
-  this.changes = [pending_changes.rebase(patch, true)];
-  if (this.changes[0].isNoOp()) this.changes = [];
 
   // Bring the patch forward for any pending changes.
-  patch = patch.rebase(pending_changes, true);
+  var patch1 = patch.rebase(pending_changes, { document: this.changes_start_content });
 
   // Update the document.
-  var new_content = patch.apply(this.base_content);
-  this.set_document(new_content, patch);
-  this.base_content = new_content;
+  this.changes_last_content = patch1.apply(this.changes_last_content);
+  this.set_document(this.changes_last_content, patch1);
+  
+  // Bring any pending changes forward so that when they are next
+  // requested by the client, they take into account that the
+  // remote changes have been applied.
+  this.changes_start_content = patch.apply(this.changes_start_content);
+  pending_changes = pending_changes.rebase(patch, { document: this.changes_start_content });
+  if (pending_changes.isNoOp())
+    this.changes = [];
+  else
+    this.changes = [pending_changes];
 }
 
 exports.simple_widget.prototype.status = function(state) {
