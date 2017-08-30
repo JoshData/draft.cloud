@@ -304,10 +304,10 @@ exports.create_routes = function(app, settings) {
     // or "singularity", which represents the state of the document prior to the first
     // Revision.
     //
-    // Calls cb(error) or cb(null, revision_id, content, path), where revision_id
-    // is "singularity" or a Revision UUID, content is the document content, and
-    // path is a data structure similar to the pointer that is used to create
-    // JOT operations at that path --- unlike pointer, it distinguishes Array and
+    // Calls cb(error) or cb(null, revision, content, path), where revision is null
+    // representing the "singularity" or a Revision instance or UUID, content is the document
+    // content, and path is a data structure similar to the pointer that is used to
+    // create JOT operations at that path --- unlike pointer, it distinguishes Array and
     // Object accesses.
 
     if (at_revision == "singularity") {
@@ -317,13 +317,20 @@ exports.create_routes = function(app, settings) {
       if (pointer)
         cb('Document path ' + pointer + ' cannot exist before the document is started.');
       else
-        cb(null, at_revision, null, []);
+        cb(null, null, null, []);
       return;
     }
 
-    // Documents always start with a null value at the start of the revision history.
-    var revision_id = "singularity";
-    var content = null;
+    if (typeof at_revision === "string") {
+    	// If given a Revision UUID, look it up in the database.
+  		exports.load_revision_from_id(doc, at_revision, function(revision) {
+  			if (!revision)
+		        cb('Invalid revision: ' + at_revision);
+		    else
+  				exports.get_document_content(doc, pointer, revision, cb);
+  		});
+    	return;
+    }
 
     // Find the most recent Revision with cached content, but no later
     // than at_revision (if at_revision is not null).
@@ -358,17 +365,21 @@ exports.create_routes = function(app, settings) {
         order: [["id", "ASC"]]
       })
       .then(function(revs) {
+        // Documents always start with a null value at the start of the revision history.
+        var current_revision = "singularity";
+        var content = null;
+
         // Start with the peg revision, assuming there was one.
         if (peg_revision) {
           content = peg_revision.cached_document;
-          revision_id = peg_revision.uuid;
+          current_revision = peg_revision;
         }
 
         // Apply all later revisions' operations (if any).
         for (var i = 0; i < revs.length; i++) {
           var op = jot.opFromJSON(revs[i].op);
           content = op.apply(content);
-          revision_id = revs[i].uuid;
+          current_revision = revs[i];
         }
 
         // We now have the latest content....
@@ -397,7 +408,7 @@ exports.create_routes = function(app, settings) {
         content = x[1];
 
         // Callback.
-        cb(null, revision_id, content, op_path);
+        cb(null, current_revision, content, op_path);
       })
       .catch(function(err) {
         cb("There is an error with the document.");
@@ -450,7 +461,7 @@ exports.create_routes = function(app, settings) {
     }
 
     // Parse the path via get_document_content.
-    exports.get_document_content(doc, pointer, base_revision, function(err, revision_id, content, op_path) {
+    exports.get_document_content(doc, pointer, base_revision, function(err, revision, content, op_path) {
       cb(err, op_path);
     });
   }
@@ -464,7 +475,7 @@ exports.create_routes = function(app, settings) {
       exports.get_document_content(doc,
         req.params.pointer,
         req.headers['Revision-Id'],
-        function(err, revision_id, content) {
+        function(err, revision, content) {
 
         if (err) {
           res.status(404).send(err);
@@ -473,7 +484,7 @@ exports.create_routes = function(app, settings) {
 
         // Send a header with the ID of the revision that this content came from,
         // so that if the user submits new content we know what the base revision was.
-        res.header("Revision-Id", revision_id)
+        res.header("Revision-Id", revision ? revision.uuid : "singularity")
         res.header("Access-Level", access_level)
 
         // What content type should be used for the response? Get the preferred
@@ -571,8 +582,8 @@ exports.create_routes = function(app, settings) {
   exports.load_revision_from_id = function(doc, revision_id, cb) {
     // Gets a Revision instance from a revision UUID. If revision_id is...
     //   "singularity", then "singularity"
-    //   "", then the most recent revision
-    //   a revision id, then the revision object
+    //   "", then the most recent revision ("singularity" or a Revision instance)
+    //   a revision id, then that one
     //   not valid, then null
     // ... is passed to the callback.
 
@@ -658,7 +669,7 @@ exports.create_routes = function(app, settings) {
         }
 
         // Get the content of the document as of the base revision.
-        exports.get_document_content(doc, req.params.pointer, base_revision, function(err, revision_id, content, op_path) {
+        exports.get_document_content(doc, req.params.pointer, base_revision, function(err, revision, content, op_path) {
           if (err) {
             res.status(404).send(err);
             return;

@@ -92,7 +92,7 @@ function commit_revision(document, revision, cb) {
 
     // Load the document at the base revision.
     routes.get_document_content(document, revision.doc_pointer, baseRevision,
-      function(err, revision_id, content, op_path) {
+      function(err, doc_revision, content, op_path) {
         // There should not be any errors...
         if (err) {
           cb(err);

@@ -84,39 +84,58 @@ exports.init = function(io, sessionStore, settings) {
           return;
         }
 
-        // Sufficient permission. Now get the document's current content.
+        if (doc.uuid in socket.open_documents) {
+          // Can't open the same document more than once.
+          response({ error: "Document is already open." });
+          return;
+        }
+
+        // Sufficient permission.... Get the document's current content
+        // and/or the Revision corresponding to what this reconnecting
+        // client last saw.
         routes.get_document_content(doc,
           data.path,
-          null, // current revision
-          function(err, revision_id, content, op_path) {
+          data.last_seen_revision, // null or the last revision seen before disconnect
+          function(err, revision, content, op_path) {
             if (err) {
               response({ error: err });
               return;
             }
 
-            if (doc.uuid in socket.open_documents) {
-              response({ error: "Document is already open." });
-              return;
-            }
-
-            // Assign a key to this document for the client, so that the client
-            // can keep multiple documents open.
             response({
               document: routes.make_document_json(owner, doc),
               access_level: level,
               content: content,
-              revision: revision_id
+              revision: revision ? revision.uuid : "singularity"
             });
+
+            if (data.last_seen_revision) {
+              console.log("RECONNECT WITH ", data.last_seen_revision)
+              models.Revision.findAll({
+                where: {
+                  documentId: doc.id,
+                  id: { "$gt": revision.id },
+                  committed: true
+                },
+                order: [["id", "ASC"]]
+              })
+              .then(function(revs) {
+                socket.emit("new-revisions", {
+                  document: doc.uuid,
+                  revisions: revs.map(function(rev) { return routes.make_revision_response(rev, op_path) })
+                });
+              });
+            }
 
             // Add this socket to the global object containing all sockets listening
             // to documents.
             socket.open_documents[doc.uuid] = {
               user: user, // who authenticated
               doc_pointer: data.path,
-              op_path: op_path,
-              last_revision_sent: revision_id
+              op_path: op_path
             };
             document_watchers.add(doc, socket);
+
           });
       });
     });
@@ -196,31 +215,5 @@ exports.emit_revisions = function(doc, revs) {
       document: doc.uuid,
       revisions: revs.map(function(rev) { return routes.make_revision_response(rev, state.op_path) })
     });
-
-    /*
-    // Emit all of the revisions from the last one the client saw
-    // up through this one to avoid race conditions.
-    models.Revision.findAll({
-      where: {
-        documentId: revision.documentId,
-        id: {
-          "$gt": state.last_revision_sent,
-          "$lte": revision.id
-        }
-      },
-      order: [["id", "ASC"]]
-    }).then(function(revs) {
-      if (revs.length == 0)
-        return;
-      var revs = revs.map(function(rev) {
-        rev.op = JSON.parse(rev.op);
-        rev.userdata = JSON.parse(rev.userdata);          
-        return make_revision_response(rev, state.op_path);
-      });
-      console.log(socket.id, revs)
-      socket.emit("new-revisions", revs);
-      state.last_revision_sent = revs[revs.length-1].id;
-    })
-    */
   })
 }
