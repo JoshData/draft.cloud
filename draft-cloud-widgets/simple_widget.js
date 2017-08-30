@@ -35,6 +35,9 @@ exports.simple_widget.prototype.compute_changes = function() {
 }
 
 exports.simple_widget.prototype.initialize = function(state) {
+  this.logger = state.logger;
+  this.logger(this.name + " initialized");
+
   // Start the base state off with the given document content.
   this.base_content = state.content;
 
@@ -42,16 +45,18 @@ exports.simple_widget.prototype.initialize = function(state) {
   this.set_readonly(state.readonly);
   this.set_document(state.content);
 
-  // The polling function that checks for changes in the widget's contents.
+  // Start polling for changes in the widget's contents.
   var _this = this;
   function poll_for_changes() {
     _this.compute_changes();
-    setTimeout(poll_for_changes, exports.poll_interval);
   }
-
-  // Start polling for changes.
-  poll_for_changes();
+  this.intervalId = setInterval(poll_for_changes, exports.poll_interval);
 };
+
+exports.simple_widget.prototype.destroy = function() {
+  if (this.intervalId)
+    clearInterval(this.intervalId);
+}
 
 exports.simple_widget.prototype.pop_changes = function(state) {
   // Return the local changes as a jot operation and clear the list.

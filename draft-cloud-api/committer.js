@@ -68,6 +68,7 @@ function commit_uncommitted_revisions() {
               // for this document.
               require("../draft-cloud-api/live.js").emit_revisions(doc, revs);
               cb();
+              if (err) console.error(err);
             }
           );
         },
@@ -93,8 +94,10 @@ function commit_revision(document, revision, cb) {
     routes.get_document_content(document, revision.doc_pointer, baseRevision,
       function(err, revision_id, content, op_path) {
         // There should not be any errors...
-        if (err)
-          throw err;
+        if (err) {
+          cb(err);
+          return;
+        }
 
         // Load the JOT operation.
         var op = jot.opFromJSON(revision.op);
@@ -127,7 +130,12 @@ function commit_revision(document, revision, cb) {
 
           // Rebase. Pass the base document content to enable conflictless rebase.
           // TODO: This may throw.
-          op = op.rebase(base_ops, { document: content });
+          try {
+            op = op.rebase(base_ops, { document: content });
+          } catch (e) {
+            // Rebase failed? That's bad.
+            op = new jot.NO_OP();
+          }
 
           // Make a revision.
           revision.op = op.toJSON();

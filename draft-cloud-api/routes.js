@@ -157,7 +157,9 @@ exports.create_routes = function(app, settings) {
       userdata: doc.userdata,
       api_urls: {
         document: api_public_base_url + document_route.replace(/:owner/, encodeURIComponent(owner.name))
-          .replace(/:document/, encodeURIComponent(doc.name))
+          .replace(/:document/, encodeURIComponent(doc.name)),
+        debugger: api_public_base_url + document_route.replace(/:owner/, encodeURIComponent(owner.name))
+          .replace(/:document/, encodeURIComponent(doc.name)) + "/debug"
       },
       web_urls: {
         document: api_public_base_url + "/:owner/:document".replace(/:owner/, encodeURIComponent(owner.name))

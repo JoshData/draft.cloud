@@ -4,6 +4,9 @@
 // browserify -d draft-cloud-widgets/browserfy_root.js -o public_html/draftdotcloud.js
 //
 
+// Let other initialization occur before we actually start initialization.
+setTimeout(init, 0);
+
 var log_receivers = [];
 
 function init() {
@@ -55,8 +58,6 @@ function init() {
     }
   }
 }
-
-init();
 
 global.draft_cloud_on_event = function(log_recipient) {
   log_receivers.push(log_recipient);

@@ -30,6 +30,8 @@ exports.textarea = function(textarea) {
 
 exports.textarea.prototype = new simple_widget(); // inherit
 
+exports.textarea.prototype.name = "Textarea Widget";
+
 exports.textarea.prototype.get_document = function() {
   return this.textarea.value; 
 }
