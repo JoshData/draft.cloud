@@ -231,15 +231,19 @@ paths:
         Updates the content of a `Document` with content provided in the request body.
         Document content is text or arbitrary JSON data provided in the request body
         (see the request Content-Type header parameter).
+
         If a [JSON Pointer](https://tools.ietf.org/html/rfc6901) to a subpart of the document is given at the end of the URL (see GET),
         then the content provided in this PUT request replaces the content at the location in the
         document that the pointer points to and the operation in the revision in the response body is
         relative to that part of the document.
+
         If a base revision is specified with the Base-Revision-Id header, then the changes made
         relative to the base revision will be merged with the changes made in any Revisions that
         were made after the base revision (probably by other users acting simultaneously).
-        The response is a new `Revsion` object (or an empty 200 OK response if the document did
-        not change).
+
+        The response is a new uncommitted `Revsion` object, meaning it has not yet been applied
+        to the document. Revisions are applied in an asynchronous manner, so the document's content
+        and history will reflect the new Revision after a few moments.
       parameters:
         - name: owner
           in: path
@@ -279,10 +283,8 @@ paths:
           description: An API key that has WRITE access to the document.
           required: true
       responses:
-        200:
-          description: The request body does not differ from the document's content at the base revision.
         201:
-          description: A `Revision` was saved. The response is the new `Revision`.
+          description: A `Revision` was saved. The response is the new uncommitted `Revision`.
           headers:
             Content-Type:
               description: Always `application/json`.
@@ -298,13 +300,18 @@ paths:
     patch:
       description: |
         Updates the content of a `Document` with a raw JOT operation provided in the request body.
+        
         If a [JSON Pointer](https://tools.ietf.org/html/rfc6901) to a subpart of the document is given at the end of the URL (see GET),
         then the operation applies to that location in the document that the pointer points to and the operation in the revision in the response body is
         relative to that part of the document.
+        
         If a base revision is specified with the Base-Revision-Id header, then the operation
         will be transformed to apply logically as if the changes made in any Revisions that
         were made after the base revision were made simultaneously.
-        The response is a new `Revsion` object.
+        
+        The response is a new uncommitted `Revsion` object, meaning it has not yet been applied
+        to the document. Revisions are applied in an asynchronous manner, so the document's content
+        and history will reflect the new Revision after a few moments.
       parameters:
         - name: owner
           in: path
@@ -345,7 +352,7 @@ paths:
           required: true
       responses:
         201:
-          description: A `Revision` was saved. The response is the new `Revision`.
+          description: A `Revision` was saved. The response is the new uncommitted `Revision`.
           headers:
             Content-Type:
               description: Always `application/json`.

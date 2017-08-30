@@ -326,6 +326,7 @@ exports.create_routes = function(app, settings) {
     // Find the most recent Revision with cached content, but no later
     // than at_revision (if at_revision is not null).
     var where = {
+      committed: true, // necessarily true anyway if has_cached_document
       documentId: doc.id,
       has_cached_document: true
     };
@@ -342,6 +343,7 @@ exports.create_routes = function(app, settings) {
       // we load all revisions from the beginning.
       var where = {
         documentId: doc.id,
+        committed: true
       };
       if (at_revision || peg_revision)
         where["id"] = { };
@@ -519,98 +521,24 @@ exports.create_routes = function(app, settings) {
     cb(null, op);
   }
 
-  exports.make_revision = function(user, doc, base_revision, content, op, op_path, comment, userdata, res) {
-    // Begin a transaction so that we can lock on the document. For some reason when I used
-    // "managed" transaction it didn't run COMMIT and the sqlite database remained locked
-    // forever.
-    models.db.transaction().then(function (transaction) {
-      // Acquire a lock on the document so that make_revision calls are serialized,
-      // since the statement below fetching all subsequent revisions since the
-      // base revision *must* remain the total set of revisions until the new
-      // revision is added.
-      return models.Document.findOne({
-        where: { id: doc.id },
-        transaction: transaction,
-        lock: "UPDATE" // TOOD: Not working in sqlite or anywhere?
-      }).then(function(_dummy_) {
+  exports.make_revision = function(user, doc, base_revision, op, pointer, comment, userdata, res) {
+    // Record an uncommitted transaction.
+    models.Revision.create({
+      userId: user.id,
+      documentId: doc.id,
+      baseRevisionId: base_revision == "singularity" ? null : base_revision.id,
+      doc_pointer: pointer,
+      op: op.toJSON(),
+      comment: comment,
+      userdata: userdata
+    })
+    .then(function(rev) {
+      // Send response.
+      res.status(201).json(exports.make_revision_response(rev, null));
 
-        // Rebase against all of the subsequent operations after the base revision to
-        // the current revision. Find all of the subsequent operations.
-        models.Revision.findAll({
-          where: {
-            documentId: doc.id,
-            id: {
-              "$gt": base_revision == "singularity" ? 0 : base_revision.id,
-            }
-          },
-          order: [["id", "ASC"]],
-          transaction: transaction
-        })
-        .then(function(revs) {
-          // Load the JOT operations as a LIST.
-          var base_ops = jot.LIST(revs.map(function(rev) {
-            var op = jot.opFromJSON(rev.op);
-              op_path.forEach(function(key) {
-                op = op.drilldown(key);
-              });
-            return op;
-          })).simplify();
-
-          // Rebase. Pass the base document content to enable conflictless rebase.
-          try {
-            op = op.rebase(base_ops, { document: content });
-          } catch (e) {
-            res.status(409).send("The document was modified. Changes could not be applied.")
-            transaction.rollback();
-            return;
-          }
-          if (op.isNoOp()) {
-            res.status(200).send("no change");
-            transaction.rollback();
-            return;
-          }
-
-          // If this operation occurred at a sub-path on the document, then wrap the
-          // operation within APPLY operations to get down to that path. op_path has been
-          // constructed so that the elements are either numbers or strings, and jot.APPLY
-          // will use that distinction to select whether it is the APPLY for sequences
-          // (the element is a number, an index) or objects (the element is a string, a key).
-          for (var i = op_path.length-1; i >= 0; i--)
-            op = jot.APPLY(op_path[i], op);
-
-          // Make a revision.
-          return models.Revision.create({
-            userId: user.id,
-            documentId: doc.id,
-            op: op.toJSON(),
-            comment: comment,
-            userdata: userdata
-          }, {
-            transaction: transaction          
-          })
-          .then(function(rev) {
-            transaction.commit();
-            res.status(201).json(exports.make_revision_response(rev, op_path));
-            require("../draft-cloud-api/live.js").emit_revision(doc, rev);
-          })
-          .catch(function (err) {
-            transaction.rollback();
-            res.status(500).send("Something went wrong, sorry!.")
-            console.log(err);
-          });
-        })
-        .catch(function (err) {
-          transaction.rollback();
-          res.status(500).send("Something went wrong, sorry!.")
-          console.log(err);
-        });
-      })
-      .catch(function (err) {
-        transaction.rollback();
-        res.status(500).send("Something went wrong, sorry!.")
-        console.log(err);
-      });
-    });
+      // Alert committer to look for new revisions.
+      require("./committer.js").notify();
+    })
   }
 
   function drill_down_operation(op, op_path) {
@@ -623,14 +551,19 @@ exports.create_routes = function(app, settings) {
   }
 
   exports.make_revision_response = function(rev, op_path) {
-    return {
+    var ret = {
       createdAt: rev.createdAt,
       id: rev.uuid,
-      op: drill_down_operation(rev.op, op_path),
       author: rev.userId,
       comment: rev.comment,
-      userdata: rev.userdata
+      userdata: rev.userdata,
+      committed: rev.committed
     };
+
+    if (rev.committed) 
+      ret.op = drill_down_operation(rev.op, op_path);
+
+    return ret;
   }
 
   exports.load_revision_from_id = function(doc, revision_id, cb) {
@@ -744,9 +677,8 @@ exports.create_routes = function(app, settings) {
                 user,
                 doc,
                 base_revision,
-                content,
                 op,
-                op_path,
+                req.params.pointer,
                 req.headers['revision-comment'],
                 userdata,
                 res);
@@ -800,24 +732,16 @@ exports.create_routes = function(app, settings) {
             return;
           }
 
-          exports.get_document_content(doc, req.params.pointer, base_revision, function(err, revision_id, content, op_path) {
-            if (err) {
-              res.status(404).send(err);
-              return;
-            }
-
-            // Make a new revision.
-            exports.make_revision(
-              user,
-              doc,
-              base_revision,
-              content,
-              op,
-              op_path,
-              req.headers['revision-comment'],
-              userdata,
-              res);
-          });
+          // Make a new revision.
+          exports.make_revision(
+            user,
+            doc,
+            base_revision,
+            op,
+            req.params.pointer,
+            req.headers['revision-comment'],
+            userdata,
+            res);
         });
       })
     }
@@ -840,6 +764,7 @@ exports.create_routes = function(app, settings) {
         // Fetch revisions since the base revision.
         var where = {
           documentId: doc.id,
+          committed: true
         };
         if (base_revision != "singularity")
           where['id'] = { "$gt": base_revision.id };

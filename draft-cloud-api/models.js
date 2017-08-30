@@ -282,6 +282,21 @@ exports.initialize_database = function(connection_uri, ready) {
         defaultValue: Sequelize.UUIDV4
       },
 
+      // Whether this operation has been committed yet. An uncommitted
+      // Revision has a baseRevision that it still needs to be rebased
+      // against. Uncommitted revisions are not exposed to the user.
+      // They are committed in order of their primary key 'id'.
+      committed: {
+        type: Sequelize.BOOLEAN,
+        defaultValue: false
+      },
+
+      // For an uncommitted Revision, the JSON Pointer to a sub-part of
+      // the document that is being modified.
+      doc_pointer: {
+        type: Sequelize.STRING
+      },
+
       // A JOT operation giving the change to the document made in this Revision.
       op: {
         type: Sequelize.JSON
@@ -313,6 +328,7 @@ exports.initialize_database = function(connection_uri, ready) {
     });
   exports.Revision.belongsTo(exports.User);
   exports.Revision.belongsTo(exports.Document);
+  exports.Revision.belongsTo(exports.Revision, {as: 'baseRevision'});
 
   // Synchronize models to database tables.
   exports.db.sync().then(ready);

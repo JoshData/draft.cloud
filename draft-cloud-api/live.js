@@ -14,10 +14,13 @@ var document_watchers = {
     if (!(doc.uuid in this._map))
       this._map[doc.uuid] = [ ];
     this._map[doc.uuid].push(socket);
+    console.log("doc", doc.uuid, "now watched by", socket.id);
   },
   remove: function(document_uuid, socket) {
-    if (document_uuid in this._map)
+    if (document_uuid in this._map) {
+      console.log("doc", document_uuid, "no longer watched by", socket.id);
       this._map[document_uuid] = this._map[document_uuid].filter(function(s) { return s !== socket });
+    }
   },
   get: function(doc) {
     if (doc.uuid in this._map)
@@ -113,7 +116,7 @@ exports.init = function(io, sessionStore, settings) {
             // to documents.
             socket.open_documents[doc.uuid] = {
               user: user, // who authenticated
-              op_pointer: data.path,
+              doc_pointer: data.path,
               op_path: op_path,
               last_revision_sent: revision_id
             };
@@ -145,31 +148,27 @@ exports.init = function(io, sessionStore, settings) {
 
         // Find the base revision. If not specified, it's the current revision.
         routes.load_revision_from_id(doc, data.base_revision, function(base_revision) {
-          routes.get_document_content(doc, data.op_pointer, base_revision, function(err, revision_id, content, op_path) {
-            // TODO: check err
-            routes.make_revision(
-              doc_state.user,
-              doc,
-              base_revision,
-              content,
-              op,
-              doc_state.op_path,
-              data.comment,
-              data.userdata,
-              {
-                _status: null,
-                status: function(code) { this._status = code; return this; },
-                send: function(message) {
-                  socket.emit('document-patch-received', { document: doc.uuid, error: message, code: this._status });
-                },
-                json: function(data) {
-                  socket.emit('document-patch-received', {
-                    document: doc.uuid,
-                    revision: data
-                  });
-                }
-              });
-          });
+          routes.make_revision(
+            doc_state.user,
+            doc,
+            base_revision,
+            op,
+            doc_state.doc_pointer,
+            data.comment,
+            data.userdata,
+            {
+              _status: null,
+              status: function(code) { this._status = code; return this; },
+              send: function(message) {
+                socket.emit('document-patch-received', { document: doc.uuid, error: message, code: this._status });
+              },
+              json: function(data) {
+                socket.emit('document-patch-received', {
+                  document: doc.uuid,
+                  revision: data
+                });
+              }
+            });
         });
       })
     });
@@ -190,13 +189,15 @@ exports.init = function(io, sessionStore, settings) {
   });
 };
 
-exports.emit_revision = function(doc, rev) {
+exports.emit_revisions = function(doc, revs) {
   // Send this revision out to all websockets listening on this document.
+  //console.log("notifying about", doc.uuid, "...");
   document_watchers.get(doc).forEach(function(socket) {
+    console.log("notifying", socket.id, "about", doc.uuid);
     var state = socket.open_documents[doc.uuid];
     socket.emit("new-revisions", {
       document: doc.uuid,
-      revisions: [routes.make_revision_response(rev, state.op_path)]
+      revisions: revs.map(function(rev) { return routes.make_revision_response(rev, state.op_path) })
     });
 
     /*

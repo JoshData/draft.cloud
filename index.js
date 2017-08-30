@@ -8,6 +8,10 @@ var settings = JSON.parse(fs.readFileSync("local/environment.json"))
 require("./draft-cloud-api/models.js")
   .initialize_database("sqlite://db.sqlite", function() {
 
+  // Start the background process that commits revisions.
+  require('./draft-cloud-api/committer.js').begin();
+
+  // Start the HTTP server.
   var app = express();
   var sessionStore = require('express-session').MemoryStore;
     sessionStore = new sessionStore();

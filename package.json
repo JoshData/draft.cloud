@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "description": "The draft.cloud website, a collaboration server for structure data.",
   "dependencies": {
+    "async": "*",
     "body-parser": "*",
     "cookie-parser": "*",
     "credential": "*",
