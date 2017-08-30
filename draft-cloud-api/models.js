@@ -9,12 +9,12 @@ var valid_name_regex = /^[A-Za-z0-9_-]{5,64}$/;
 var valid_name_text = "Names may only contain the characters A-Z, a-z, 0-9, underscore, and hyphen and must be between 5 and 64 characters inclusive.";
 
 exports.initialize_database = function(connection_uri, ready) {
-  db = new Sequelize(connection_uri);
+  exports.db = new Sequelize(connection_uri);
 
   // CREATE MODELS
 
   // USERs.
-  exports.User = db.define('user',
+  exports.User = exports.db.define('user',
     {
       // The 'name' is the text that appears in URLs.
       name: {
@@ -47,7 +47,7 @@ exports.initialize_database = function(connection_uri, ready) {
     });
 
   // API KEYs.
-  exports.UserApiKey = db.define('user_api_key',
+  exports.UserApiKey = exports.db.define('user_api_key',
     {
       // A UUID to identify the API key. It is for identification only
       // and is not secret.
@@ -168,7 +168,7 @@ exports.initialize_database = function(connection_uri, ready) {
         }
 
   // SOCIAL LOGINS.
-  exports.UserExternalAccount = db.define('user_external_account',
+  exports.UserExternalAccount = exports.db.define('user_external_account',
     {
       // The name of the account provider.
       provider: {
@@ -201,7 +201,7 @@ exports.initialize_database = function(connection_uri, ready) {
   exports.UserExternalAccount.belongsTo(exports.User);
 
   // DOCUMENTs.
-  exports.Document = db.define('document',
+  exports.Document = exports.db.define('document',
     {
       // The 'name' is the text that appears in URLs.
       name: {
@@ -274,7 +274,7 @@ exports.initialize_database = function(connection_uri, ready) {
   }
 
   // REVISIONs.
-  exports.Revision = db.define('revision',
+  exports.Revision = exports.db.define('revision',
     {
       // A global identifier for this Revision.
       uuid: {
@@ -315,6 +315,6 @@ exports.initialize_database = function(connection_uri, ready) {
   exports.Revision.belongsTo(exports.Document);
 
   // Synchronize models to database tables.
-  db.sync().then(ready);
+  exports.db.sync().then(ready);
 
 }
