@@ -11,7 +11,7 @@
 
 var jot = require("../jot");
 
-exports.poll_interval = 333;
+exports.poll_interval = 1000;
 
 exports.simple_widget = function() {
   // Track local changes.

@@ -7,6 +7,14 @@ exports.textarea = function(textarea) {
   textarea.value = "";
   textarea.readOnly = true;
 
+  // Record changes on keypresses of whitespace since that's a nice time to
+  // send a chunk of changes to the server, preserving some logical intent.
+  var _this = this;
+  textarea.addEventListener("keypress", function(e) {
+    if (/^\s+$/.exec(e.key))
+      _this.compute_changes();
+  })
+
   // Make a widget that shows saved status.
   var saved_status_badge_style = "position: absolute; border: 1px solid #AAA; background-color: rgba(255,255,255,.85); padding: 2px; font-size: 11px; border-radius: 5px; cursor: default";
   var saved_status_badge = document.createElement("div");
