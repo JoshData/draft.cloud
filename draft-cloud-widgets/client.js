@@ -158,12 +158,12 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
 
     // Compose that with revs_after_ours, which occurred after
     // our last push so no rebase is necessary. Advance the base content.
-    var widget_patch = revs_before_ours.compose(revs_after_ours).simplify();
+    var patch = revs_before_ours.compose(revs_after_ours).simplify();
     widget_base_content = revs_after_ours.apply(widget_base_content);
 
     // Send the history to the widget.
-    if (!widget_patch.isNoOp())
-      widget.merge_remote_changes(widget_patch);
+    if (!patch.isNoOp())
+      widget.merge_remote_changes(patch);
 
     // Update Document State
     // =====================

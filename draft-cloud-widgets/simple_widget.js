@@ -21,16 +21,25 @@ exports.simple_widget = function() {
 }
 
 exports.simple_widget.prototype.compute_changes = function() {
-  // Has the document changed locally since the last fetched content?
-  var current_content = this.get_document();
-  var patch = jot.diff(this.changes_last_content, current_content);
-  if (!patch.isNoOp()) {
-    // There's been a change. Record it.
-    this.changes.push(patch);
+  // This function is called at intervals to see if the widget's
+  // content has changed. If the content has changed, a JOT operation
+  // is constructed and stored in widget.changes.
 
-    // And make the current state the new base.
-    this.changes_last_content = current_content;
-  }
+  // Get the widget's current document content.
+  var current_content = this.get_document();
+
+  // Run a diff against the last time we did this.
+  var op = jot.diff(this.changes_last_content, current_content);
+
+  // If there hasn't been a change, return.
+  if (op.isNoOp())
+    return;
+
+  // Record the change.
+  this.changes.push(op);
+
+  // Make the current content the new base for future diffs.
+  this.changes_last_content = current_content;
 }
 
 exports.simple_widget.prototype.initialize = function(state) {
@@ -38,6 +47,9 @@ exports.simple_widget.prototype.initialize = function(state) {
   this.logger(this.name + " initialized");
 
   // Start the base state off with the given document content.
+  // (New documents begin as null, so we may immediately register
+  // a change from null to the initial state of the widget, like
+  // the empty string, if the widget's document cannot be null.)
   this.changes_start_content = state.content;
   this.changes_last_content = state.content;
 
@@ -58,27 +70,52 @@ exports.simple_widget.prototype.destroy = function() {
     clearInterval(this.intervalId);
 }
 
-exports.simple_widget.prototype.pop_changes = function(state) {
-  // Return the local changes as a jot operation and clear the list.
-  var patch = new jot.LIST(this.changes).simplify()
+exports.simple_widget.prototype.pop_changes = function() {
+  // This function is called by the Client instance that this widget
+  // has been provided to. It returns a JOT operation for any changes
+  // that have been made by the end user since the last call to
+  // pop_changes and since any previous calls to merge_remote_changes.
+  // It is called at frequent intervals to poll for changes in the
+  // widget.
+
+  if (this.changes.length == 0) {
+    // Nothing new.
+    return new jot.NO_OP();
+  }
+
+  // Form a JOT operation.
+  var op = new jot.LIST(this.changes).simplify()
+
+  // Clear the changes queue.
   this.changes = [];
+
+  // Track what the document held before the first element of changes
+  // will have applied.
   this.changes_start_content = this.changes_last_content;
-  return patch;
+
+  // Return the operation.
+  return op;
 }
 
 exports.simple_widget.prototype.merge_remote_changes = function(patch) {
-  // We've got remote changes to merge into the widget's document.
-  // We have two tasks:
+  // This function is called by the Client instance that this widget
+  // has been provided to whenever there are changes made by remote
+  // users that need to be merged into the widget's state.
   //
-  // * The patch is against the state of the document the last time
-  //   pop_changes was called. We may have pending recorded changes
-  //   in local_changes that we have to rebase.
+  // patch is a JOT operation that comes in sequence after any changes
+  // previously given to the Client by pop_changes.
   //
-  // * The widget itself must be updated.
+  // But the widget may already have been changed since the last time
+  // the Client called pop_changes, so we have to rebase patch against
+  // any changes the Client has not yet seen.
+  //
+  // Then we apply the patch to the widget's content and update the
+  // widget.
 
-  // Run compute_changes one last time so that
-  // changes_start_content + changes == document.
-  this.compute_changes();
+  // Run compute_changes one last time synchronously so that
+  // changes_start_content + changes gives us the actual
+  // content present in the widget.
+  this.compute_changes()
   var pending_changes = new jot.LIST(this.changes).simplify();
 
   // Bring the patch forward for any pending changes.
@@ -101,11 +138,21 @@ exports.simple_widget.prototype.merge_remote_changes = function(patch) {
 
 exports.simple_widget.prototype.status = function(state) {
   // state is "saving" or "saved"
+
+  // Check synchronously for any new edits in the widget.
   this.compute_changes();
+
+  // If there are any edits, then the document is unsaved.
   if (this.changes.length > 0) {
     this.show_status("Not Saved");
+
+  // Or we could be saving changes that have been given
+  // to the client class by pop_changes.
   } else if (state == "saving") {
     this.show_status("Saving...");
+
+  // Or if the client class says everything is saved, and
+  // nothing is pending, then everything is saved.
   } else if (state == "saved") {
     this.show_status("Saved");
   }
