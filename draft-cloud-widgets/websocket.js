@@ -4,34 +4,31 @@ var socket = null;
 
 exports.open = function(owner_name, document_name, api_key, cbobj) {
   if (!socket) {
-    socket = global.io.connect('/');
+    socket = global.io('/');
     socket.on('message', function (message) {
       alert(message)
     });
-    socket.streamcount = 0;
   }
 
   var document_id;
   var access_level;
 
-  var requestid = ++socket.streamcount;
-
   socket.emit('open-document', {
-    requestid: requestid,
     owner: owner_name,
     document: document_name,
     api_key: api_key
-  });
+  }, function(response) {
+    if (response.error) {
+      cbobj.error(response.error);
+      return;
+    }
 
-  socket.on('document-opened', function (data) {
-    if (data.requestid != requestid) return; // for a different open-document request
-
-    document_id = data.document.id;
-    access_level = data.access_level;
+    document_id = response.document.id;
+    access_level = response.access_level;
 
     cbobj.opened({
-        content: data.content,
-        revision: data.revision,
+        content: response.content,
+        revision: response.revision,
         access_level: access_level,
         pushfunc: push,
         closefunc: function() {
@@ -48,27 +45,23 @@ exports.open = function(owner_name, document_name, api_key, cbobj) {
     cbobj.pull(data.revisions);
   });
 
-  var current_push_cb;
-
   function push(base_revision, patch, cb) {
-    current_push_cb = cb;
+    // The Client class calls this function to submit a JOT operation to
+    // the server. The server will record an *uncommitted* Revision and
+    // send that back in the socket callback function.
     socket.emit('document-patch', {
       document: document_id,
       base_revision: base_revision,
       patch: patch.toJSON(),
       comment: null,
       userdata: null
+    }, function(data) {
+      if (data.error) {
+        cb("There was an error submitting a local change: " + data.error);
+        return;
+      }
+
+      cb(null, data.revision);
     });
   }    
-
-  socket.on('document-patch-received', function (data) {
-    if (data.document != document_id) return; // for a different open-document stream
-
-    if (data.error) {
-      cb("There was an error submitting a local change: " + data.error);
-      return;
-    }
-
-    current_push_cb(null, data.revision);
-  });
 }

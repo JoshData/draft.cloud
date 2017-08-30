@@ -67,7 +67,7 @@ exports.init = function(io, sessionStore, settings) {
     
     // The open-document message begins a connection to monitor a document for
     // real time changes.
-    socket.on('open-document', function (data) {
+    socket.on('open-document', function (data, response) {
       // Check that the requestor has READ permission. socket.handshake has
       // a 'headers' property that auth.get_document_authz expects for finding
       // the user's API key, which works out if the web browser knows to send
@@ -80,8 +80,7 @@ exports.init = function(io, sessionStore, settings) {
       auth.get_document_authz(req_ish, data.owner, data.document, function(user, owner, doc, level) {
         if (auth.min_access("READ", level) != "READ") {
           // No READ permission. Fatal.
-          socket.emit('message', "403");
-          socket.disconnect();
+          response({ error: "You do not have permission to read this document."});
           return;
         }
 
@@ -91,21 +90,18 @@ exports.init = function(io, sessionStore, settings) {
           null, // current revision
           function(err, revision_id, content, op_path) {
             if (err) {
-              socket.emit('message', err);
-              socket.disconnect();
+              response({ error: err });
               return;
             }
 
             if (doc.uuid in socket.open_documents) {
-              socket.emit('message', 'Document is already open.');
-              socket.disconnect();
+              response({ error: "Document is already open." });
               return;
             }
 
             // Assign a key to this document for the client, so that the client
             // can keep multiple documents open.
-            socket.emit('document-opened', {
-              requestid: data.requestid,
+            response({
               document: routes.make_document_json(owner, doc),
               access_level: level,
               content: content,
@@ -125,7 +121,7 @@ exports.init = function(io, sessionStore, settings) {
       });
     });
 
-    socket.on('document-patch', function (data) {
+    socket.on('document-patch', function (data, response) {
       // This is just like the PATCH route but without authorization because we already
       // did that.
 
@@ -160,10 +156,11 @@ exports.init = function(io, sessionStore, settings) {
               _status: null,
               status: function(code) { this._status = code; return this; },
               send: function(message) {
-                socket.emit('document-patch-received', { document: doc.uuid, error: message, code: this._status });
+                // An error ocurred.
+                response({ document: doc.uuid, error: message, code: this._status });
               },
               json: function(data) {
-                socket.emit('document-patch-received', {
+                response({
                   document: doc.uuid,
                   revision: data
                 });
