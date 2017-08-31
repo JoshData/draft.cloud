@@ -11,12 +11,14 @@
     "express-session": "*",
     "helmet": "*",
     "json-ptr": "*",
+    "jsoneditor": "*",
     "mustache": "*",
     "passport": "*",
     "passport-github2": "*",
     "randomstring": "*",
     "sequelize": "*",
     "socket.io": "*",
+    "sqlite3": "*",
     "textarea-caret": "*",
     "uuid": "*"
   },
@@ -27,11 +29,6 @@
   "author": "Joshua Tauberer",
   "scripts": {
     "test": "tap tests/*.js"
-  },
-  "devDependencies": {
-    "connect": "*",
-    "sqlite3": "*",
-    "tap": "~0.4.9"
   },
   "bugs": {
     "url": "https://github.com/joshdata/draft.cloud/issues"
