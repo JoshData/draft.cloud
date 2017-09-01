@@ -132,6 +132,7 @@ exports.init = function(io, sessionStore, settings) {
             // to documents.
             socket.open_documents[doc.uuid] = {
               user: user, // who authenticated
+              document: doc,
               doc_pointer: data.path,
               op_path: op_path
             };
@@ -155,39 +156,32 @@ exports.init = function(io, sessionStore, settings) {
       var op = jot.opFromJSON(data.patch);
 
       // Load the document.
-      models.Document.findOne({
-        where: {
-          uuid: data.document
-        }}).then(function(doc) {
+      var doc_state = socket.open_documents[data.document];
 
-        var doc_state = socket.open_documents[doc.uuid];
-
-        // Find the base revision. If not specified, it's the current revision.
-        routes.load_revision_from_id(doc, data.base_revision, function(base_revision) {
-          routes.make_revision(
-            doc_state.user,
-            doc,
-            base_revision,
-            op,
-            doc_state.doc_pointer,
-            data.comment,
-            data.userdata,
-            {
-              _status: null,
-              status: function(code) { this._status = code; return this; },
-              send: function(message) {
-                // An error ocurred.
-                response({ document: doc.uuid, error: message, code: this._status });
-              },
-              json: function(data) {
-                response({
-                  document: doc.uuid,
-                  revision: data
-                });
-              }
-            });
-        });
-      })
+      // Find the base revision. If not specified, it's the current revision.
+      routes.load_revision_from_id(doc_state.document, data.base_revision, function(base_revision) {
+        routes.make_revision(
+          doc_state.user,
+          doc_state.document,
+          base_revision,
+          op,
+          doc_state.doc_pointer,
+          data.comment,
+          data.userdata,
+          {
+            _status: null,
+            status: function(code) { this._status = code; return this; },
+            send: function(message) {
+              // An error ocurred.
+              response({ error: message, code: this._status });
+            },
+            json: function(data) {
+              response({
+                revision: data
+              });
+            }
+          });
+      });
     });
 
     function close_document(uuid) {
