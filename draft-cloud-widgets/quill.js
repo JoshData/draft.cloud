@@ -170,16 +170,17 @@ function createDelta(current_doc, patch) {
           // orignal document are carried through to new characters.
           var charindex = 0;
           innerop.ops["insert"].hunks.forEach(function(hunk) {
-            if (hunk.offset)
+            if (hunk.offset > 0)
               delta.ops.push({ retain: hunk.offset });
             charindex += hunk.offset;
-            delta.ops.push({ delete: hunk.length });
-            delta.ops.push({ insert: hunk.op.apply(d.insert.slice(charindex,charindex+hunk.length)), attributes: d.attributes });
+            if (hunk.length > 0) delta.ops.push({ delete: hunk.length });
+            var insert = hunk.op.apply(d.insert.slice(charindex,charindex+hunk.length));
+            if ((typeof insert != "string") || insert.length > 0) delta.ops.push({ insert: insert, attributes: d.attributes });
             charindex += hunk.length;
           });
 
           // Retain any characters at the end of the PATCH.
-          if (d.insert.length-charindex)
+          if (d.insert.length-charindex > 0)
             delta.ops.push({ retain: d.insert.length-charindex });
         
 
@@ -214,7 +215,8 @@ function createDelta(current_doc, patch) {
                       : 1; // embeds have "length 1"
         delems.push(d);
       }
-      delta.ops.push({ delete: total_chars_deleted });
+      if (total_chars_deleted > 0)
+        delta.ops.push({ delete: total_chars_deleted });
 
       // Insert an insert with the new content.
       delems = hunk.op.apply(delems);
