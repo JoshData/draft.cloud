@@ -310,25 +310,26 @@ exports.initialize_database = function(connection_uri, ready) {
       // User-provided arbitrary metadata stored with the revision.
       userdata: {
         type: Sequelize.JSON
-      },
-
-      // The document content as of this Revision, if has_cached_document is true.
-      cached_document: {
-        type: Sequelize.JSON,
-        defaultValue: null
-      },
-
-      // A boolean indicating whether cached_document is filled in with a value.
-      has_cached_document: {
-        type: Sequelize.BOOLEAN,
-        defaultValue: false
-      },
+      }
     }, {
       freezeTableName: true // Model tableName will be the same as the model name
     });
   exports.Revision.belongsTo(exports.User);
   exports.Revision.belongsTo(exports.Document);
   exports.Revision.belongsTo(exports.Revision, {as: 'baseRevision'});
+
+  // CACHED DOCUMENT CONTENT.
+  exports.CachedContent = exports.db.define('cachedcontent',
+    {
+      // The document content as of this Revision
+      document_content: {
+        type: Sequelize.JSON
+      }
+    }, {
+      freezeTableName: true // Model tableName will be the same as the model name
+    });
+  exports.CachedContent.belongsTo(exports.Document);
+  exports.CachedContent.belongsTo(exports.Revision);
 
   // Synchronize models to database tables.
   exports.db.sync().then(ready);

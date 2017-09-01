@@ -332,34 +332,33 @@ exports.create_routes = function(app, settings) {
     	return;
     }
 
-    // Find the most recent Revision with cached content, but no later
+    // Find the most recent CachedContent, but no later
     // than at_revision (if at_revision is not null).
-    var where = {
-      committed: true, // necessarily true anyway if has_cached_document
-      documentId: doc.id,
-      has_cached_document: true
-    };
+    var where = { documentId: doc.id };
     if (at_revision)
-      where['id'] = { "$lte": at_revision.id };
-    models.Revision.findOne({
+      where['revisionId'] = { "$lte": at_revision.id };
+    models.CachedContent.findOne({
       where: where,
-      order: [["id", "DESC"]]
+      order: [["revisionId", "DESC"]],
+      include: [{
+        model: models.Revision
+      }]
     })
-    .then(function(peg_revision) {
+    .then(function(cache_hit) {
       // Load all subsequent revisions. Add to the id filter to only get
-      // revisions after the peg revision. The peg_revision may be null
-      // if there are no revisions with cached content --- in which case
+      // revisions after the cache hit's revision. The cache_hit may be null
+      // if there is no available cached content --- in which case
       // we load all revisions from the beginning.
       var where = {
         documentId: doc.id,
         committed: true
       };
-      if (at_revision || peg_revision)
+      if (at_revision || cache_hit)
         where["id"] = { };
       if (at_revision)
         where['id']["$lte"] = at_revision.id;
-      if (peg_revision)
-        where['id']["$gt"] = peg_revision.id;
+      if (cache_hit)
+        where['id']["$gt"] = cache_hit.revisionId;
       models.Revision.findAll({
         where: where,
         order: [["id", "ASC"]]
@@ -370,9 +369,9 @@ exports.create_routes = function(app, settings) {
         var content = null;
 
         // Start with the peg revision, assuming there was one.
-        if (peg_revision) {
-          content = peg_revision.cached_document;
-          current_revision = peg_revision;
+        if (cache_hit) {
+          content = cache_hit.document_content;
+          current_revision = cache_hit.revision;
         }
 
         // Apply all later revisions' operations (if any).
@@ -387,12 +386,13 @@ exports.create_routes = function(app, settings) {
         // If the most recent revision doesn't have cached content,
         // store it so we don't have to do all this work again next time.
         if (revs.length > 0) {
-          var last_rev = revs[revs.length-1];
-          last_rev.set("has_cached_document", true);
-          last_rev.set("cached_document", content);
-          last_rev.save().then(function() {
-            // hmm, ignoring this callback
-          })
+          models.CachedContent.create({
+                documentId: doc.id,
+                revisionId: current_revision.id,
+                document_content: content
+              }).then(function(user) {
+                // we're not waiting for this to finish
+              });
         }
 
         // Execute the JSON Pointer given in the URL. We could use
