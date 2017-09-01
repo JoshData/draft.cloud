@@ -95,6 +95,10 @@ function commit_revision(document, revision, cb) {
       function(err, doc_revision, content, op_path) {
         // There should not be any errors...
         if (err) {
+          // There is an error with document content. It is too late to
+          // do anything about this. But in order to prevent trying to
+          // commit the revision over and over again, just kill it.
+          revision.destroy(); // HMM!
           cb(err);
           return;
         }
@@ -146,6 +150,9 @@ function commit_revision(document, revision, cb) {
             console.log("committed", document.uuid, revision.uuid);
             cb();
           });
+        }).catch(function(err) {
+          revision.destroy(); // HMM!
+          cb(err);
         });
     });
   });
