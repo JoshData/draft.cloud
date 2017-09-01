@@ -39,12 +39,15 @@ exports.open = function(owner_name, document_name, api_key, cbobj) {
       // to the Client object.
       if (is_first_open) {
         is_first_open = false;
-        cbobj.opened({
+        cbobj.opened(
+          response.user,
+          {
             content: response.content,
             revision: response.revision,
-            access_level: access_level,
-            pushfunc: push,
-            closefunc: function() {
+            access_level: access_level
+          }, {
+            push: push,
+            close: function() {
               socket.emit('close-document', {
                 document: document_id
               });

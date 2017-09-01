@@ -15,8 +15,7 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
   var widget_base_revision;
 
   // Channel state.
-  var channel_push_func;
-  var channel_close_func;
+  var channel_methods;
   var remote_changes = [];
   var waiting_for_local_change_to_save = false;
   var waiting_for_local_change_to_return = null;
@@ -38,24 +37,24 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
       // Fatal error opening initial connction.
       alert(msg);
     },
-    opened: function(doc) {
+    opened: function(user, doc, methods) {
       // The document was successfully opened. We've now got
       // its current content and the corresponding revision id.
       if (closed) { doc.closefunc(); return; } // closed before calledback
 
-      logger("document opened with " + doc.access_level + " access");
+      logger("document opened by " + user.name + " with " + doc.access_level + " access");
 
       // Set global state.
       widget_base_content = doc.content;
       widget_base_revision = doc.revision;
-      channel_push_func = doc.pushfunc;
-      channel_close_func = doc.closefunc;
+      channel_methods = methods;
 
       // Do we have write access?
       var readonly = !(doc.access_level == "WRITE" || doc.access_level == "ADMIN");
 
       // Initialize the widget.
       widget.initialize({
+        user: user,
         content: doc.content,
         readonly: readonly,
         logger: logger
@@ -184,7 +183,7 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
     if (
          !waiting_for_local_change_to_save
       && !waiting_for_local_change_to_return
-      && channel_push_func) {
+      && channel_methods) {
       // Push the local changes --- everything queued up as
       // a single revision.
       var patch = widget.pop_changes();
@@ -195,7 +194,7 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
         
         widget.status("saving");
 
-        channel_push_func(widget_base_revision, patch, function(err, revision) {
+        channel_methods.push(widget_base_revision, patch, function(err, revision) {
           // We've gotten back the revision ID for the patch we
           // submitted. Remember it for later when we process
           // remote changes, so we can identify when we see
@@ -232,8 +231,8 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
       if (!closed)
         logger("connection closed");
       closed = true;
-      if (channel_close_func)
-        channel_close_func();
+      if (channel_methods)
+        channel_methods.close();
       if (pushIntervalObj)
         clearInterval(pushIntervalObj);
     } 

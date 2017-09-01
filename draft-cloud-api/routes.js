@@ -43,7 +43,7 @@ exports.create_routes = function(app, settings) {
         res
           .header("X-Api-Key", api_key)
           .status(200)
-          .json(form_user_response_body(user));
+          .json(exports.form_user_response_body(user));
       });
     });
   });
@@ -78,11 +78,11 @@ exports.create_routes = function(app, settings) {
     authz_user(req, res, "READ", function(requestor, target) {
       res
       .status(200)
-      .json(form_user_response_body(target));
+      .json(exports.form_user_response_body(target));
     });
   });
 
-  function form_user_response_body(user) {
+  exports.form_user_response_body = function(user) {
     return {
         id: user.uuid,
         name: user.name,
@@ -153,7 +153,7 @@ exports.create_routes = function(app, settings) {
       id: doc.uuid,
       name: doc.name,
       anon_access_level: doc.anon_access_level,
-      owner: form_user_response_body(owner),
+      owner: exports.form_user_response_body(owner),
       userdata: doc.userdata,
       api_urls: {
         document: api_public_base_url + document_route.replace(/:owner/, encodeURIComponent(owner.name))

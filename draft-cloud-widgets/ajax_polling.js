@@ -33,12 +33,18 @@ exports.open = function(owner_name, document_name, api_key, cbobj) {
 
       // Pass the initial document content to the callback,
       // which lets the caller know the channel is open.
-      cbobj.opened({
+      cbobj.opened(
+        {
+          // user data; TODO
+        },
+        {
           content: document_content,
           revision: xhr.getResponseHeader("Revision-Id"),
-          access_level: xhr.getResponseHeader("Access-Level"),
-          pushfunc: push,
-          closefunc: function() { poll_state.closed = true; }
+          access_level: xhr.getResponseHeader("Access-Level")
+        },
+        {
+          push: push,
+          close: function() { poll_state.closed = true; }
         }
       );
 

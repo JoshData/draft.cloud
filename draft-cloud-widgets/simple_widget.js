@@ -46,6 +46,9 @@ exports.simple_widget.prototype.initialize = function(state) {
   this.logger = state.logger;
   this.logger(this.name + " initialized");
 
+  // Remember the user.
+  this.user = state.user;
+
   // Start the base state off with the given document content.
   // (New documents begin as null, so we may immediately register
   // a change from null to the initial state of the widget, like

@@ -104,6 +104,7 @@ exports.init = function(io, sessionStore, settings) {
             }
 
             response({
+              user: routes.form_user_response_body(user),
               document: routes.make_document_json(owner, doc),
               access_level: level,
               content: content,
