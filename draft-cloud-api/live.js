@@ -96,6 +96,7 @@ exports.init = function(io, sessionStore, settings) {
         routes.get_document_content(doc,
           data.path,
           data.last_seen_revision, // null or the last revision seen before disconnect
+          true, /* cache, many people might be reconnecting here */
           function(err, revision, content, op_path) {
             if (err) {
               response({ error: err });

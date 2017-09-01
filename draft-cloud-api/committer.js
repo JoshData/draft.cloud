@@ -91,7 +91,7 @@ function commit_revision(document, revision, cb) {
       baseRevision = "singularity";
 
     // Load the document at the base revision.
-    routes.get_document_content(document, revision.doc_pointer, baseRevision,
+    routes.get_document_content(document, revision.doc_pointer, baseRevision, false /* don't cache */,
       function(err, doc_revision, content, op_path) {
         // There should not be any errors...
         if (err) {

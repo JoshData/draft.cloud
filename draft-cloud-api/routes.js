@@ -294,7 +294,7 @@ exports.create_routes = function(app, settings) {
 
   var document_content_route = document_route + '/content:pointer(/[\\w\\W]*)?';
 
-  exports.get_document_content = function(doc, pointer, at_revision, cb) {
+  exports.get_document_content = function(doc, pointer, at_revision, save_cached_content, cb) {
     // Get the content of a document (or part of a document) at a particular revision.
     //
     // pointer is null or a string containing a JSON Pointer indicating the part of
@@ -327,7 +327,7 @@ exports.create_routes = function(app, settings) {
   			if (!revision)
 		        cb('Invalid revision: ' + at_revision);
 		    else
-  				exports.get_document_content(doc, pointer, revision, cb);
+  				exports.get_document_content(doc, pointer, revision, save_cached_content, cb);
   		});
     	return;
     }
@@ -385,7 +385,7 @@ exports.create_routes = function(app, settings) {
 
         // If the most recent revision doesn't have cached content,
         // store it so we don't have to do all this work again next time.
-        if (revs.length > 0) {
+        if (revs.length > 0 && save_cached_content) {
           models.CachedContent.create({
                 documentId: doc.id,
                 revisionId: current_revision.id,
@@ -461,7 +461,7 @@ exports.create_routes = function(app, settings) {
     }
 
     // Parse the path via get_document_content.
-    exports.get_document_content(doc, pointer, base_revision, function(err, revision, content, op_path) {
+    exports.get_document_content(doc, pointer, base_revision, false, function(err, revision, content, op_path) {
       cb(err, op_path);
     });
   }
@@ -475,6 +475,7 @@ exports.create_routes = function(app, settings) {
       exports.get_document_content(doc,
         req.params.pointer,
         req.headers['Revision-Id'],
+        true, // cache the content at this revision
         function(err, revision, content) {
 
         if (err) {
@@ -669,7 +670,7 @@ exports.create_routes = function(app, settings) {
         }
 
         // Get the content of the document as of the base revision.
-        exports.get_document_content(doc, req.params.pointer, base_revision, function(err, revision, content, op_path) {
+        exports.get_document_content(doc, req.params.pointer, base_revision, false /* dont cache */, function(err, revision, content, op_path) {
           if (err) {
             res.status(404).send(err);
             return;
