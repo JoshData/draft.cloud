@@ -11,20 +11,20 @@ var document_watchers = {
   _map: { },
 
   add: function(doc, socket) {
-    if (!(doc.uuid in this._map))
-      this._map[doc.uuid] = [ ];
-    this._map[doc.uuid].push(socket);
-    console.log("doc", doc.uuid, "now watched by", socket.id);
+    if (!(doc in this._map))
+      this._map[doc] = [ ];
+    this._map[doc].push(socket);
+    console.log("doc", doc, "now watched by", socket.id);
   },
-  remove: function(document_uuid, socket) {
-    if (document_uuid in this._map) {
-      console.log("doc", document_uuid, "no longer watched by", socket.id);
-      this._map[document_uuid] = this._map[document_uuid].filter(function(s) { return s !== socket });
+  remove: function(doc, socket) {
+    if (doc in this._map) {
+      console.log("doc", doc, "no longer watched by", socket.id);
+      this._map[doc] = this._map[doc].filter(function(s) { return s !== socket });
     }
   },
   get: function(doc) {
-    if (doc.uuid in this._map)
-      return this._map[doc.uuid];
+    if (doc in this._map)
+      return this._map[doc];
     else
       return [];
   }
@@ -103,12 +103,20 @@ exports.init = function(io, sessionStore, settings) {
               return;
             }
 
+            // Get the current pier state of everyone else connected.
+            var peer_states = { };
+            document_watchers.get(doc.uuid).forEach(function(peer_socket) {
+              peer_states[peer_socket.id] = make_peer_state(peer_socket.open_documents[doc.uuid]);
+            });
+
+            // Send.
             response({
               user: routes.form_user_response_body(user),
               document: routes.make_document_json(owner, doc),
               access_level: level,
               content: content,
-              revision: revision ? revision.uuid : "singularity"
+              revision: revision ? revision.uuid : "singularity",
+              peer_states: peer_states
             });
 
             if (data.last_seen_revision) {
@@ -135,13 +143,21 @@ exports.init = function(io, sessionStore, settings) {
               user: user, // who authenticated
               document: doc,
               doc_pointer: data.path,
-              op_path: op_path
+              op_path: op_path,
+              ephemeral_state: null
             };
-            document_watchers.add(doc, socket);
+            document_watchers.add(doc.uuid, socket);
 
           });
       });
     });
+
+    function make_peer_state(state) {
+      return {
+        user: { id: state.user.uuid, name: state.user.name },
+        state: state.ephemeral_state,
+      }
+    }
 
     socket.on('document-patch', function (data, response) {
       // This is just like the PATCH route but without authorization because we already
@@ -185,8 +201,36 @@ exports.init = function(io, sessionStore, settings) {
       });
     });
 
+    socket.on('update-state', function (data) {
+      // Set the user's ephemeral state and broadcast it to everyone listening.
+      if (!(data.document in socket.open_documents))
+        return;
+
+      // Update state.
+      socket.open_documents[data.document].ephemeral_state = data.state;
+
+      // Broadcast it (but not to ourself).
+      document_watchers.get(data.document).forEach(function(peer_socket) {
+        if (peer_socket == socket) return;
+        peer_socket.emit("peer-state", {
+          document: data.document,
+          peer: socket.id,
+          state: make_peer_state(socket.open_documents[data.document])
+        });
+      })
+    });
+
     function close_document(uuid) {
       document_watchers.remove(uuid, socket)
+
+      // Broadcast that the peer is gone.
+      document_watchers.get(uuid).forEach(function(peer_socket) {
+        peer_socket.emit("peer-state", {
+          document: uuid,
+          peer: socket.id,
+          state: null
+        });
+      });
     }
 
     socket.on('close-document', function (data) {
@@ -204,7 +248,7 @@ exports.init = function(io, sessionStore, settings) {
 exports.emit_revisions = function(doc, revs) {
   // Send this revision out to all websockets listening on this document.
   //console.log("notifying about", doc.uuid, "...");
-  document_watchers.get(doc).forEach(function(socket) {
+  document_watchers.get(doc.uuid).forEach(function(socket) {
     console.log("notifying", socket.id, "about", doc.uuid);
     var state = socket.open_documents[doc.uuid];
     socket.emit("new-revisions", {

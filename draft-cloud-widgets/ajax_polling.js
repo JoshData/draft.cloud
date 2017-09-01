@@ -43,6 +43,9 @@ exports.open = function(owner_name, document_name, api_key, cbobj) {
           access_level: xhr.getResponseHeader("Access-Level")
         },
         {
+          // peer states unavailable via ajax
+        },
+        {
           push: push,
           close: function() { poll_state.closed = true; }
         }

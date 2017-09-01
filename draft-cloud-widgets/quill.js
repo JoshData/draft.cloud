@@ -14,8 +14,13 @@ elem.href = dist_url + "/quill.snow.css";
 elem.rel = "stylesheet";
 elem.type = "text/css";
 document.getElementsByTagName('head')[0].appendChild(elem);
+
 var elem = document.createElement('script');
 elem.src = dist_url + "/quill.min.js";
+document.getElementsByTagName('head')[0].appendChild(elem);
+
+var elem = document.createElement('style');
+elem.innerHTML = ".quill-editor-peer-cursor { display: block; position: absolute; width: 7em; border: 1px solid black; padding: .25em; overflow: hidden; }";
 document.getElementsByTagName('head')[0].appendChild(elem);
 
 exports.quill = function(elem, dist_url, quill_options) {
@@ -36,9 +41,13 @@ exports.quill = function(elem, dist_url, quill_options) {
     readOnly: true,
     theme: 'snow'
   };
+
   // Initialize editor in read-only mode.
-  var _this = this;
   this.editor = new Quill(elem, quill_options);
+
+  // Initialize cursors.
+  this.cursor_container = elem;
+  this.cursors = { };
 }
 
 exports.quill.prototype = new simple_widget(); // inherit
@@ -106,6 +115,39 @@ exports.quill.prototype.set_document = function(document, patch) {
   // Fall back to calling .setContents() and blowing away the user's current
   // caret/scroll position.
   this.editor.setContents(document);
+}
+
+exports.quill.prototype.get_ephemeral_state = function() {
+  return { quill_selection: this.editor.getSelection() };
+}
+
+exports.quill.prototype.on_peer_state_updated = function(peerid, user, state) {
+  if (!user || !state || !state.quill_selection) {
+    // Peer disconnected.
+    if (peerid in this.cursors) {
+      this.cursors[peerid].widget.parentNode.removeChild(this.cursors[peerid].widget);
+      delete this.cursors[peerid];
+    }
+    return;
+  }
+
+  // New?
+  if (!(peerid in this.cursors)) {
+    this.cursors[peerid] = {
+    };
+
+    var widget = document.createElement('div');
+    widget.setAttribute('class', 'quill-editor-peer-cursor');
+    this.cursor_container.appendChild(widget);
+    this.cursors[peerid].widget = widget;
+  }
+
+  // Update.
+  var widget = this.cursors[peerid].widget;
+  widget.innerHTML = user.name;
+  var bounds = this.editor.getBounds(state.quill_selection.index, state.quill_selection.length);
+  widget.style.top = bounds.top + "px";
+  widget.style.left = bounds.left + "px";
 }
 
 exports.quill.prototype.nonfatal_error = function(message) {

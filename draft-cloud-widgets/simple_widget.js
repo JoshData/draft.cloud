@@ -66,6 +66,11 @@ exports.simple_widget.prototype.initialize = function(state) {
     _this.compute_changes();
   }
   this.intervalId = setInterval(poll_for_changes, exports.poll_interval);
+
+  // Initial peer states.
+  Object.keys(state.peer_states).forEach(function(peerid) {
+    _this.on_peer_state_updated(peerid, state.peer_states[peerid].user, state.peer_states[peerid].state);
+  })
 };
 
 exports.simple_widget.prototype.destroy = function() {
@@ -98,6 +103,13 @@ exports.simple_widget.prototype.pop_changes = function() {
 
   // Return the operation.
   return op;
+}
+
+exports.simple_widget.prototype.get_ephemeral_state = function() {
+  return null;
+}
+
+exports.simple_widget.prototype.on_peer_state_updated = function(peerid, user, state) {
 }
 
 exports.simple_widget.prototype.merge_remote_changes = function(patch) {

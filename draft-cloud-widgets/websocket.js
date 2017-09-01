@@ -45,8 +45,11 @@ exports.open = function(owner_name, document_name, api_key, cbobj) {
             content: response.content,
             revision: response.revision,
             access_level: access_level
-          }, {
+          },
+          response.peer_states,
+          {
             push: push,
+            send_state: send_state,
             close: function() {
               socket.emit('close-document', {
                 document: document_id
@@ -109,4 +112,17 @@ exports.open = function(owner_name, document_name, api_key, cbobj) {
       cb(null, data.revision);
     });
   }    
+
+  function send_state(new_state) {
+    socket.emit('update-state', {
+      document: document_id,
+      state: new_state
+    });
+  }
+
+  socket.on('peer-state', function (data) {
+    if (data.document != document_id) return; // for a different open-document stream
+    if (data.state == null) data.state = { user: null, state: null }; // peer disconnected
+    cbobj.peer_state_updated(data.peer, data.state.user, data.state.state);
+  });
 }

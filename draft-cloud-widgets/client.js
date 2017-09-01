@@ -14,6 +14,9 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
   var widget_base_content;
   var widget_base_revision;
 
+  // Ephemeral state.
+  var ephemeral_state = null;
+
   // Channel state.
   var channel_methods;
   var remote_changes = [];
@@ -37,7 +40,7 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
       // Fatal error opening initial connction.
       alert(msg);
     },
-    opened: function(user, doc, methods) {
+    opened: function(user, doc, peer_states, methods) {
       // The document was successfully opened. We've now got
       // its current content and the corresponding revision id.
       if (closed) { doc.closefunc(); return; } // closed before calledback
@@ -57,6 +60,7 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
         user: user,
         content: doc.content,
         readonly: readonly,
+        peer_states: peer_states,
         logger: logger
       });
 
@@ -70,6 +74,9 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
       // them.
       revisions.forEach(function(rev) { remote_changes.push(rev); })
       merge_remote_changes();
+    },
+    peer_state_updated: function(peerid, user, state) {
+      widget.on_peer_state_updated(peerid, user, state);
     },
     nonfatal_error: function(message) {
       if (closed) return;
@@ -221,6 +228,13 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
           merge_remote_changes();
         })
       }
+    }
+
+    // Check if the ephemeral_state changed.
+    var es = widget.get_ephemeral_state();
+    if (!jot.diff(ephemeral_state, es).isNoOp()) {
+      channel_methods.send_state(es);
+      ephemeral_state = es;
     }
   }
 
