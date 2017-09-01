@@ -103,7 +103,7 @@ exports.init = function(io, sessionStore, settings) {
               return;
             }
 
-            // Get the current pier state of everyone else connected.
+            // Get the current peer state of everyone else connected.
             var peer_states = { };
             document_watchers.get(doc.uuid).forEach(function(peer_socket) {
               peer_states[peer_socket.id] = make_peer_state(peer_socket.open_documents[doc.uuid]);
@@ -119,8 +119,9 @@ exports.init = function(io, sessionStore, settings) {
               peer_states: peer_states
             });
 
+            // If reconnecting, send all of the revisions that ocurred while the
+            // user was off-line.
             if (data.last_seen_revision) {
-              console.log("RECONNECT WITH ", data.last_seen_revision)
               models.Revision.findAll({
                 where: {
                   documentId: doc.id,
@@ -144,6 +145,7 @@ exports.init = function(io, sessionStore, settings) {
               document: doc,
               doc_pointer: data.path,
               op_path: op_path,
+              last_seen_revision: revision,
               ephemeral_state: null
             };
             document_watchers.add(doc.uuid, socket);
@@ -247,13 +249,45 @@ exports.init = function(io, sessionStore, settings) {
 
 exports.emit_revisions = function(doc, revs) {
   // Send this revision out to all websockets listening on this document.
-  //console.log("notifying about", doc.uuid, "...");
   document_watchers.get(doc.uuid).forEach(function(socket) {
-    console.log("notifying", socket.id, "about", doc.uuid);
+    // Notify this client about this new set of revisions.
     var state = socket.open_documents[doc.uuid];
-    socket.emit("new-revisions", {
-      document: doc.uuid,
-      revisions: revs.map(function(rev) { return routes.make_revision_response(rev, state.op_path) })
-    });
+    console.log("notifying", socket.id, "about", doc.uuid);
+
+    // There is a race condition between what was sent to the user when
+    // their connection was established and new revisions that follow.
+    // A revision might be committed after document content is fetched
+    // but before the client is able to receive notifications of new
+    // revisions. In that case, catch them up here.
+    if (state.last_seen_revision) {
+      // Find any revisions that have ocurred.
+      models.Revision.findAll({
+        where: {
+          documentId: doc.id,
+          committed: true,
+          id: {
+            $gt: state.last_seen_revision.id,
+            $lt: revs[0].id
+          }
+        },
+        order: [["id", "ASC"]]
+      }).then(function(earlier_revs) {
+        // Emit all of the earlier ones, plus the new ones.
+        emit_the_revisions(earlier_revs.concat(revs));
+      })
+      delete state.last_seen_revision;
+      return;
+    }
+
+    emit_the_revisions(revs);
+
+    //
+
+    function emit_the_revisions(revs) {
+      socket.emit("new-revisions", {
+        document: doc.uuid,
+        revisions: revs.map(function(rev) { return routes.make_revision_response(rev, state.op_path) })
+      });
+    }
   })
 }
