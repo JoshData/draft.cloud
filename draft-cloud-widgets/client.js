@@ -8,6 +8,7 @@ exports.push_interval = 200;
 exports.Client = function(owner_name, document_name, api_key, channel, widget, logger) {
   // Our state.
   var closed = false;
+  var pushIntervalObj = null;
 
   // Document state.
   var widget_base_content;
@@ -62,7 +63,7 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
 
       // Begin periodically pushing new local changes.
       if (!readonly)
-        push_local_changes();
+        pushIntervalObj = setInterval(push_local_changes, exports.push_interval);
     },
     pull: function(revisions) {
       // New changes have come in from the server. Append them
@@ -222,9 +223,6 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
         })
       }
     }
-    
-    // Push again soon.
-    setTimeout(push_local_changes, exports.push_interval);
   }
 
   return {
@@ -236,6 +234,8 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
       closed = true;
       if (channel_close_func)
         channel_close_func();
+      if (pushIntervalObj)
+        clearInterval(pushIntervalObj);
     } 
   }
 };
