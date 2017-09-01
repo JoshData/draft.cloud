@@ -48,10 +48,38 @@ exports.quill.prototype.name = "quill Widget";
 exports.quill.prototype.get_document = function() {
   // Quill gives us an array of delta objects with a __proto__
   // attribute that will confuse jot.diff because it has
-  // functions. Convert to a JSONable data structure.
-  var document = this.editor.getContents();
-  document = JSON.parse(JSON.stringify(document));
-  return document; 
+  // functions. Make sure we return a plain JSONable data
+  // structure. If we don't rewrite it below, we should do
+  // JSON.parse(JSON.stringify(document));
+
+  // Additionally, it has long runs of text. If formatting
+  // is changed on a slice of a long run of text, then the
+  // run is broken up into smaller pieces and jot.diff will
+  // see this as a delete & insert. We can fix this by
+  // breaking up long runs here. The resulting data structure
+  // will still be equivalent, from Quill's point of view,
+  // it just won't be compact. And createDelta won't mind
+  // because the resulting delta is about characters anyway.
+  var ops = [];
+  this.editor.getContents().ops.forEach(function(op) {
+    // Pass embeds unchanged.
+    if (typeof op.insert != "string") {
+      var op1 = { insert: op.insert };
+      if (op.attributes) op1.attributes = op.attributes;
+      ops.push(op1);
+      return;
+    }
+
+    // Split the insert on whitespace. Retain the attributes on
+    // each word.
+    op.insert.split(/( +)/).forEach(function(word) {
+      if (word.length == 0) return; // shouldn't be possible?
+      var op1 = { insert: word };
+      if (op.attributes) op1.attributes = op.attributes;
+      ops.push(op1);
+    })
+  });
+  return { ops: ops };
 }
 
 exports.quill.prototype.set_readonly = function(readonly) {
@@ -224,6 +252,5 @@ function createDelta(current_doc, patch) {
     }
   });
 
-  console.log(patch.inspect(), delta);
   return delta;
 }
