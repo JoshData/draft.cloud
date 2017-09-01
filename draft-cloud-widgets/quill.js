@@ -19,10 +19,6 @@ var elem = document.createElement('script');
 elem.src = dist_url + "/quill.min.js";
 document.getElementsByTagName('head')[0].appendChild(elem);
 
-var elem = document.createElement('style');
-elem.innerHTML = ".quill-editor-peer-cursor { display: block; position: absolute; width: 7em; border: 1px solid black; padding: .25em; overflow: hidden; }";
-document.getElementsByTagName('head')[0].appendChild(elem);
-
 exports.quill = function(elem, dist_url, quill_options) {
   // Default options.
   quill_options = quill_options || {
@@ -48,6 +44,12 @@ exports.quill = function(elem, dist_url, quill_options) {
   // Initialize cursors.
   this.cursor_container = elem;
   this.cursors = { };
+
+  // Update cursors.
+  var _this = this;
+  this.editor.on('text-change', function(delta, oldDelta, source) {
+    update_cursor_positions(_this, delta);
+  });
 }
 
 exports.quill.prototype = new simple_widget(); // inherit
@@ -104,7 +106,8 @@ exports.quill.prototype.set_document = function(document, patch) {
   // to apply patch, then just fall back to setContents.
   if (patch) {
     try {
-      this.editor.updateContents(createDelta(this.get_document(), patch), 'api');
+      var delta = createDelta(this.get_document(), patch);
+      this.editor.updateContents(delta, 'api');
       return; // success
     } catch (e) {
       // fail, fall through to below
@@ -120,6 +123,11 @@ exports.quill.prototype.set_document = function(document, patch) {
 exports.quill.prototype.get_ephemeral_state = function() {
   return { quill_selection: this.editor.getSelection() };
 }
+
+var cursor_colors = [ // copied from http://clrs.cc/
+  "#001f3f", "#0074D9", "#39CCCC", "#3D9970", "#2ECC40",
+  "#85144b", "#F012BE", "#B10DC9"
+];
 
 exports.quill.prototype.on_peer_state_updated = function(peerid, user, state) {
   if (!user || !state || !state.quill_selection) {
@@ -138,16 +146,77 @@ exports.quill.prototype.on_peer_state_updated = function(peerid, user, state) {
 
     var widget = document.createElement('div');
     widget.setAttribute('class', 'quill-editor-peer-cursor');
+    widget.setAttribute('style', 'position: absolute;');
     this.cursor_container.appendChild(widget);
-    this.cursors[peerid].widget = widget;
+
+    var widget_bar = document.createElement('div');
+    widget.appendChild(widget_bar);
+    widget_bar.setAttribute('class', 'quill-editor-peer-cursor-bar');
+    widget_bar.setAttribute('style', 'width: 0; height: 0; border-left: 2px solid black;');
+
+    var widget_name = document.createElement('div');
+    widget.appendChild(widget_name);
+    widget_name.setAttribute('class', 'quill-editor-peer-cursor-name');
+    widget_name.setAttribute('style', 'cursor: pointer; color: white; font-weight: bold; border: 1px solid black; border-radius: .5em; padding: .125em; font-size: 90%; max-width: 12em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;');
+
+    this.cursors[peerid].widget = { widget: widget, bar: widget_bar, name: widget_name };
   }
 
   // Update.
-  var widget = this.cursors[peerid].widget;
-  widget.innerHTML = user.name;
-  var bounds = this.editor.getBounds(state.quill_selection.index, state.quill_selection.length);
-  widget.style.top = bounds.top + "px";
-  widget.style.left = bounds.left + "px";
+  this.cursors[peerid].peerid = peerid;
+  this.cursors[peerid].user = user;
+  this.cursors[peerid].state = state;
+  update_cursor(this.editor, this.cursors[peerid]);
+}
+
+function update_cursor(quill, peer_state) {
+  // Update bounds.
+  var bounds = quill.getBounds(peer_state.state.quill_selection.index, peer_state.state.quill_selection.length);
+  peer_state.widget.widget.style.top = bounds.top + "px";
+  peer_state.widget.widget.style.left = (bounds.left-2) + "px";
+  peer_state.widget.bar.style.height = bounds.height + "px";
+
+  // Update color. Map the user's peerid stably to a color choice.
+  // Since peerid's are random, we can use that as a numerical starting
+  // point.
+  var color_code = 0;
+  for (var i = 0; i < peer_state.peerid.length; i++) color_code += peer_state.peerid.charCodeAt(i);
+  var color = cursor_colors[color_code % cursor_colors.length];
+  peer_state.widget.name.style.backgroundColor = color;
+  peer_state.widget.name.style.borderColor = color;
+  peer_state.widget.bar.style.borderColor = color;
+
+  // Update name.
+  peer_state.widget.name.innerHTML = peer_state.user.name;
+}
+
+function update_cursor_positions(me, delta) {
+  // Update the cursor positions. Since the cursor positions shift
+  // due to remote changes, but remote changes come asynchronously
+  // with cursor update messages, we should update cursor positions
+  // as fast as possible.
+  console.log(me.cursors);
+  for (var peerid in me.cursors) {
+    var qs = me.cursors[peerid].state.quill_selection;
+    console.log(qs);
+    var index = 0;
+    delta.ops.forEach(function(op) {
+      if (index > qs.index)
+        return;
+      if (op.insert) {
+        var dx = (typeof op.insert == "string" ? op.insert.length : 1);
+        qs.index += dx;
+        index += dx;
+      }
+      if (op.delete) {
+        qs.index -= op.delete;
+        index += op.delete;
+      }
+      if (op.retain)
+        index += op.retain;
+    });
+    update_cursor(me.editor, me.cursors[peerid]);
+  }
 }
 
 exports.quill.prototype.nonfatal_error = function(message) {
