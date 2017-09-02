@@ -27,6 +27,10 @@ exports.quill = function(elem, quill_options) {
     readOnly: true,
     theme: 'snow'
   };
+
+  // Must set this so that undo/redo skips over remote users' changes.
+  if (!this.quill_options.modules.history) this.quill_options.modules.history = { };
+  this.quill_options.modules.history.userOnly = true;
 }
 
 exports.quill.prototype = new simple_widget(); // inherit
