@@ -4,29 +4,51 @@ var jotvals = require('../jot/values.js');
 var jotseqs = require('../jot/sequences.js');
 var jotobjs = require('../jot/objects.js');
 
-// Add CSS and SCRIPT tags for jsoneditor.
-var dist_url = "/static/jsoneditor";
-var elem = document.createElement('link');
-elem.href = dist_url + "/jsoneditor.min.css";
-elem.rel = "stylesheet";
-elem.type = "text/css";
-document.getElementsByTagName('head')[0].appendChild(elem);
-var elem = document.createElement('script');
-elem.src = dist_url + "/jsoneditor.min.js";
-document.getElementsByTagName('head')[0].appendChild(elem);
 
-exports.jsoneditor = function(elem, dist_url) {
+exports.jsoneditor = function(elem) {
+  this.elem = elem;
+}
+
+exports.jsoneditor.prototype = new simple_widget(); // inherit
+
+exports.jsoneditor.prototype.name = "jsoneditor Widget";
+
+exports.jsoneditor.prototype.prepare_dom_async = function(callback) {
+  if (typeof jsoneditor == "object") {
+    // already loaded on the page
+    this.prepare_dom_async2(callback);
+    return;
+  }
+
+  this.logger("adding jsoneditor CSS/JS tags to the DOM");
+
+  // Add CSS and SCRIPT tags for jsoneditor.
+  var dist_url = "/static/jsoneditor";
+  var elem = document.createElement('link');
+  elem.href = dist_url + "/jsoneditor.min.css";
+  elem.rel = "stylesheet";
+  elem.type = "text/css";
+  document.getElementsByTagName('head')[0].appendChild(elem);
+  var elem = document.createElement('script');
+  elem.src = dist_url + "/jsoneditor.min.js";
+  var _this = this;
+  elem.onload = function() {
+    // Once the script loads, we can create the Quill editor.
+    _this.prepare_dom_async2(callback);
+  }
+  document.getElementsByTagName('head')[0].appendChild(elem);
+}
+
+exports.jsoneditor.prototype.prepare_dom_async2 = function(callback) {
   // Initialize editor in read-only mode.
   var _this = this;
   this.editor = new JSONEditor(elem, {
     mode: 'view',
     onChange: function() { _this.compute_changes(); }
   });
+
+  callback();
 }
-
-exports.jsoneditor.prototype = new simple_widget(); // inherit
-
-exports.jsoneditor.prototype.name = "jsoneditor Widget";
 
 exports.jsoneditor.prototype.get_document = function() {
   return this.editor.get(); 

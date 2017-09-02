@@ -6,14 +6,8 @@
 // browserify -d draft-cloud-widgets/draftdotcloud.js -o public_html/draftdotcloud.js
 //
 
-// Add LINK/SCRIPT tags. Hmm. Gotta figure out how to only add tags
-// for things we need.
-var jsoneditor = require("./jsoneditor.js").jsoneditor;
-var quill = require("./quill.js").quill;
-
-// Let other initialization occur before we actually start initialization,
-// including enough time to load the JSONEditor CSS & JS.
-setTimeout(init, 100);
+// Let other initialization occur before we actually start initialization.
+setTimeout(init, 1);
 
 var log_receivers = [];
 
@@ -33,10 +27,10 @@ function init() {
     // <div>s can have any other widget
     else if (elem.tagName == "DIV"
       && elem.getAttribute("data-draftdotcloud-widget") == "jsoneditor")
-      widget = jsoneditor;
+      widget = require("./jsoneditor.js").jsoneditor;
     else if (elem.tagName == "DIV"
       && elem.getAttribute("data-draftdotcloud-widget") == "quill")
-      widget = quill;
+      widget = require("./quill.js").quill;
 
     else
       // invalid

@@ -6,6 +6,8 @@
    for which there are two implemnations: websocket(.js) and AJAX
    polling (ajax_polling.js). */
 
+var async = require("async");
+
 var jot = require("../jot");
 
 exports.push_interval = 200;
@@ -15,9 +17,13 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
   var closed = false;
   var pushIntervalObj = null;
 
-  // Document state.
+  // Document/widget state.
+  var the_user;
+  var initial_peer_states;
+  var readonly;
   var widget_base_content;
   var widget_base_revision;
+  var is_widget_initialized = false;
 
   // Ephemeral state.
   var ephemeral_state = null;
@@ -37,57 +43,87 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
     logger = function(msg) { }
   }
 
-  // Open the communication channel and initialize the widget.
-  logger("opening document using " + channel.name);
-  channel.open(owner_name, document_name, api_key, {
-    opened: function(user, doc, peer_states, methods) {
-      // The document was successfully opened. We've now got
-      // its current content and the corresponding revision id.
-      if (closed) { methods.close(); return; } // closed before calledback
+  // Open the communication channel and initialize the widget asynchronously,
+  // wait for both to finish, and then start polling for widget changes.
+  async.parallel([
+    function(callback) {
+      // Open the communication channel.
+      logger("opening document using " + channel.name);
+      channel.open(owner_name, document_name, api_key, {
+        opened: function(user, doc, peer_states, methods) {
+          // The document was successfully opened. We've now got
+          // its current content and the corresponding revision id.
 
-      logger("document opened by " + user.name + " with " + doc.access_level + " access");
+          if (closed) { methods.close(); callback("already closed"); callback = null; return; } // closed before calledback
 
-      // Set global state.
-      widget_base_content = doc.content;
-      widget_base_revision = doc.revision;
-      channel_methods = methods;
+          logger("document opened by " + user.name + " with " + doc.access_level + " access");
 
-      // Do we have write access?
-      var readonly = !(doc.access_level == "WRITE" || doc.access_level == "ADMIN");
+          // Set global state.
+          the_user = user;
+          widget_base_content = doc.content;
+          widget_base_revision = doc.revision;
+          initial_peer_states = peer_states;
+          channel_methods = methods;
 
-      // Initialize the widget.
-      widget.initialize({
-        user: user,
-        content: doc.content,
+          // Do we have write access?
+          readonly = !(doc.access_level == "WRITE" || doc.access_level == "ADMIN");
+
+          callback(); callback = null;
+        },
+        pull: function(revisions) {
+          // New changes have come in from the server. Append them
+          // to the end of remote_changes and then try to process
+          // them.
+          revisions.forEach(function(rev) { remote_changes.push(rev); })
+          if (is_widget_initialized)
+            merge_remote_changes();
+        },
+        peer_state_updated: function(peerid, user, state) {
+          widget.on_peer_state_updated(peerid, user, state);
+        },
+        nonfatal_error: function(message) {
+          if (closed) return;
+          widget.show_message("warning", message);
+        },
+        fatal_error: function(message) {
+          // if this ocurred during channel open, call the async.parallel callback
+          if (callback) callback(message);
+          callback = null;
+
+          if (closed) return;
+          widget.show_message("error", message);
+          close_client();
+        }
+      });        
+    },
+    function(callback) {
+      // Give the widget some time to initialize.
+      widget.initialize(logger, callback);
+    }
+  ], function(err, results) {
+      if (err) {
+        alert(err);
+        return;
+      }
+
+      // Give the widget the initial document state.
+      widget.open({
+        user: the_user,
+        content: widget_base_content,
         readonly: readonly,
-        peer_states: peer_states,
-        logger: logger
+        peer_states: initial_peer_states
       });
 
       // Begin periodically pushing new local changes.
       if (!readonly)
         pushIntervalObj = setInterval(push_local_changes, exports.push_interval);
-    },
-    pull: function(revisions) {
-      // New changes have come in from the server. Append them
-      // to the end of remote_changes and then try to process
-      // them.
-      revisions.forEach(function(rev) { remote_changes.push(rev); })
+
+      // If any changes came in after opening the document but before the widget
+      // finished initializing, process them now.
       merge_remote_changes();
-    },
-    peer_state_updated: function(peerid, user, state) {
-      widget.on_peer_state_updated(peerid, user, state);
-    },
-    nonfatal_error: function(message) {
-      if (closed) return;
-      widget.show_message("warning", message);
-    },
-    fatal_error: function(message) {
-      if (closed) return;
-      widget.show_message("error", message);
-      close_client();
-    }
-  });        
+      is_widget_initialized = true;
+  });
+    
 
   function merge_remote_changes() {
     // Process any Revisions the server sent to us.

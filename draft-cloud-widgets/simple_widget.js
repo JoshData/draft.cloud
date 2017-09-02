@@ -10,6 +10,7 @@
 // * show_status(message[str])
 //
 // and may implement:
+// * prepare_dom_async(callback)
 // * get_ephemeral_state() => object
 // * on_peer_state_updated(peerid, user, state)
 
@@ -46,10 +47,18 @@ exports.simple_widget.prototype.compute_changes = function() {
   this.changes_last_content = current_content;
 }
 
-exports.simple_widget.prototype.initialize = function(state) {
-  this.logger = state.logger;
-  this.logger(this.name + " initialized");
+exports.simple_widget.prototype.initialize = function(logger, callback) {
+  this.logger = logger;
+  this.logger(this.name + " initializing");
+  this.prepare_dom_async(callback);
+}
 
+exports.simple_widget.prototype.prepare_dom_async = function(callback) {
+  callback();
+}
+
+exports.simple_widget.prototype.open = function(state) {
+  // This method is called by the Client object when the document is opened.
   // Remember the user.
   this.user = state.user;
 

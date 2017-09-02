@@ -7,21 +7,11 @@ var jotvals = require('../jot/values.js');
 var jotseqs = require('../jot/sequences.js');
 var jotobjs = require('../jot/objects.js');
 
-// Add CSS and SCRIPT tags for quill.
-var dist_url = "/static/quill";
-var elem = document.createElement('link');
-elem.href = dist_url + "/quill.snow.css";
-elem.rel = "stylesheet";
-elem.type = "text/css";
-document.getElementsByTagName('head')[0].appendChild(elem);
+exports.quill = function(elem, quill_options) {
+  this.elem = elem;
 
-var elem = document.createElement('script');
-elem.src = dist_url + "/quill.min.js";
-document.getElementsByTagName('head')[0].appendChild(elem);
-
-exports.quill = function(elem, dist_url, quill_options) {
   // Default options.
-  quill_options = quill_options || {
+  this.quill_options = quill_options || {
     modules: {
       toolbar: [
         ['bold', 'italic'],
@@ -37,24 +27,57 @@ exports.quill = function(elem, dist_url, quill_options) {
     readOnly: true,
     theme: 'snow'
   };
+}
 
+exports.quill.prototype = new simple_widget(); // inherit
+
+exports.quill.prototype.name = "quill Widget";
+
+exports.quill.prototype.prepare_dom_async = function(callback) {
+  if (typeof Quill == "object") {
+    // Quill is already loaded on the page.
+    this.prepare_dom_async2(callback);
+    return;
+  }
+
+  this.logger("adding Quill CSS/JS tags to the DOM");
+
+  // Add CSS and SCRIPT tags for quill.
+  var dist_url = "/static/quill";
+  var elem = document.createElement('link');
+  elem.href = dist_url + "/quill.snow.css";
+  elem.rel = "stylesheet";
+  elem.type = "text/css";
+  document.getElementsByTagName('head')[0].appendChild(elem);
+
+  var elem = document.createElement('script');
+  elem.src = dist_url + "/quill.min.js";
+  var _this = this;
+  elem.onload = function() {
+    // Once the script loads, we can create the Quill editor.
+    _this.prepare_dom_async2(callback);
+  }
+  document.getElementsByTagName('head')[0].appendChild(elem);
+}
+
+exports.quill.prototype.prepare_dom_async2 = function(callback) {
   // Initialize editor in read-only mode.
-  this.editor = new Quill(elem, quill_options);
+  this.editor = new Quill(this.elem, this.quill_options);
 
   // Initialize cursors.
-  this.cursor_container = elem;
+  this.cursor_container = this.elem;
   this.cursors = { };
+
+  this.logger("Quill widget created");
 
   // Update cursors.
   var _this = this;
   this.editor.on('text-change', function(delta, oldDelta, source) {
     update_cursor_positions(_this, delta);
   });
+
+  callback();
 }
-
-exports.quill.prototype = new simple_widget(); // inherit
-
-exports.quill.prototype.name = "quill Widget";
 
 exports.quill.prototype.get_document = function() {
   // Quill gives us an array of delta objects with a __proto__
