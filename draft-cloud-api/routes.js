@@ -62,12 +62,12 @@ exports.create_routes = function(app, settings) {
     });
   });
 
-  function authz_user(req, res, min_level, cb) {
+  function authz_user(req, res, target_user_name, min_level, cb) {
     // Checks authorization for user URLs. The callback is called
     // as: cb(requestor, target) where requestor is the User making the
     // request and target is User about which the request is being made.
-    if (!(min_level == "READ" || min_level == "WRITE" || min_level == "ADMIN")) throw "invalid argument";
-    auth.get_user_authz(req, req.params.user, function(requestor, target, level) {
+    if (!(min_level == "NONE" || min_level == "READ" || min_level == "WRITE" || min_level == "ADMIN")) throw "invalid argument";
+    auth.get_user_authz(req, target_user_name, function(requestor, target, level) {
       // Check permission level.
       if (auth.min_access(min_level, level) != min_level) {
         // The user's access level is lower than the minimum access level required.
@@ -77,7 +77,7 @@ exports.create_routes = function(app, settings) {
         else
           // The user does not have READ access, so we do not reveal whether or not
           // a document exists here.
-          res.status(404).send('User not found or you do not have permission to see it.');
+          res.status(404).send('User not found or you do not have permission to see them.');
         return;
       }
 
@@ -89,7 +89,7 @@ exports.create_routes = function(app, settings) {
   app.get(user_route, function (req, res) {
     // Gets information about the user. The requesting user must have READ
     // permission on the user.
-    authz_user(req, res, "READ", function(requestor, target) {
+    authz_user(req, res, req.params.user, "READ", function(requestor, target) {
       res
       .status(200)
       .json(exports.form_user_response_body(target));
@@ -296,6 +296,86 @@ exports.create_routes = function(app, settings) {
       })
     })
   })
+
+  // DOCUMENT PERMISSIONS
+
+  app.get(document_route + '/team', function (req, res) {
+    // Fetch the collaborators for this document.
+    //
+    // Requires READ permission on the document (and the document must exist).
+    authz_document(req, res, true, "READ", function(user, owner, doc) {
+      // Fetch all team members.
+      models.DocumentPermission.findAll({
+        where: {
+          documentId: doc.id
+        },
+        include: [{
+          model: models.User
+        }]
+      }).then(function(team) {
+        // Remove the owner since we'll add them back at the top.
+        team = team.filter(function(member) { return member.id != owner.id; })
+
+        // Format for public fields.
+        team = team.map(function(member) { return { id: memer.user.uuid, name: member.user.name, access_level: member.level }; })
+
+        // Add the owner at the top.
+        team = [{ id: user.uuid, name: user.name, access_level: "owner" }]
+                  .concat(team);
+
+        res
+        .status(200)
+        .json(team);
+      })
+    })
+  })
+
+  app.put(document_route + '/team', bodyParser.json(), function (req, res) {
+    // Add, remove, or update a collaborator for this document.
+    //
+    // Requires ADMIN permission on the document (and the document must exist)
+    // and READ permission for the user being added/updated but no permission
+    // for the user if they are being removed.
+
+    if (typeof req.body != "object")
+      return res.status(400).send(req.body);
+    if (!auth.is_access_level(req.body.access_level))
+      return res.status(400).send("invalid access level: " + req.body.access_level);
+
+    authz_document(req, res, true, "ADMIN", function(user, owner, doc) {
+      authz_user(req, res, req.body.user, req.body.access_level != "NONE" ? "READ" : "NONE", function(_, target) {
+        // Get any existing permsision.
+        models.DocumentPermission.findOne({
+          where: {
+            documentId: doc.id,
+            userId: target.id
+          }
+        }).then(function(dp) {
+          if (!dp && req.body.access_level == "NONE") {
+            // No permission and none requested - nothing to do.
+            res.status(200).send("no change");
+            return;
+          } else if (req.body.access_level == "NONE") {
+            // Kill an existing permission.
+            dp.destroy().then(function() {
+                res.status(200).send("removed");
+            });
+            return;
+          }
+
+          if (!dp)
+            dp = new models.DocumentPermission();
+          dp.documentId = doc.id;
+          dp.userId = target.id;
+          dp.access_level = req.body.access_level;
+          dp.save().then(function(err) {
+            res.status(200).send("saved");
+          });
+        });
+      });
+    })
+  })
+
 
   // DOCUMENT CONTENT AND HISTORY
 

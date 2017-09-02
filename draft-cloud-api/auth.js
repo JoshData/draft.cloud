@@ -131,51 +131,59 @@ exports.get_document_authz = function(req, owner_name, document_name, cb) {
     get_document(owner, document_name, function(document) {
       // Get the user making the request.
       exports.check_request_authorization(req, function(user, user_api_key) {
-        //console.log(owner, document, user)
+        // Get permissions for this user to this document.
+        models.DocumentPermission.findOne({
+          where: {
+            documentId: document.id,
+            userId: user ? user.id : -1 // don't return anything if the user is anonymous
+          }
+        }).then(function(document_permission) {
+          // Compute the access level in order of precedence.
+          var level;
 
-        // Compute the access level in order of precedence.
-        var level;
+          // If the user owns this document, then the user has ADMIN level.
+          // Ignore any explicit document permission.
+          if (user && user.id == owner.id)
+            level = "ADMIN";
 
-        // If the user owns this document, then the user has ADMIN level.
-        if (user && user.id == owner.id)
-          level = "ADMIN";
+          // If the document has granted access to the user, then use that.
+          else if (document_permission)
+            level = document_permission.access_level;
 
-        // If the document has granted access to the user, then use that.
-        //else if (user && document && 0)
-          // TODO
+          // Otherwise the document, if it exists, provides a default access level
+          // (but never more than WRITE (and if the requets is anonymous then not
+          // more than READ).
+          else if (document) {
+            level = document.anon_access_level;
 
-        // Otherwise the document, if it exists, provides a default access level
-        // (but never more than WRITE (and if the requets is anonymous then not
-        // more than READ).
-        else if (document) {
-          level = document.anon_access_level;
+            // If the request is not authenticated, do not allow WRITE or ADMIN.
+            if (!user)
+              level = exports.min_access(level, "READ");
 
-          // If the request is not authenticated, do not allow WRITE or ADMIN.
-          if (!user)
-            level = exports.min_access(level, "READ");
+            // If the request is authenticated, still do not allow ADMIN as an
+            // anonymous access level.
+            else
+              level = exports.min_access(level, "WRITE");
+          
+          } else {
+            // Default to no level.
+            level = "NONE";
 
-          // If the request is authenticated, still do not allow ADMIN.
-          else
-            level = exports.min_access(level, "WRITE");
-        
-        } else {
-          // Default to no level.
-          level = "NONE";
+          }
 
-        }
+          // The API key may specify a lower access level either for particular
+          // resources or for all resources.
+          if (user_api_key) {
+            if (document && typeof user_api_key.resource_acess_levels[document.uuid] != "undefined")
+              // Limit to the access level for this particular resource.
+              level = exports.min_access(level, user_api_key.resource_acess_levels[document.uuid]);
+            else
+              // Limit to the access level given in the key for all resources.
+              level = exports.min_access(level, user_api_key.access_level);
+          }
 
-        // The API key may specify a lower access level either for particular
-        // resources or for all resources.
-        if (user_api_key) {
-          if (document && typeof user_api_key.resource_acess_levels[document.uuid] != "undefined")
-            // Limit to the access level for this particular resource.
-            level = exports.min_access(level, user_api_key.resource_acess_levels[document.uuid]);
-          else
-            // Limit to the access level given in the key for all resources.
-            level = exports.min_access(level, user_api_key.access_level);
-        }
-
-        cb(user, owner, document, level);
+          cb(user, owner, document, level);
+        });
       });
 
     });

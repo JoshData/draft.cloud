@@ -181,6 +181,79 @@ paths:
           description: The caller has permission to see the document but not delete it.
         404:
           description: Document does not exist or caller does not have permission to see the document.
+  /documents/{owner}/{document}/team:
+    get:
+      description: |
+        Gets a list of all `User`s with READ permission on the `Document`.
+      parameters:
+        - name: owner
+          in: path
+          description: The name of a `User` who owns the document.
+          required: true
+          type: string
+        - name: document
+          in: path
+          description: The name of a `Document` owned by  `owner`.
+          required: true
+          type: string
+        - name: Authorization
+          in: header
+          type: string
+          description: An API key that has READ access to the document. Optional if the document's anonymous access level is READ.
+      responses:
+        200:
+          description: The Document's team members are returned as JSON.
+          headers:
+            Content-Type:
+              description: Always `application/json`.
+              type: string
+          schema:
+            title: Document Team
+            type: object
+        404:
+          description: The owner or document does not exist or caller does not have permission to see the owner or document.
+    put:
+      description: |
+        Updates `User` permissions on a `Document`.
+      parameters:
+        - name: owner
+          in: path
+          description: The name of a `User` who owns the document.
+          required: true
+          type: string
+        - name: document
+          in: path
+          description: The name of a `Document` owned by  `owner`, or the name of a new document to create.
+          required: true
+          type: string
+        - name: Content-Type
+          in: header
+          type: string
+          description: Must be `application/json`.
+        - name: Authorization
+          in: header
+          type: string
+          description: An API key that has ADMIN access to the document and READ access to the user whose permissions are being changed, unless the user is being removed from the Document.
+          required: true
+        - name: user
+          in: body
+          type: string
+          description: The name of the user whose permissions are being changed.
+          required: true
+        - name: access_level
+          in: body
+          type: string
+          description: The new access level for the user, one of NONE, READ, WRITE, or ADMIN.
+          required: true
+      responses:
+        200:
+          description: The document permissions were updated.
+        400:
+          description: The access_level was invalid.
+        403:
+          description: The caller has permission to see the document but not make changes to its metadata.
+        404:
+          description: Document does not exist or caller does not have permission to see the document.
   /documents/{owner}/{document}/content{path}:
     get:
       description: |

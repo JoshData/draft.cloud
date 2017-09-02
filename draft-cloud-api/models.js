@@ -332,6 +332,26 @@ exports.initialize_database = function(connection_uri, ready) {
   exports.CachedContent.belongsTo(exports.Document);
   exports.CachedContent.belongsTo(exports.Revision);
 
+  // DOCUMENT PERMISSIONs (for non-owners).
+  exports.DocumentPermission = exports.db.define('documentpermission',
+    {
+      // The access level granted to this user for this document.
+      access_level: {
+        type: Sequelize.STRING(16),
+        defaultValue: ""
+      },
+
+      // Some additional information.
+      userdata: {
+        type: Sequelize.JSON
+      }
+    }, {
+      paranoid: true, // rows are never deleted, just marked as deleted
+      freezeTableName: true // Model tableName will be the same as the model name
+    });
+  exports.DocumentPermission.belongsTo(exports.User);
+  exports.DocumentPermission.belongsTo(exports.Document);
+
   // Synchronize models to database tables.
   exports.db.sync().then(ready);
 
