@@ -156,7 +156,8 @@ exports.quill.prototype.on_peer_state_updated = function(peerid, user, state) {
   if (!user || !state || !state.quill_selection) {
     // Peer disconnected.
     if (peerid in this.cursors) {
-      this.cursors[peerid].widget.parentNode.removeChild(this.cursors[peerid].widget);
+      this.cursors[peerid].widget.bar.parentNode.removeChild(this.cursors[peerid].widget.bar);
+      this.cursors[peerid].widget.name.parentNode.removeChild(this.cursors[peerid].widget.name);
       delete this.cursors[peerid];
     }
     return;
@@ -167,22 +168,17 @@ exports.quill.prototype.on_peer_state_updated = function(peerid, user, state) {
     this.cursors[peerid] = {
     };
 
-    var widget = document.createElement('div');
-    widget.setAttribute('class', 'quill-editor-peer-cursor');
-    widget.setAttribute('style', 'position: absolute;');
-    this.cursor_container.appendChild(widget);
-
     var widget_bar = document.createElement('div');
-    widget.appendChild(widget_bar);
+    this.cursor_container.appendChild(widget_bar);
     widget_bar.setAttribute('class', 'quill-editor-peer-cursor-bar');
-    widget_bar.setAttribute('style', 'width: 0; height: 0; border-left: 2px solid black;');
+    widget_bar.setAttribute('style', 'position: absolute; width: 0; height: 0; border-left: 2px solid black;');
 
     var widget_name = document.createElement('div');
-    widget.appendChild(widget_name);
+    this.cursor_container.appendChild(widget_name);
     widget_name.setAttribute('class', 'quill-editor-peer-cursor-name');
-    widget_name.setAttribute('style', 'cursor: pointer; color: white; font-weight: bold; border: 1px solid black; border-radius: .5em; padding: .125em; font-size: 90%; max-width: 12em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;');
+    widget_name.setAttribute('style', 'position: absolute; cursor: default; color: white; font-weight: bold; border: 1px solid black; border-radius: .5em; padding: .125em; font-size: 90%; max-width: 12em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;');
 
-    this.cursors[peerid].widget = { widget: widget, bar: widget_bar, name: widget_name };
+    this.cursors[peerid].widget = { bar: widget_bar, name: widget_name };
   }
 
   // Update.
@@ -194,10 +190,18 @@ exports.quill.prototype.on_peer_state_updated = function(peerid, user, state) {
 
 function update_cursor(quill, peer_state) {
   // Update bounds.
-  var bounds = quill.getBounds(peer_state.state.quill_selection.index, peer_state.state.quill_selection.length);
-  peer_state.widget.widget.style.top = bounds.top + "px";
-  peer_state.widget.widget.style.left = (bounds.left-2) + "px";
+  var bounds;
+  try {
+    bounds = quill.getBounds(peer_state.state.quill_selection.index, peer_state.state.quill_selection.length);
+  } catch (e) {
+    // It's possible the cursor state is invalid, so silently skip.
+    return;
+  }
+  peer_state.widget.bar.style.top = bounds.top + "px";
+  peer_state.widget.bar.style.left = (bounds.left-2) + "px";
   peer_state.widget.bar.style.height = bounds.height + "px";
+  peer_state.widget.name.style.top = (bounds.top+bounds.height) + "px";
+  peer_state.widget.name.style.left = (bounds.left-2) + "px";
 
   // Update color. Map the user's peerid stably to a color choice.
   // Since peerid's are random, we can use that as a numerical starting
@@ -210,7 +214,7 @@ function update_cursor(quill, peer_state) {
   peer_state.widget.bar.style.borderColor = color;
 
   // Update name.
-  peer_state.widget.name.innerHTML = peer_state.user.name;
+  peer_state.widget.name.textContent = peer_state.user.name;
 }
 
 function update_cursor_positions(me, delta) {
@@ -218,22 +222,25 @@ function update_cursor_positions(me, delta) {
   // due to remote changes, but remote changes come asynchronously
   // with cursor update messages, we should update cursor positions
   // as fast as possible.
-  console.log(me.cursors);
   for (var peerid in me.cursors) {
     var qs = me.cursors[peerid].state.quill_selection;
-    console.log(qs);
     var index = 0;
     delta.ops.forEach(function(op) {
-      if (index > qs.index)
-        return;
       if (op.insert) {
         var dx = (typeof op.insert == "string" ? op.insert.length : 1);
-        qs.index += dx;
+        if (index < qs.index)
+          qs.index += dx;
+        else if (index < qs.index+qs.length)
+          qs.length += dx;
         index += dx;
       }
       if (op.delete) {
-        qs.index -= op.delete;
-        index += op.delete;
+        var dx = op.delete;
+        if (index+dx < qs.index)
+          qs.index -= dx;
+        else if (index+dx < qs.index+qs.length)
+          qs.length -= dx;
+        index += dx;
       }
       if (op.retain)
         index += op.retain;
