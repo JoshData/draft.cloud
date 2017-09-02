@@ -3,11 +3,15 @@
 // document.
 //
 // subclasses must implement:
-// * nonfatal_error(message[str])
+// * show_message(level[str], message[str])
 // * set_readonly(bool)
-// * get_document([anything])
+// * get_document() => any JSONable value
 // * set_document(anything[, patch])
 // * show_status(message[str])
+//
+// and may implement:
+// * get_ephemeral_state() => object
+// * on_peer_state_updated(peerid, user, state)
 
 var jot = require("../jot");
 

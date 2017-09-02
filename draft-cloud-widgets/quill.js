@@ -219,7 +219,7 @@ function update_cursor_positions(me, delta) {
   }
 }
 
-exports.quill.prototype.nonfatal_error = function(message) {
+exports.quill.prototype.show_message = function(level, message) {
   alert(message);
 }
 

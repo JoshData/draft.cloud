@@ -104,7 +104,7 @@ exports.textarea.prototype.set_document = function(document, patch) {
   this.textarea.selectionEnd = selection[1];
 }
 
-exports.textarea.prototype.nonfatal_error = function(message) {
+exports.textarea.prototype.show_message = function(level, message) {
   alert(message);
 }
 

@@ -125,7 +125,7 @@ exports.open = function(owner_name, document_name, api_key, cbobj) {
     },
     error: function(msg) {
       // An error at this point is fatal.
-      cbobj.error(msg)
+      cbobj.fatal_error(msg)
     }
   });
 }

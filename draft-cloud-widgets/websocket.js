@@ -28,7 +28,8 @@ exports.open = function(owner_name, document_name, api_key, cbobj) {
       last_seen_revision: last_seen_revision
     }, function(response) {
       if (response.error) {
-        cbobj.error(response.error); // note: could be a call in a reconnection
+        // This could be an error on first connection or on reconnection.
+        cbobj.fatal_error(response.error);
         return;
       }
 

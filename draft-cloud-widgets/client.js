@@ -1,5 +1,10 @@
-/* This module manages an open connection between the client and
-   the Draft.cloud server for a single document. */
+/* The Client class defined in this module manages the connection
+   between the Draft.Cloud server and a UI widget for a single
+   document.
+
+   Communication with the Draft.Cloud server occurrs over a channel,
+   for which there are two implemnations: websocket(.js) and AJAX
+   polling (ajax_polling.js). */
 
 var jot = require("../jot");
 
@@ -32,18 +37,13 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
     logger = function(msg) { }
   }
 
+  // Open the communication channel and initialize the widget.
   logger("opening document using " + channel.name);
-
-  // Open the channel and start receiving remote changes.
   channel.open(owner_name, document_name, api_key, {
-    error: function(msg) {
-      // Fatal error opening initial connction.
-      alert(msg);
-    },
     opened: function(user, doc, peer_states, methods) {
       // The document was successfully opened. We've now got
       // its current content and the corresponding revision id.
-      if (closed) { doc.closefunc(); return; } // closed before calledback
+      if (closed) { methods.close(); return; } // closed before calledback
 
       logger("document opened by " + user.name + " with " + doc.access_level + " access");
 
@@ -80,9 +80,14 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
     },
     nonfatal_error: function(message) {
       if (closed) return;
-      widget.nonfatal_error(message);
+      widget.show_message("warning", message);
+    },
+    fatal_error: function(message) {
+      if (closed) return;
+      widget.show_message("error", message);
+      close_client();
     }
-  });
+  });        
 
   function merge_remote_changes() {
     // Process any Revisions the server sent to us.
@@ -218,7 +223,7 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
           }
           if (err) {
             // TODO: Restore state to try again later.
-            widget.nonfatal_error(err);
+            widget.show_message("warning", err);
           }
 
           // Clear the flag that we've got a change in the channel,
@@ -238,19 +243,21 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
     }
   }
 
+  function close_client() {
+    // Function to shut down the channel and all polling.
+    widget.destroy();
+    if (!closed)
+      logger("connection closed");
+    closed = true;
+    if (channel_methods)
+      channel_methods.close();
+    if (pushIntervalObj)
+      clearInterval(pushIntervalObj);
+  } 
+
   return {
-    close: function() {
-      // Function to shut down the channel and all polling.
-      widget.destroy();
-      if (!closed)
-        logger("connection closed");
-      closed = true;
-      if (channel_methods)
-        channel_methods.close();
-      if (pushIntervalObj)
-        clearInterval(pushIntervalObj);
-    } 
-  }
+    close: close_client
+  };
 };
         
 

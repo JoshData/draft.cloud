@@ -60,7 +60,7 @@ exports.jsoneditor.prototype.set_document = function(document, patch) {
   this.editor.set(document);
 }
 
-exports.jsoneditor.prototype.nonfatal_error = function(message) {
+exports.jsoneditor.prototype.show_message = function(level, message) {
   alert(message);
 }
 
