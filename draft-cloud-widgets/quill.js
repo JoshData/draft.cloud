@@ -158,7 +158,7 @@ exports.quill.prototype.set_document = function(document, patch) {
 }
 
 exports.quill.prototype.get_ephemeral_state = function() {
-  return { quill_selection: this.editor.getSelection() };
+  return { quill_selection: this.editor.getSelection(), name: this.quill_options.display_name };
 }
 
 var cursor_colors = [ // copied from http://clrs.cc/
@@ -228,7 +228,7 @@ function update_cursor(quill, peer_state) {
   peer_state.widget.bar.style.borderColor = color;
 
   // Update name.
-  peer_state.widget.name.textContent = peer_state.user.name;
+  peer_state.widget.name.textContent = peer_state.state.name || peer_state.user.name;
 }
 
 function update_cursor_positions(me, delta) {
