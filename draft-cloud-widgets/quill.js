@@ -64,6 +64,13 @@ exports.quill.prototype.prepare_dom_async2 = function(callback) {
   // Initialize editor in read-only mode.
   this.editor = new Quill(this.elem, this.quill_options);
 
+  // Add a span to the toolbar for showing saved state.
+  var toolbar = this.elem.previousSibling;
+  this.saved_state_indicator = document.createElement('span');
+  this.saved_state_indicator.setAttribute("class", "ql-formats");
+  this.saved_state_indicator.setAttribute("style", "padding-top: 3px; font-style: italic; color: #666;");
+  toolbar.appendChild(this.saved_state_indicator);
+
   // Initialize cursors.
   this.cursor_container = this.elem;
   this.cursors = { };
@@ -254,7 +261,7 @@ exports.quill.prototype.show_message = function(level, message) {
 }
 
 exports.quill.prototype.show_status = function(message) {
-  // TODO
+  this.saved_state_indicator.textContent = message;
 }
 
 function createDelta(current_doc, patch) {

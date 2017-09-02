@@ -26,7 +26,7 @@ exports.textarea = function(textarea) {
       saved_status_badge.setAttribute("style", "display: none; " + saved_status_badge_style);
       return;
     }
-    saved_status_badge.innerHTML = message;
+    saved_status_badge.textContent = message;
     saved_status_badge.setAttribute("style", saved_status_badge_style); // force display to get dimensions
     var bbox = textarea.getBoundingClientRect();
     var dims = saved_status_badge.getBoundingClientRect();
