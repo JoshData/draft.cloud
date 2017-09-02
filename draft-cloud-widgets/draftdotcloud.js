@@ -41,7 +41,6 @@ function init() {
     var api_key = elem.getAttribute("data-draftdotcloud-apikey");
     if (!owner_name || !document_name) continue;
 
-    console.log("attaching draft.cloud widget to", elem);
     var client = require("./client.js").Client(
       owner_name,
       document_name,
