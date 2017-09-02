@@ -232,7 +232,7 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
 
     // Check if the ephemeral_state changed.
     var es = widget.get_ephemeral_state();
-    if (!jot.diff(ephemeral_state, es).isNoOp()) {
+    if (jot.cmp(ephemeral_state, es) != 0) {
       channel_methods.send_state(es);
       ephemeral_state = es;
     }
