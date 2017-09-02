@@ -1,7 +1,9 @@
-// This bundles our Javascript resources for the client.
+// This is the entry point for bundling our Javascript resources for the
+// Draft.cloud client.
+//
 // Build with:
 //
-// browserify -d draft-cloud-widgets/browserfy_root.js -o public_html/draftdotcloud.js
+// browserify -d draft-cloud-widgets/draftdotcloud.js -o public_html/draftdotcloud.js
 //
 
 // Add LINK/SCRIPT tags. Hmm. Gotta figure out how to only add tags
