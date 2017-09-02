@@ -3,6 +3,17 @@ exports.name = "Websocket";
 var socket = null;
 
 exports.open = function(owner_name, document_name, api_key, cbobj) {
+  // On first use, add the socket.io script tag.
+  var elem = document.createElement('script');
+  elem.src = "/socket.io/socket.io.js";
+  elem.onload = function() {
+    // Once the script loads, we can open a websocket.
+    open(owner_name, document_name, api_key, cbobj);
+  }
+  document.getElementsByTagName('head')[0].appendChild(elem);
+}
+
+function open(owner_name, document_name, api_key, cbobj) {
   if (!socket) {
     socket = global.io('/');
 
