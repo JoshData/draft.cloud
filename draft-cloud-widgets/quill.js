@@ -7,13 +7,15 @@ var jotvals = require('../jot/values.js');
 var jotseqs = require('../jot/sequences.js');
 var jotobjs = require('../jot/objects.js');
 
-exports.quill = function(elem, quill_options) {
+exports.quill = function(elem, quill_options, baseurl) {
   this.elem = elem;
+  this.baseurl = baseurl || "";
 
   // Default options.
-  this.quill_options = quill_options || {
-    modules: {
-      toolbar: [
+  this.quill_options = quill_options || { };
+  if (!this.quill_options.modules) this.quill_options.modules = { };
+  if (!this.quill_options.modules.toolbar)
+    this.quill_options.modules.toolbar = [
         ['bold', 'italic'],
         ['blockquote', 'code-block'],
         [{ 'header': 1 }, { 'header': 2 }, { 'header': 3 }],
@@ -21,12 +23,13 @@ exports.quill = function(elem, quill_options) {
         [{ 'indent': '-1'}, { 'indent': '+1' }],
         [{ 'direction': 'rtl' }],
         ['clean']
-      ]
-    },
-    //placeholder: 'Compose an epic...',
-    readOnly: true,
-    theme: 'snow'
-  };
+      ];
+  if (!this.quill_options.theme)
+    this.quill_options.theme = 'snow';
+
+  // Must start it off readonly because the widget has not been initialized
+  // with content yet.
+  this.quill_options['readOnly'] = true;
 
   // Must set this so that undo/redo skips over remote users' changes.
   if (!this.quill_options.modules.history) this.quill_options.modules.history = { };
@@ -47,7 +50,7 @@ exports.quill.prototype.prepare_dom_async = function(callback) {
   this.logger("adding Quill CSS/JS tags to the DOM");
 
   // Add CSS and SCRIPT tags for quill.
-  var dist_url = "/static/quill";
+  var dist_url = this.baseurl + "/static/quill";
   var elem = document.createElement('link');
   elem.href = dist_url + "/quill.snow.css";
   elem.rel = "stylesheet";

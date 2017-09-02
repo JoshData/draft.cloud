@@ -39,14 +39,18 @@ function init() {
     var owner_name = elem.getAttribute("data-draftdotcloud-owner");
     var document_name = elem.getAttribute("data-draftdotcloud-document");
     var api_key = elem.getAttribute("data-draftdotcloud-apikey");
+    var baseurl = elem.getAttribute("data-draftdotcloud-baseurl");
     if (!owner_name || !document_name) continue;
+
+    var websocket = require("./websocket.js");
+    websocket.baseurl = baseurl;
 
     var client = require("./client.js").Client(
       owner_name,
       document_name,
       api_key,
-      require("./websocket.js"), // or require("./ajax_polling.js")
-      new widget(elem),
+      websocket, // or require("./ajax_polling.js")
+      new widget(elem, draftdotcloud_widget_options, baseurl),
       function(doc, msg) {
         log_receivers.forEach(function(recip) {
           recip(doc, msg);
