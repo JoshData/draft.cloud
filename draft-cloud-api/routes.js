@@ -96,6 +96,35 @@ exports.create_routes = function(app, settings) {
     });
   });
 
+  app.put(user_route, bodyParser.json(), function (req, res) {
+    // Update's a user.
+    //
+    // See https://github.com/expressjs/body-parser#bodyparserjsonoptions for
+    // default restrictions on the request body payload.
+    //
+    // Requires ADMIN permission on the user.
+
+    // Validate/sanitize input.
+    req.body = models.Document.clean_document_dict(req.body);
+    if (typeof req.body == "string")
+      return res.status(400).send(req.body);
+
+    authz_user(req, res, req.params.user, "ADMIN", function(requestor, target) {
+      // Update user's globally unique name.
+      if (typeof req.body.name != "undefined")
+        target.set("name", req.body.name);
+
+      if (typeof req.body.profile != "undefined")
+        target.set("profile", req.body.profile);
+      
+      target.save().then(function() {
+        res
+        .status(200)
+        .json(exports.form_user_response_body(target));
+      })
+    });
+  })
+
   exports.form_user_response_body = function(user) {
     return {
         id: user.uuid,

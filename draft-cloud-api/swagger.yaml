@@ -35,6 +35,58 @@ paths:
         403:
           description: The Draft.Cloud backend does not allow the creation of new users through the API.
 
+  /users/{user}:
+    get:
+      description: |
+        Gets `User` metadata.
+      parameters:
+        - name: user
+          in: path
+          description: The name of a `User`.
+          required: true
+          type: string
+        - name: Authorization
+          in: header
+          type: string
+          description: An API key that has READ access to the document. Optional if the document's anonymous access level is READ.
+      responses:
+        200:
+          description: The User metadata is returned as JSON.
+          headers:
+            Content-Type:
+              description: Always `application/json`.
+              type: string
+          schema:
+            title: User
+            type: object
+        404:
+          description: User does not exist or caller does not have permission to see the document.
+    put:
+      description: |
+        Updates a User. The response is as in a GET.
+      parameters:
+        - name: user
+          in: path
+          description: The name of a `User`.
+          required: true
+          type: string
+        - name: Content-Type
+          in: header
+          type: string
+          description: Must be `application/json`.
+        - name: Authorization
+          in: header
+          type: string
+          description: An API key that has ADMIN access to the document, or for a new document and API key for the owner of the new document.
+          required: true
+      responses:
+        200:
+          description: The User was updated. The response body is as in GET.
+        403:
+          description: The caller has permission to see the User but not make changes to its metadata.
+        404:
+          description: User does not exist or caller does not have permission to see the document.
+    
   /documents/{owner}:
     get:
       description: |
