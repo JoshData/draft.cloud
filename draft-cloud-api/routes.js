@@ -25,25 +25,39 @@ exports.create_routes = function(app, settings) {
     // Create a new User with an initial, strong API key. Return a
     // redirect to the User's API url but include the API key in a
     // response header.
-    if (!settings.allow_anonymous_user_creation) {
-      res.status(403).send('New users cannot be created through the API.');
-      return;
-    }
-    models.User.create({
-      name: randomstring.generate({
-        length: 48,
-        charset: 'alphanumeric'
-      })
-    }).then(function(user) {
-      models.UserApiKey.createApiKey(user, .001, function(obj, api_key) {
-        // Give the key ADMIN access to the User's own account.
-        obj.set("access_level", "ADMIN");
-        obj.save();
 
-        res
-          .header("X-Api-Key", api_key)
-          .status(200)
-          .json(exports.form_user_response_body(user));
+    auth.check_request_authorization(req, function(req_user, requestor_api_key) {
+      if (!req_user && !settings.allow_anonymous_user_creation) {
+        res.status(403).send('You are not allowed to create a new user.');
+        return;
+      }
+
+      // If the API key lowers access...
+      if (requestor_api_key && auth.min_access("ADMIN", requestor_api_key.access_level) != "ADMIN") {
+        res.status(403).send('You are not allowed to create a new user with this API key.');
+        return;
+      }
+
+      // Create a new User. If this API call is authenticated, then the new User
+      // is owned by the user making the request.
+      models.User.create({
+        name: randomstring.generate({
+          length: 48,
+          charset: 'alphanumeric'
+        }),
+        ownerId: req_user.id,
+      }).then(function(user) {
+        // Create an initial API key for this user.
+        models.UserApiKey.createApiKey(user, .001, function(obj, api_key) {
+          // Give the key ADMIN access to the User's own account.
+          obj.set("access_level", "ADMIN");
+          obj.save();
+
+          res
+            .header("X-Api-Key", api_key)
+            .status(200)
+            .json(exports.form_user_response_body(user));
+        });
       });
     });
   });

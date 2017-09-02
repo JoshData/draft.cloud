@@ -45,6 +45,7 @@ exports.initialize_database = function(connection_uri, ready) {
       ],
       freezeTableName: true // Model tableName will be the same as the model name
     });
+  exports.User.belongsTo(exports.User, {as: 'owner'});
 
   // API KEYs.
   exports.UserApiKey = exports.db.define('user_api_key',

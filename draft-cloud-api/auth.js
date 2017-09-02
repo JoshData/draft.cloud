@@ -45,7 +45,7 @@ function get_document(owner, document_name, cb) {
   });
 }
 
-function check_request_authorization(req, cb) {
+exports.check_request_authorization = function(req, cb) {
   // Is the request authenticated? If an Authorization header contains
   // a valid API key, then the callback is called with a User and an
   // UserApiKey instance.
@@ -78,12 +78,16 @@ exports.get_user_authz = function(req, user_name, cb) {
     }
 
     // Get the user making the request.
-    check_request_authorization(req, function(requestor, requestor_api_key) {
+    exports.check_request_authorization(req, function(requestor, requestor_api_key) {
       // Compute the access level in order of precedence.
       var level;
 
       // A User is an ADMIN to their own account.
       if (requestor && requestor.id == target.id)
+        level = "ADMIN";
+
+      // A User is an ADMIN to their sub-accounts.
+      if (requestor && requestor.id == target.ownerId)
         level = "ADMIN";
 
       else
@@ -126,7 +130,7 @@ exports.get_document_authz = function(req, owner_name, document_name, cb) {
     // to create a new document.)
     get_document(owner, document_name, function(document) {
       // Get the user making the request.
-      check_request_authorization(req, function(user, user_api_key) {
+      exports.check_request_authorization(req, function(user, user_api_key) {
         //console.log(owner, document, user)
 
         // Compute the access level in order of precedence.

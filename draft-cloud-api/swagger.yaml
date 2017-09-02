@@ -14,7 +14,13 @@ paths:
         Creates a new user, responding with a username, an API key, and the API base URL for the user's documents.
         An API key is not needed for this API call.
 
-        This route is only available if the Draft.Cloud backend is configured to allow the creation of users.
+        This route is only available if the Draft.Cloud backend is configured to allow the creation of anonymous users
+        or if the request is authorized with a valid API key.
+      parameters:
+        - name: Authorization
+          in: header
+          type: string
+          description: Optional. An API key that has ADMIN access to user making the request.
       responses:
         200:
           description: A user was created. The user's username and other information besides the API key
