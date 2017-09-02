@@ -30,57 +30,59 @@ exports.create_routes = function(app, sessionStore, settings) {
     });
   });
 
-  // Github login.
-  var github_login_path = "/auth/github";
-  var github_callback_path = github_login_path + "/callback";
-  passport.use(new GitHubStrategy({
-      clientID: settings.GITHUB_CLIENT_ID,
-      clientSecret: settings.GITHUB_CLIENT_SECRET,
-      callbackURL: settings.url + github_callback_path
-    },
-    function(accessToken, refreshToken, profile, done) {
-      models.UserExternalAccount
-        .findOrCreate({ where: { provider: "github", identifier: profile.id }})
-        .then(function(data) {
-          var userextlogin = data[0];
-          var isnew = data[1];
-          if (!userextlogin.userId) { // better than isnew
-            // Create new user account for this new login.
-            models.User.create({
-              name: profile.username
-            }).then(function(user) {
-              finish(user);
-            });
-          } else {
-            // Look up user.
-            models.User.find({ where: { id: userextlogin.userId }})
-              .then(finish);
-          }
+  if (settings.GITHUB_CLIENT_ID && settings.GITHUB_CLIENT_SECRET) {
+    // Github login.
+    var github_login_path = "/auth/github";
+    var github_callback_path = github_login_path + "/callback";
+    passport.use(new GitHubStrategy({
+        clientID: settings.GITHUB_CLIENT_ID,
+        clientSecret: settings.GITHUB_CLIENT_SECRET,
+        callbackURL: settings.url + github_callback_path
+      },
+      function(accessToken, refreshToken, profile, done) {
+        models.UserExternalAccount
+          .findOrCreate({ where: { provider: "github", identifier: profile.id }})
+          .then(function(data) {
+            var userextlogin = data[0];
+            var isnew = data[1];
+            if (!userextlogin.userId) { // better than isnew
+              // Create new user account for this new login.
+              models.User.create({
+                name: profile.username
+              }).then(function(user) {
+                finish(user);
+              });
+            } else {
+              // Look up user.
+              models.User.find({ where: { id: userextlogin.userId }})
+                .then(finish);
+            }
 
-          function finish(user) {
-            // Update (or set for the first time).
-            userextlogin.userId = user.id;
-            userextlogin.tokens = { accessToken: accessToken, refreshToken: refreshToken };
-            userextlogin.profile = profile;
-            userextlogin.save();
-            // Callback.
-            done(null, user);
-          }
-      });
-    }
-  ));
-  app.get(github_login_path,
-    passport.authenticate('github', { scope: [ 'user:email' ] }));
-  app.get(github_callback_path, 
-    passport.authenticate('github', { failureRedirect: '/' }),
-    function(req, res) {
-      if (req.session.redirect_after_login) {
-        res.redirect(req.session.redirect_after_login)
-        delete req.session.redirect_after_login;
-        return;
+            function finish(user) {
+              // Update (or set for the first time).
+              userextlogin.userId = user.id;
+              userextlogin.tokens = { accessToken: accessToken, refreshToken: refreshToken };
+              userextlogin.profile = profile;
+              userextlogin.save();
+              // Callback.
+              done(null, user);
+            }
+        });
       }
-      res.redirect('/');
-    });
+    ));
+    app.get(github_login_path,
+      passport.authenticate('github', { scope: [ 'user:email' ] }));
+    app.get(github_callback_path, 
+      passport.authenticate('github', { failureRedirect: '/' }),
+      function(req, res) {
+        if (req.session.redirect_after_login) {
+          res.redirect(req.session.redirect_after_login)
+          delete req.session.redirect_after_login;
+          return;
+        }
+        res.redirect('/');
+      });
+  }
 
   // Start a new document.
   app.get("/new", function (req, res) {
