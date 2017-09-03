@@ -134,7 +134,7 @@ exports.get_document_authz = function(req, owner_name, document_name, cb) {
         // Get permissions for this user to this document.
         models.DocumentPermission.findOne({
           where: {
-            documentId: document.id,
+            documentId: document ? document.id : -1, // don't return anything if the document doesn't exist
             userId: user ? user.id : -1 // don't return anything if the user is anonymous
           }
         }).then(function(document_permission) {
