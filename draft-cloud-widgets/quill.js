@@ -1,13 +1,20 @@
 // This implements simple_widget based on the Quill rich text
 // editor at quilljs.com.
 
+var uaparser = require('ua-parser-js');
+
 var simple_widget = require('./simple_widget.js').simple_widget;
 
+var jot = require('../jot');
 var jotvals = require('../jot/values.js');
 var jotseqs = require('../jot/sequences.js');
 var jotobjs = require('../jot/objects.js');
 
 exports.quill = function(elem, quill_options, baseurl) {
+  // check that Quill supports this browser
+  run_browser_check();
+
+  // init
   this.elem = elem;
   this.baseurl = baseurl || "";
 
@@ -34,6 +41,36 @@ exports.quill = function(elem, quill_options, baseurl) {
   // Must set this so that undo/redo skips over remote users' changes.
   if (!this.quill_options.modules.history) this.quill_options.modules.history = { };
   this.quill_options.modules.history.userOnly = true;
+}
+
+function run_browser_check() {
+  var ua = uaparser();
+
+  function parse_version(version) {
+    return version.split(/\./).map(function(item) { return parseInt(item); });
+  }
+
+  function check(engine, min_version, warning) {
+    if (ua.engine.name != engine)
+      return; // not this engine
+    if (jot.cmp(
+      parse_version(ua.engine.version),
+      parse_version(min_version)) >= 0)
+      return; // version is ok
+    alert(warning + " or later is required to edit the document on this page.");
+    throw new Error("Quill does not support this browser version.")
+  }
+
+  // Based on https://github.com/quilljs/quill/#readme but
+  // converting the browser versions to engine versions for
+  // better reliability in checking, hopefully.
+  check("Gecko", "44", "Firefox version 44"); // engine number == browser number
+  if (ua.browser.name == "Safari" || ua.browser.name == "Mobile Safari")
+    check("WebKit", "601", "Safari version 9");
+  else
+    check("WebKit", "537.36", "Chrome version 47"); // https://en.wikipedia.org/wiki/Google_Chrome_version_history
+  check("Trident", "7.0", "Internet Explorer 11"); // https://en.wikipedia.org/wiki/Trident_%28layout_engine%29#Release_history
+  check("EdgeHTML", "13", "Edge 13");
 }
 
 exports.quill.prototype = new simple_widget(); // inherit

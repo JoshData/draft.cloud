@@ -21,6 +21,7 @@
     "socket.io": "*",
     "sqlite3": "*",
     "textarea-caret": "*",
+    "ua-parser-js": "*",
     "uuid": "*"
   },
   "repository": {
