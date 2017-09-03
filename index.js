@@ -6,7 +6,7 @@ var settings = JSON.parse(fs.readFileSync("local/environment.json"))
 
 // Prep the database.
 require("./draft-cloud-api/models.js")
-  .initialize_database("sqlite://db.sqlite", function() {
+  .initialize_database(settings, function() {
 
   // Start the background process that commits revisions.
   require('./draft-cloud-api/committer.js').begin();

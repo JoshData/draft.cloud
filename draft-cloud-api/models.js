@@ -8,8 +8,13 @@ var db;
 var valid_name_regex = /^[A-Za-z0-9_-]{5,64}$/;
 var valid_name_text = "Names may only contain the characters A-Z, a-z, 0-9, underscore, and hyphen and must be between 5 and 64 characters inclusive.";
 
-exports.initialize_database = function(connection_uri, ready) {
-  exports.db = new Sequelize(connection_uri);
+exports.initialize_database = function(settings, ready) {
+  exports.db = new Sequelize(
+    settings.database || "sqlite://db.sqlite",
+    {
+      logging: settings.database_logging ? console.log : null
+    }
+  );
 
   // CREATE MODELS
 
