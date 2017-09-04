@@ -1,3 +1,4 @@
+const fs = require('fs');
 const Sequelize = require('sequelize');
 const credential = require('credential');
 
@@ -9,9 +10,14 @@ var valid_name_regex = /^[A-Za-z0-9_-]{5,64}$/;
 var valid_name_text = "Names may only contain the characters A-Z, a-z, 0-9, underscore, and hyphen and must be between 5 and 64 characters inclusive.";
 
 exports.initialize_database = function(settings, ready) {
+  // Replace the ssl.ca field with file contents.
+  if (settings.database_connection_options && settings.database_connection_options.ssl && settings.database_connection_options.ssl.ca)
+    settings.database_connection_options.ssl.ca = fs.readFileSync(settings.database_connection_options.ssl.ca);
+
   exports.db = new Sequelize(
     settings.database || "sqlite://db.sqlite",
     {
+      dialectOptions: settings.database_connection_options,
       logging: settings.database_logging ? console.log : null
     }
   );

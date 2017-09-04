@@ -11,6 +11,7 @@ var apiroutes = require("../draft-cloud-api/routes.js");
 // Export a function that creates routes on the express app.
 
 exports.create_routes = function(app, sessionStore, settings) {
+  if (!settings.secret_key) return; // can't do the logged in front-end without this, so skip
   app.use(session({
     store: sessionStore,
     secret: settings.secret_key,

@@ -1,4 +1,6 @@
 var fs = require('fs');
+var http = require('http');
+var https = require('https');
 var express = require('express');
 
 // Load local settings.
@@ -29,14 +31,24 @@ require("./draft-cloud-api/models.js")
     .create_routes(app, sessionStore, settings);
 
   // Start listening.
-  var io = require('socket.io')
-    .listen(app
-      .listen(settings.port || 8000, "0.0.0.0"));
+  var bind = settings.bind || "0.0.0.0";
+  var port = settings.port || 8000;
+  console.log("Starting on " + bind + ":" + port + ".");
+  var server;
+  if (!settings.tls) {
+    server = http.createServer(app);
+  } else {
+    var options = { key: fs.readFileSync(settings.tls.key),
+                cert: fs.readFileSync(settings.tls.cert) };
+    server = https.createServer(options, app);
+  }
+  server.listen(port, bind);
 
   // Initialize the back-end websocket handler, which must be
   // after we start listening.
+  var websocketio = require('socket.io').listen(server);
   require("./draft-cloud-api/live.js")
-    .init(io, sessionStore, settings);
+    .init(websocketio, sessionStore, settings);
 
   // Initialize the front-end.
   app.use('', express.static(require('path').join(__dirname, 'public_html')))
