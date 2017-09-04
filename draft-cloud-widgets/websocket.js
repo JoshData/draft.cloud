@@ -17,7 +17,7 @@ exports.open = function(owner_name, document_name, api_key, cbobj) {
 
 function open(owner_name, document_name, api_key, cbobj) {
   if (!socket) {
-    socket = global.io(exports.baseurl + '/');
+    socket = global.io('/');
 
     socket.on('message', function (message) {
       alert(message)
