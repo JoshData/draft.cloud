@@ -86,9 +86,13 @@ exports.simple_widget.prototype.open = function(state) {
   })
 };
 
-exports.simple_widget.prototype.destroy = function() {
+exports.simple_widget.prototype.document_closed = function() {
+  // Stop polling.
   if (this.intervalId)
     clearInterval(this.intervalId);
+
+  // Make the editor read only.
+  this.set_readonly(true);
 }
 
 exports.simple_widget.prototype.pop_changes = function() {
@@ -170,18 +174,21 @@ exports.simple_widget.prototype.status = function(state) {
   // Check synchronously for any new edits in the widget.
   this.compute_changes();
 
+  // If there was any error saving, it's permanent.
+  if (state == "error")
+    this.show_status("Could Not Save");
+
   // If there are any edits, then the document is unsaved.
-  if (this.changes.length > 0) {
+  else if (this.changes.length > 0)
     this.show_status("Not Saved");
 
   // Or we could be saving changes that have been given
   // to the client class by pop_changes.
-  } else if (state == "saving") {
+  else if (state == "saving")
     this.show_status("Saving...");
 
   // Or if the client class says everything is saved, and
   // nothing is pending, then everything is saved.
-  } else if (state == "saved") {
+  else if (state == "saved")
     this.show_status("Saved");
-  }
 }

@@ -693,12 +693,17 @@ exports.create_routes = function(app, settings) {
       id: rev.uuid,
       author: rev.userId,
       comment: rev.comment,
-      userdata: rev.userdata,
-      committed: rev.committed
+      userdata: rev.userdata
     };
 
-    if (rev.committed) 
+    if (rev.committed) {
+      ret.status = "committed";
       ret.op = drill_down_operation(rev.op, op_path);
+    } else if (rev.error) {
+      ret.status = "error";
+    } else {
+      ret.status = "pending";
+    }
 
     return ret;
   }

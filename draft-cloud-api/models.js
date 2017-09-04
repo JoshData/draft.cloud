@@ -303,6 +303,15 @@ exports.initialize_database = function(settings, ready) {
         defaultValue: false
       },
 
+      // Whether this operation has been committed yet. An uncommitted
+      // Revision has a baseRevision that it still needs to be rebased
+      // against. Uncommitted revisions are not exposed to the user.
+      // They are committed in order of their primary key 'id'.
+      error: {
+        type: Sequelize.BOOLEAN,
+        defaultValue: false
+      },
+
       // For an uncommitted Revision, the JSON Pointer to a sub-part of
       // the document that is being modified.
       doc_pointer: {

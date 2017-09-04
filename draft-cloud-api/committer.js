@@ -27,16 +27,18 @@ function commit_uncommitted_revisions() {
   // to err on the side of thinking there is a change when there is none.
   has_new_uncommitted_revisions = false;
 
-  console.log("Committing...")
-
   // Pull all uncommitted revisions.
   models.Revision.findAll({
     where: {
-      committed: false
+      committed: false,
+      error: false
     },
     order: [["documentId", "ASC"], ["id", "ASC"]]
   })
   .then(function(revs) {
+    if (revs.length > 0)
+      console.log("Committing...");
+
     // Make a mapping from document IDs to arrays of revisions.
     var revsbydoc = { };
     revs.forEach(function(rev) {
@@ -65,7 +67,8 @@ function commit_uncommitted_revisions() {
             function(rev, cb) { commit_revision(doc, rev, cb); },
             function(err) {
               // Notify all listening websocket clients of the committed revisions
-              // for this document.
+              // for this document. (Some revisions might be marked as having
+              // had an error and therefore not committed.)
               require("../draft-cloud-api/live.js").emit_revisions(doc, revs);
               cb();
               if (err) console.error(err);
@@ -95,10 +98,12 @@ function commit_revision(document, revision, cb) {
       function(err, doc_revision, content, op_path) {
         // There should not be any errors...
         if (err) {
-          // There is an error with document content. It is too late to
-          // do anything about this. But in order to prevent trying to
-          // commit the revision over and over again, just kill it.
-          revision.destroy(); // HMM!
+          // There is an error with document content. This should never happen
+          // since we check Revisions before committing them. It is too late to
+          // do anything about this. Mark the new Revision as an error so we
+          // don't keep trying to commit it.
+          revision.error = true;
+          revision.save();
           cb(err);
           return;
         }
@@ -133,12 +138,21 @@ function commit_revision(document, revision, cb) {
           })).simplify();
 
           // Rebase. Pass the base document content to enable conflictless rebase.
-          // TODO: This may throw.
           try {
+            // Rebase.
             op = op.rebase(base_ops, { document: content });
+
+            // Validate the resulting operation is valid on the document.
+            // It may throw if the operation was invalid.
+            op.apply(content);
           } catch (e) {
-            // Rebase failed? That's bad.
-            op = new jot.NO_OP();
+            // This Revision had an invalid operation. Don't commit it.
+            revision.error = true;
+            revision.save().then(function() {
+              console.log("error in", document.uuid, revision.uuid);
+              cb();
+            });
+            return;
           }
 
           // Make a revision.
@@ -151,7 +165,10 @@ function commit_revision(document, revision, cb) {
             cb();
           });
         }).catch(function(err) {
-          revision.destroy(); // HMM!
+          // Something horrible went wrong. Don't try this Revision
+          // again.
+          revision.error = true;
+          revision.save();
           cb(err);
         });
     });
