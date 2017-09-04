@@ -5,6 +5,7 @@
   "dependencies": {
     "async": "*",
     "body-parser": "*",
+    "browserify": "^14.4.0",
     "cookie-parser": "*",
     "credential": "*",
     "express": "*",

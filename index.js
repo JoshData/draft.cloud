@@ -17,6 +17,7 @@ require("./draft-cloud-api/models.js")
     sessionStore = new sessionStore();
 
   // General expresss settings.
+  if (settings.trust_proxy) app.set('trust proxy', settings.trust_proxy); // express won't set secure cookies if it can't see it's running behind https
   app.use(require('helmet')())
 
   // Initialize the back-end API routes.

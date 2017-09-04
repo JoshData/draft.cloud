@@ -49,9 +49,7 @@ exports.create_routes = function(app, sessionStore, settings) {
               // Create new user account for this new login.
               models.User.create({
                 name: profile.username
-              }).then(function(user) {
-                finish(user);
-              });
+              }).then(finish);
             } else {
               // Look up user.
               models.User.find({ where: { id: userextlogin.userId }})
@@ -62,7 +60,7 @@ exports.create_routes = function(app, sessionStore, settings) {
               // Update (or set for the first time).
               userextlogin.userId = user.id;
               userextlogin.tokens = { accessToken: accessToken, refreshToken: refreshToken };
-              userextlogin.profile = profile;
+              userextlogin.profile = profile._json;
               userextlogin.save();
               // Callback.
               done(null, user);
@@ -75,7 +73,7 @@ exports.create_routes = function(app, sessionStore, settings) {
     app.get(github_callback_path, 
       passport.authenticate('github', { failureRedirect: '/' }),
       function(req, res) {
-        if (req.session.redirect_after_login) {
+        if (req.session.redirect_after_login && req.user) {
           res.redirect(req.session.redirect_after_login)
           delete req.session.redirect_after_login;
           return;
