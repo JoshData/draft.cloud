@@ -691,7 +691,10 @@ exports.create_routes = function(app, settings) {
     var ret = {
       createdAt: rev.createdAt,
       id: rev.uuid,
-      author: rev.userId,
+      author: {
+        id: rev.user.uuid,
+        name: rev.user.name
+      },
       comment: rev.comment,
       userdata: rev.userdata
     };
@@ -912,7 +915,10 @@ exports.create_routes = function(app, settings) {
           where['id'] = { "$gt": base_revision.id };
         models.Revision.findAll({
           where: where,
-          order: [["id", "ASC"]]
+          order: [["id", "ASC"]],
+          include: [{
+            model: models.User
+          }]
         })
         .then(function(revs) {
           // Parse the "pointer" parameter, which is a JSON Pointer to the
