@@ -671,6 +671,7 @@ exports.create_routes = function(app, settings) {
     })
     .then(function(rev) {
       // Send response.
+      rev.user = user; // fill in model
       res.status(201).json(exports.make_revision_response(rev, null));
 
       // Alert committer to look for new revisions.

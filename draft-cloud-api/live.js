@@ -270,7 +270,10 @@ exports.emit_revisions = function(doc, revs) {
             $lt: revs[0].id
           }
         },
-        order: [["id", "ASC"]]
+        order: [["id", "ASC"]],
+        include: [{
+          model: models.User
+        }]
       }).then(function(earlier_revs) {
         // Emit all of the earlier ones, plus the new ones.
         emit_the_revisions(earlier_revs.concat(revs));

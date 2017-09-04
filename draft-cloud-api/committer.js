@@ -33,7 +33,10 @@ function commit_uncommitted_revisions() {
       committed: false,
       error: false
     },
-    order: [["documentId", "ASC"], ["id", "ASC"]]
+    order: [["documentId", "ASC"], ["id", "ASC"]],
+    include: [{
+      model: models.User
+    }]
   })
   .then(function(revs) {
     if (revs.length > 0)
