@@ -43,7 +43,9 @@ function init() {
     if (!owner_name || !document_name) continue;
 
     var websocket = require("./websocket.js");
-    websocket.baseurl = baseurl;
+    if (baseurl) websocket.baseurl = baseurl;
+
+    if (typeof draftdotcloud_widget_options == "undefined") draftdotcloud_widget_options = null;
 
     var client = require("./client.js").Client(
       owner_name,
