@@ -21,7 +21,7 @@
     "randomstring": "*",
     "sequelize": "*",
     "socket.io": "*",
-    "sqlite3": "*",
+    "sqlite3": "https://github.com/mapbox/node-sqlite3/tarball/master",
     "textarea-caret": "*",
     "ua-parser-js": "*",
     "uuid": "*"
