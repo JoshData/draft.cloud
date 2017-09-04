@@ -115,6 +115,12 @@ exports.quill.prototype.prepare_dom_async2 = function(callback) {
   this.saved_state_indicator.setAttribute("style", "padding-top: 3px; font-style: italic; color: #666;");
   toolbar.appendChild(this.saved_state_indicator);
 
+  // Correctly size the editor to the parent node's size minus the toolbar size.
+  var _this = this;
+  function resize() { _this.elem.style.height = (_this.elem.parentNode.clientHeight - toolbar.offsetHeight) + "px"; }
+  window.addEventListener("resize", resize);
+  resize();
+
   // Initialize cursors.
   this.cursor_container = this.elem;
   this.cursors = { };
@@ -122,7 +128,6 @@ exports.quill.prototype.prepare_dom_async2 = function(callback) {
   this.logger("Quill widget created");
 
   // Update cursors.
-  var _this = this;
   this.editor.on('text-change', function(delta, oldDelta, source) {
     update_cursor_positions(_this, delta);
   });
