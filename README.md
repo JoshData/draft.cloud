@@ -31,11 +31,12 @@ In `local/environment.json`:
 	  "secret_key": "...",
 	  "GITHUB_CLIENT_ID": "...",
 	  "GITHUB_CLIENT_SECRET": "...",
-	  "database": "mysql://draftdotcloud:...@localhost/draftdotcloud"
+	  "database": "postgresql://draftdotcloud:...@localhost/draftdotcloud"
 	}
 
 Test functionality:
 
+	./build.sh
 	node index.js
 	  ^C it once it starts running
 

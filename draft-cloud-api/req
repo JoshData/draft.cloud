@@ -1,4 +1,6 @@
 #!/bin/sh
+HERE=$(dirname $0)
+PORT=$(jq .port < $HERE/../environment.json)
 curl \
 	-D - \
 	-X $1 -d "$2" \
@@ -7,5 +9,5 @@ curl \
 	--header "Authorization: $API_KEY" \
 	--header "Revision-Userdata: $USERDATA" \
 	--header "Base-Revision-Id: $BASEREV" \
-	http://localhost:8000/api/v1/$3
+	http://localhost:$PORT/api/v1/$3
 
