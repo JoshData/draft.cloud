@@ -8,7 +8,7 @@
 
 var async = require("async");
 
-var jot = require("../jot");
+var jot = require("jot");
 
 exports.push_interval = 200;
 

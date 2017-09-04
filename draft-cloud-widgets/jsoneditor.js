@@ -1,8 +1,8 @@
 var simple_widget = require('./simple_widget.js').simple_widget;
-var jot = require('../jot');
-var jotvals = require('../jot/values.js');
-var jotseqs = require('../jot/sequences.js');
-var jotobjs = require('../jot/objects.js');
+var jot = require('jot');
+var jotvals = require('jot/jot/values.js');
+var jotseqs = require('jot/jot/sequences.js');
+var jotobjs = require('jot/jot/objects.js');
 
 
 exports.jsoneditor = function(elem) {

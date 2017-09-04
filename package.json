@@ -10,6 +10,7 @@
     "express": "*",
     "express-session": "*",
     "helmet": "*",
+    "jot": "git+https://github.com/joshdata/jot.git",
     "json-ptr": "*",
     "jsoneditor": "*",
     "mustache": "*",

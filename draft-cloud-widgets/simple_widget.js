@@ -14,7 +14,7 @@
 // * get_ephemeral_state() => object
 // * on_peer_state_updated(peerid, user, state)
 
-var jot = require("../jot");
+var jot = require("jot");
 
 exports.poll_interval = 1000;
 

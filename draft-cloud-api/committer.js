@@ -3,7 +3,7 @@ var async = require("async");
 var routes = require("./routes.js");
 var models = require("./models.js");
 
-var jot = require("../jot");
+var jot = require("jot");
 
 exports.begin = function() {
   setInterval(commit_uncommitted_revisions, 100);

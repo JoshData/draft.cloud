@@ -6,7 +6,7 @@ var json_ptr = require('json-ptr');
 var auth = require("./auth.js");
 var models = require("./models.js");
 
-var jot = require("../jot");
+var jot = require("jot");
 
 // Export a function that creates routes on the express app.
 

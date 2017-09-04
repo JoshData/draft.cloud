@@ -2,7 +2,7 @@
 
 var expressCookieParser = require('cookie-parser');
 
-var jot = require("../jot");
+var jot = require("jot");
 var auth = require("./auth.js");
 var models = require("./models.js");
 var routes = require("./routes.js");

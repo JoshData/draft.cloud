@@ -1,5 +1,5 @@
 var simple_widget = require('./simple_widget.js').simple_widget;
-var jot = require('../jot');
+var jot = require('jot');
 
 exports.textarea = function(textarea) {
   // Set the textarea's UI to a holding state before initial content is loaded.
