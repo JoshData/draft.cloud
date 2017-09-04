@@ -98,17 +98,17 @@ exports.create_routes = function(app, sessionStore, settings) {
         req.user,
         {
           // make the document public by default since it will get an unguessable address anyway
-          anon_access_level: "READ"
+          anon_access_level: "WRITE"
         },
         function(doc) {
-        res.redirect(req.user.name + "/" + doc.name)
+        res.redirect("/edit/" + req.user.name + "/" + doc.name)
       });
     }
   });
 
   // A document.
   var document_page = fs.readFileSync("templates/document.html", "utf8");
-  app.get("/:owner/:document", function (req, res) {
+  app.get("/edit/:owner/:document", function (req, res) {
     if (!req.user) {
       // Authenticate if not logged in.
       req.session.redirect_after_login = req.url;
