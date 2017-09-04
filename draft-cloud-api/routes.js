@@ -45,7 +45,7 @@ exports.create_routes = function(app, settings) {
           length: 48,
           charset: 'alphanumeric'
         }),
-        ownerId: req_user.id,
+        ownerId: req_user ? req_user.id : 0,
       }).then(function(user) {
         // Create an initial API key for this user.
         models.UserApiKey.createApiKey(user, .001, function(obj, api_key) {
