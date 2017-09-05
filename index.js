@@ -31,7 +31,7 @@ require("./draft-cloud-api/models.js")
     .create_routes(app, sessionStore, settings);
 
   // Start listening.
-  var bind = settings.bind || "0.0.0.0";
+  var bind = settings.bind || "127.0.0.1";
   var port = settings.port || 8000;
   console.log("Starting on " + bind + ":" + port + ".");
   var server;
