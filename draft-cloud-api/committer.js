@@ -120,7 +120,7 @@ function commit_revision(document, revision, cb) {
         // will use that distinction to select whether it is the APPLY for sequences
         // (the element is a number, an index) or objects (the element is a string, a key).
         for (var i = op_path.length-1; i >= 0; i--)
-          op = jot.APPLY(op_path[i], op);
+          op = new jot.APPLY(op_path[i], op);
 
         // Rebase against all of the subsequent operations after the base revision to
         // the current revision. Find all of the subsequent operations.
@@ -136,7 +136,7 @@ function commit_revision(document, revision, cb) {
         })
         .then(function(revs) {
           // Load the JOT operations as a LIST.
-          var base_ops = jot.LIST(revs.map(function(rev) {
+          var base_ops = new jot.LIST(revs.map(function(rev) {
             return jot.opFromJSON(rev.op);
           })).simplify();
 
