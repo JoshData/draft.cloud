@@ -25,6 +25,11 @@ exports.simple_widget = function() {
   this.changes_last_content = null;
 }
 
+exports.simple_widget.prototype.has_changes = function() {
+  this.compute_changes();
+  return this.changes.length > 0;
+}
+
 exports.simple_widget.prototype.compute_changes = function() {
   // This function is called at intervals to see if the widget's
   // content has changed. If the content has changed, a JOT operation

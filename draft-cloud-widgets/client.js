@@ -114,6 +114,20 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
         peer_states: initial_peer_states
       });
 
+      // Warn the user before leaving the page if there are unsaved changes.
+      window.addEventListener("beforeunload", function (e) {
+          if (closed)
+            return undefined;
+          if ( waiting_for_local_change_to_save
+            || waiting_for_local_change_to_return
+            || widget.has_changes()) {
+            var confirmationMessage = 'You have unsaved changes.'; // the actual text is overriden in some browsers
+            (e || window.event).returnValue = confirmationMessage; //Gecko + IE
+            return confirmationMessage; //Gecko + Webkit, Safari, Chrome etc.
+          };
+          return undefined;
+      });
+
       // Begin periodically pushing new local changes.
       if (!readonly)
         pushIntervalObj = setInterval(push_local_changes, exports.push_interval);
