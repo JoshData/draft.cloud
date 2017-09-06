@@ -216,8 +216,9 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
       // so we can't apply any further changes from the server.
       // The only thing to do now is to close the connection and
       // warn the user.
+      logger("fatal error: our revision could not be committed!");
       widget.status("error");
-      widget.show_message("error", "There is a problem with the document. Copy any changes you made into a new document. Apologies for the inconvenience.");
+      widget.show_message("error", "There is a problem with the document. Copy any changes you made into a new document, or discard your recent changes by reloading this page. Apologies for the inconvenience.");
       close_client();
       return;
     }

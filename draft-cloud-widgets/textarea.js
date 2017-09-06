@@ -39,6 +39,7 @@ exports.textarea = function(textarea) {
   if (debug_random_op_interval) {
     setInterval(
       function() {
+        if (textarea.readOnly) return;
         var doc = textarea.value;
 
         // Construct a random operation toward the beginning of the
