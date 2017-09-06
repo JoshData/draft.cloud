@@ -105,6 +105,7 @@ function commit_revision(document, revision, cb) {
           // since we check Revisions before committing them. It is too late to
           // do anything about this. Mark the new Revision as an error so we
           // don't keep trying to commit it.
+          console.error("error loading document content", err);
           revision.error = true;
           revision.save();
           cb(err);
@@ -121,6 +122,20 @@ function commit_revision(document, revision, cb) {
         // (the element is a number, an index) or objects (the element is a string, a key).
         for (var i = op_path.length-1; i >= 0; i--)
           op = new jot.APPLY(op_path[i], op);
+
+        // Validate the operation. It should apply without error to the document
+        // at the base revision.
+        try {
+          op.apply(content);
+        } catch (e) {
+          // This Revision had an invalid operation. Don't commit it.
+          revision.error = true;
+          revision.save().then(function() {
+            console.error("invalid operation submitted", document.uuid, revision.uuid, e);
+            cb();
+          });
+          return;
+        }
 
         // Rebase against all of the subsequent operations after the base revision to
         // the current revision. Find all of the subsequent operations.
@@ -145,14 +160,18 @@ function commit_revision(document, revision, cb) {
             // Rebase.
             op = op.rebase(base_ops, { document: content });
 
-            // Validate the resulting operation is valid on the document.
-            // It may throw if the operation was invalid.
-            op.apply(content);
+            // Although rebase should always give us a good result, sanity check
+            // that a) the operation can be composed with the prior operations and
+            // b) it can apply to the current document content. We sanity check
+            // two ways to be sure we don't corrupt the document. We're just
+            // checking for thrown exceptions.
+            op.apply(base_ops.apply(content)); // (content + base_ops) + op
+            base_ops.compose(op).apply(content); // content + (base_ops+op)
           } catch (e) {
             // This Revision had an invalid operation. Don't commit it.
             revision.error = true;
             revision.save().then(function() {
-              console.log("error in", document.uuid, revision.uuid);
+              console.error("sanity check failed", document.uuid, revision.uuid, e);
               cb();
             });
             return;
@@ -170,6 +189,7 @@ function commit_revision(document, revision, cb) {
         }).catch(function(err) {
           // Something horrible went wrong. Don't try this Revision
           // again.
+          console.error("unhandled error committing", document.uuid, revision.uuid, err);
           revision.error = true;
           revision.save();
           cb(err);
