@@ -128,7 +128,10 @@ exports.init = function(io, sessionStore, settings) {
                   id: { "$gt": revision.id },
                   committed: true
                 },
-                order: [["id", "ASC"]]
+                order: [["id", "ASC"]],
+                include: [{
+                  model: models.User
+                }]
               })
               .then(function(revs) {
                 socket.emit("new-revisions", {
