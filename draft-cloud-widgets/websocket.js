@@ -1,3 +1,5 @@
+var URL = require('url');
+
 exports.name = "Websocket";
 
 var socket = null;
@@ -17,7 +19,22 @@ exports.open = function(owner_name, document_name, api_key, cbobj) {
 
 function open(owner_name, document_name, api_key, cbobj) {
   if (!socket) {
-    socket = global.io('/');
+    // Where should we connect to? By default connect to
+    // the same domain this page is loaded from.
+    var wsurl = '/';
+
+    // If a baseurl is specified, just use the scheme+host
+    // because the path portion is interpreted by socket.io
+    // as a namespace, which will prevent our messages from
+    // being picked up by the server.
+    if (exports.baseurl) {
+      wsurl = URL.parse(exports.baseurl); // TODO: Update to non-legacy API.
+      wsurl.pathname = null;
+      wsurl.search = null;
+      wsurl = URL.format(wsurl);
+    }
+
+    socket = global.io(wsurl);
 
     socket.on('message', function (message) {
       alert(message)
