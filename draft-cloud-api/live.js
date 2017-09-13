@@ -159,7 +159,7 @@ exports.init = function(io, sessionStore, settings) {
 
     function make_peer_state(state) {
       return {
-        user: { id: state.user.uuid, name: state.user.name },
+        user: { id: state.user.uuid, name: state.user.name, display_name: state.user.profile && state.user.profile.display_name },
         state: state.ephemeral_state,
       }
     }

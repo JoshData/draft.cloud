@@ -169,6 +169,7 @@ exports.simple_widget.prototype.on_peer_state_updated = function(peerid, user, s
   if (this.cursors && user && state && state.cursor_charpos) {
     // Update cursor.
     this.cursors.update(peerid, {
+      label: user.display_name || user.name || peerid,
       index: state.cursor_charpos.index,
       length: state.cursor_charpos.length
     });
