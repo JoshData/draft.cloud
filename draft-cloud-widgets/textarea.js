@@ -1,11 +1,14 @@
 var simple_widget = require('./simple_widget.js').simple_widget;
 var jot = require('jot');
 
+var getCaretCoordinates = require('textarea-caret');
+
 exports.textarea = function(textarea) {
   // Set the textarea's UI to a holding state before initial content is loaded.
   this.textarea = textarea;
   textarea.value = "";
   textarea.readOnly = true;
+  textarea.style.textRendering = "geometricPrecision"; // necessary on WebKit for cursor location calculation to work
 
   // Record changes on keypresses of whitespace since that's a nice time to
   // send a chunk of changes to the server, preserving some logical intent.
@@ -66,6 +69,8 @@ exports.textarea.prototype = new simple_widget(); // inherit
 
 exports.textarea.prototype.name = "Textarea Widget";
 
+// required methods
+
 exports.textarea.prototype.get_document = function() {
   return this.textarea.value; 
 }
@@ -111,4 +116,32 @@ exports.textarea.prototype.show_message = function(level, message) {
 
 exports.textarea.prototype.show_status = function(message) {
   this.update_saved_status_badge(message);
+}
+
+// cursor support
+
+exports.textarea.prototype.get_cursor_char_range = function() {
+  return [this.textarea.selectionStart, this.textarea.selectionEnd-this.textarea.selectionStart];
+}
+
+exports.textarea.prototype.get_cursors_parent_element = function() {
+  return this.textarea.parentNode;
+}
+
+exports.textarea.prototype.get_peer_cursor_rects = function(index, length) {
+  // pos.height is returned starting with https://github.com/component/textarea-caret-position/commit/af904838644c60a7c48b21ebcca8a533a5967074
+  // which is not yet released
+  var pos = getCaretCoordinates(this.textarea, index, {debug:true});
+  return [{ top: this.textarea.offsetTop + pos.top, left: this.textarea.offsetLeft + pos.left, width: 0, height: pos.height }];
+}
+
+exports.textarea.prototype.on_change_at_charpos = function(cb) {
+  // TODO. This is not very good. There are lots of ways content
+  // changes, and we have no way to understand what the change
+  // was exactly so we can revise the cursor positions.
+  var _this = this;
+  this.textarea.addEventListener("keydown", function(e) {
+    var length = 1; // TODO: Not all keypresses result in same length.
+    cb([[_this.textarea.selectionStart, _this.textarea.selectionEnd-_this.textarea.selectionStart, length]]);
+  })
 }

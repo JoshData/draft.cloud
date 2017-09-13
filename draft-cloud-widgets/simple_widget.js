@@ -11,10 +11,19 @@
 //
 // and may implement:
 // * prepare_dom_async(callback)
+//
+// and for cursors:
+// * get_cursor_char_range() => [index, length] or null
+// * get_cursors_parent_element() => DOM element to place peer cursor divs
+// * get_peer_cursor_rects(index, length) => [ { top: , left: , width: , height: }, ... ]
+//
+// and for other state:
 // * get_ephemeral_state() => object
 // * on_peer_state_updated(peerid, user, state)
 
 var jot = require("jot");
+
+var cursors = require('./cursors.js');
 
 exports.poll_interval = 1000;
 
@@ -55,7 +64,26 @@ exports.simple_widget.prototype.compute_changes = function() {
 exports.simple_widget.prototype.initialize = function(logger, callback) {
   this.logger = logger;
   this.logger(this.name + " initializing");
-  this.prepare_dom_async(callback);
+
+  var _this = this;
+  this.prepare_dom_async(function() {
+    // If the widget supports showing peer cursors at character positions,
+    // initialize a CursorManager.
+    if (_this.get_cursors_parent_element && _this.get_peer_cursor_rects) {
+      _this.cursors = new cursors.CursorManager({
+        container: _this.get_cursors_parent_element(),
+        rects: function(index, length) { return _this.get_peer_cursor_rects(index, length) },
+      });
+      if (_this.on_change_at_charpos) {
+        _this.on_change_at_charpos(function(index, length, newlength) {
+          _this.cursors.shift_cursors(index, length, newlength);
+        });
+      }
+    }
+
+    // Let the Client know the widget is ready.
+    callback();
+  });
 }
 
 exports.simple_widget.prototype.prepare_dom_async = function(callback) {
@@ -128,10 +156,26 @@ exports.simple_widget.prototype.pop_changes = function() {
 }
 
 exports.simple_widget.prototype.get_ephemeral_state = function() {
-  return null;
+  var state = null;
+  if (this.get_cursor_char_range) {
+    var range = this.get_cursor_char_range();
+    if (range)
+      state = { cursor_charpos: { index: range[0], length: range[1] } };
+  }
+  return state;
 }
 
 exports.simple_widget.prototype.on_peer_state_updated = function(peerid, user, state) {
+  if (this.cursors && user && state && state.cursor_charpos) {
+    // Update cursor.
+    this.cursors.update(peerid, {
+      index: state.cursor_charpos.index,
+      length: state.cursor_charpos.length
+    });
+  } else if (this.cursors) {
+    // Peer disconnected.
+    this.cursors.remove(peerid);
+  }
 }
 
 exports.simple_widget.prototype.merge_remote_changes = function(patch) {

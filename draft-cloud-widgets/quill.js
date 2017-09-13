@@ -124,16 +124,7 @@ exports.quill.prototype.prepare_dom_async2 = function(callback) {
     resize();
   }
 
-  // Initialize cursors.
-  this.cursor_container = this.elem;
-  this.cursors = { };
-
   this.logger("Quill widget created");
-
-  // Update cursors.
-  this.editor.on('text-change', function(delta, oldDelta, source) {
-    update_cursor_positions(_this, delta);
-  });
 
   callback();
 }
@@ -201,113 +192,6 @@ exports.quill.prototype.set_document = function(document, patch) {
   // caret/scroll position.
   this.editor.setContents(document);
 }
-
-exports.quill.prototype.get_ephemeral_state = function() {
-  return { quill_selection: this.editor.getSelection(), name: this.quill_options.display_name };
-}
-
-var cursor_colors = [ // copied from http://clrs.cc/
-  "#001f3f", "#0074D9", "#39CCCC", "#3D9970", "#2ECC40",
-  "#85144b", "#F012BE", "#B10DC9"
-];
-
-exports.quill.prototype.on_peer_state_updated = function(peerid, user, state) {
-  if (!user || !state || !state.quill_selection) {
-    // Peer disconnected.
-    if (peerid in this.cursors) {
-      this.cursors[peerid].widget.bar.parentNode.removeChild(this.cursors[peerid].widget.bar);
-      this.cursors[peerid].widget.name.parentNode.removeChild(this.cursors[peerid].widget.name);
-      delete this.cursors[peerid];
-    }
-    return;
-  }
-
-  // New?
-  if (!(peerid in this.cursors)) {
-    this.cursors[peerid] = {
-    };
-
-    var widget_bar = document.createElement('div');
-    this.cursor_container.appendChild(widget_bar);
-    widget_bar.setAttribute('class', 'quill-editor-peer-cursor-bar');
-    widget_bar.setAttribute('style', 'position: absolute; width: 0; height: 0; border-left: 2px solid black;');
-
-    var widget_name = document.createElement('div');
-    this.cursor_container.appendChild(widget_name);
-    widget_name.setAttribute('class', 'quill-editor-peer-cursor-name');
-    widget_name.setAttribute('style', 'position: absolute; cursor: default; color: white; font-weight: bold; border: 1px solid black; border-radius: .5em; padding: .125em; font-size: 90%; max-width: 12em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;');
-
-    this.cursors[peerid].widget = { bar: widget_bar, name: widget_name };
-  }
-
-  // Update.
-  this.cursors[peerid].peerid = peerid;
-  this.cursors[peerid].user = user;
-  this.cursors[peerid].state = state;
-  update_cursor(this.editor, this.cursors[peerid]);
-}
-
-function update_cursor(quill, peer_state) {
-  // Update bounds.
-  var bounds;
-  try {
-    bounds = quill.getBounds(peer_state.state.quill_selection.index, peer_state.state.quill_selection.length);
-  } catch (e) {
-    // It's possible the cursor state is invalid, so silently skip.
-    return;
-  }
-  peer_state.widget.bar.style.top = bounds.top + "px";
-  peer_state.widget.bar.style.left = (bounds.left-2) + "px";
-  peer_state.widget.bar.style.height = bounds.height + "px";
-  peer_state.widget.name.style.top = (bounds.top+bounds.height) + "px";
-  peer_state.widget.name.style.left = (bounds.left-2) + "px";
-
-  // Update color. Map the user's peerid stably to a color choice.
-  // Since peerid's are random, we can use that as a numerical starting
-  // point.
-  var color_code = 0;
-  for (var i = 0; i < peer_state.peerid.length; i++) color_code += peer_state.peerid.charCodeAt(i);
-  var color = cursor_colors[color_code % cursor_colors.length];
-  peer_state.widget.name.style.backgroundColor = color;
-  peer_state.widget.name.style.borderColor = color;
-  peer_state.widget.bar.style.borderColor = color;
-
-  // Update name.
-  peer_state.widget.name.textContent = peer_state.state.name || peer_state.user.name;
-}
-
-function update_cursor_positions(me, delta) {
-  // Update the cursor positions. Since the cursor positions shift
-  // due to remote changes, but remote changes come asynchronously
-  // with cursor update messages, we should update cursor positions
-  // as fast as possible.
-  for (var peerid in me.cursors) {
-    var qs = me.cursors[peerid].state.quill_selection;
-    var index = 0;
-    delta.ops.forEach(function(op) {
-      if (op.insert) {
-        var dx = (typeof op.insert == "string" ? op.insert.length : 1);
-        if (index < qs.index)
-          qs.index += dx;
-        else if (index < qs.index+qs.length)
-          qs.length += dx;
-        index += dx;
-      }
-      if (op.delete) {
-        var dx = op.delete;
-        if (index+dx < qs.index)
-          qs.index -= dx;
-        else if (index+dx < qs.index+qs.length)
-          qs.length -= dx;
-        index += dx;
-      }
-      if (op.retain)
-        index += op.retain;
-    });
-    update_cursor(me.editor, me.cursors[peerid]);
-  }
-}
-
 exports.quill.prototype.show_message = function(level, message) {
   alert(message);
 }
@@ -453,4 +337,52 @@ function createDelta(current_doc, patch) {
   });
 
   return delta;
+}
+
+// cursor support
+
+exports.quill.prototype.get_cursor_char_range = function() {
+  var sel = this.editor.getSelection();
+  if (!sel) return null;
+  return [sel.index, sel.length];
+}
+
+exports.quill.prototype.get_cursors_parent_element = function() {
+  return this.elem;
+}
+
+exports.quill.prototype.get_peer_cursor_rects = function(index, length) {
+  return [this.editor.getBounds(index, length)];
+}
+
+exports.quill.prototype.on_change_at_charpos = function(cb) {
+  this.editor.on('text-change', function(delta, oldDelta, source) {
+    cb(compute_cursor_positions_shift(delta));
+  });
+}
+
+function compute_cursor_positions_shift(delta) {
+  // Update the cursor positions. Since the cursor positions shift
+  // due to remote changes, but remote changes come asynchronously
+  // with cursor update messages, we should update cursor positions
+  // as fast as possible. Turn the delta into an array of [index,
+  // length, newlength] triples that the CursorManager can handle.
+  var index = 0;
+  var changeinfo = [];
+  delta.ops.forEach(function(op) {
+    if (op.insert) {
+      var length = (typeof op.insert == "string" ? op.insert.length : 1);
+      changeinfo.push([index, 0, length]);
+    }
+    if (op.delete) {
+      var length = op.delete;
+      changeinfo.push([index, length, 0]);
+      index += length;
+    }
+    if (op.retain) {
+      var length = op.retain;
+      index += length;
+    }
+  });
+  return changeinfo;
 }
