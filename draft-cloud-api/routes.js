@@ -62,12 +62,12 @@ exports.create_routes = function(app, settings) {
     });
   });
 
-  function authz_user(req, res, target_user_name, min_level, cb) {
+  function authz_user(req, res, target_user_id, min_level, cb) {
     // Checks authorization for user URLs. The callback is called
     // as: cb(requestor, target) where requestor is the User making the
     // request and target is User about which the request is being made.
     if (!(min_level == "NONE" || min_level == "READ" || min_level == "WRITE" || min_level == "ADMIN")) throw "invalid argument";
-    auth.get_user_authz(req, target_user_name, function(requestor, target, level) {
+    auth.get_user_authz(req, target_user_id, function(requestor, target, level) {
       // Check permission level.
       if (auth.min_access(min_level, level) != min_level) {
         // The user's access level is lower than the minimum access level required.
@@ -132,8 +132,8 @@ exports.create_routes = function(app, settings) {
         profile: user.profile,
         created: user.createdAt,
         api_urls: {
-          profile: api_public_base_url + user_route.replace(/:user/, encodeURIComponent(user.name)),
-          documents: api_public_base_url + document_list_route.replace(/:owner/, encodeURIComponent(user.name))
+          profile: api_public_base_url + user_route.replace(/:user/, user.uuid),
+          documents: api_public_base_url + document_list_route.replace(/:owner/, user.uuid)
         }
       }   
   }
@@ -199,14 +199,14 @@ exports.create_routes = function(app, settings) {
       owner: exports.form_user_response_body(owner),
       userdata: doc.userdata,
       api_urls: {
-        document: api_public_base_url + document_route.replace(/:owner/, encodeURIComponent(owner.name))
-          .replace(/:document/, encodeURIComponent(doc.name)),
-        debugger: api_public_base_url + document_route.replace(/:owner/, encodeURIComponent(owner.name))
-          .replace(/:document/, encodeURIComponent(doc.name)) + "/debug"
+        document: api_public_base_url + document_route.replace(/:owner/, owner.uuid)
+          .replace(/:document/, doc.uuid),
+        debugger: api_public_base_url + document_route.replace(/:owner/, owner.uuid)
+          .replace(/:document/, doc.uuid) + "/debug"
       },
       web_urls: {
-        document: api_public_base_url + "/:owner/:document".replace(/:owner/, encodeURIComponent(owner.name))
-          .replace(/:document/, encodeURIComponent(doc.name))
+        document: api_public_base_url + "/:owner/:document".replace(/:owner/, owner.uuid)
+          .replace(/:document/, doc.uuid)
       }
     };
   }
@@ -221,8 +221,7 @@ exports.create_routes = function(app, settings) {
       var docs = models.Document.findAll({
         where: {
           userId: owner.id
-        },
-        paranoid: true // only return non-deleted rows
+        }
       })
       .then(function(docs) {
         // Turn the documents into API JSON.
@@ -258,44 +257,32 @@ exports.create_routes = function(app, settings) {
   });
 
   app.put(document_route, bodyParser.json(), function (req, res) {
-    // Create a document or update its metadata.
+    // Update document metadata.
     //
     // See https://github.com/expressjs/body-parser#bodyparserjsonoptions for
     // default restrictions on the request body payload.
     //
-    // Requires ADMIN permission on the document. (If the document doesn't yet
-    // exist, we can still have ADMIN permission in virtue of being the same
-    // user as the intended owner.)
+    // Requires ADMIN permission on the document.
 
     // Validate/sanitize input.
     req.body = models.Document.clean_document_dict(req.body);
     if (typeof req.body == "string")
       return res.status(400).send(req.body);
 
-    // Check authorization to create/update the document.
-    authz_document(req, res, false, "ADMIN", function(user, owner, doc) {
-      if (!doc) {
-        // Create a document.
-        req.body.name = req.params.document;
-        exports.create_document(owner, req.body, finish_request);
-      } else {
-        // Document exists. Update its metadata from any keys provided.
-        if (typeof req.body.name != "undefined")
-          doc.set("name", req.body.name);
-        if (typeof req.body.anon_access_level != "undefined")
-          doc.set("anon_access_level", req.body.anon_access_level);
-        if (typeof req.body.userdata != "undefined")
-          doc.set("userdata", req.body.userdata);
-        doc.save().then(function() {
-          finish_request(doc);
-        })
-      }
-
-      function finish_request(doc) {
+    // Check authorization to update the document.
+    authz_document(req, res, true, "ADMIN", function(user, owner, doc) {
+      // Document exists. Update its metadata from any keys provided.
+      if (typeof req.body.name != "undefined")
+        doc.set("name", req.body.name);
+      if (typeof req.body.anon_access_level != "undefined")
+        doc.set("anon_access_level", req.body.anon_access_level);
+      if (typeof req.body.userdata != "undefined")
+        doc.set("userdata", req.body.userdata);
+      doc.save().then(function() {
         res
         .status(200)
         .json(exports.make_document_json(owner, doc));
-      }
+      })
     })
   })
 

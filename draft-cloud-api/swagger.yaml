@@ -11,26 +11,22 @@ paths:
   /users:
     post:
       description: |
-        Creates a new user, responding with a username, an API key, and the API base URL for the user's documents.
-        An API key is not needed for this API call.
+        Creates a new user, responding with a user `id`, an API key, and the API base URL for the user's documents.
 
-        This route is only available if the Draft.Cloud backend is configured to allow the creation of anonymous users
-        or if the request is authorized with a valid API key.
+        If the Draft.Cloud backend is configured to allow the creation of anonymous users,
+        an API key is not required.
       parameters:
         - name: Authorization
           in: header
           type: string
-          description: Optional. An API key that has ADMIN access to user making the request.
+          description: Optional (see description). An API key that has ADMIN access to user making the request.
       responses:
         200:
-          description: A user was created. The user's username and other information besides the API key
+          description: A user was created. The user's `id` and username and other information besides the API key
             are returned in the JSON response body. The user's API key is returned in the `X-Api-Key` header.
           headers:
             X-Api-Key:
               description: The user's API key.
-              type: string
-            Location:
-              description: The API base URL to the user's documents.
               type: string
         403:
           description: The Draft.Cloud backend does not allow the creation of new users through the API.
@@ -42,7 +38,7 @@ paths:
       parameters:
         - name: user
           in: path
-          description: The name of a `User`.
+          description: The `id` of a `User`.
           required: true
           type: string
         - name: Authorization
@@ -67,7 +63,7 @@ paths:
       parameters:
         - name: user
           in: path
-          description: The name of a `User`.
+          description: The `id` of a `User`.
           required: true
           type: string
         - name: Content-Type
@@ -94,7 +90,7 @@ paths:
       parameters:
         - name: owner
           in: path
-          description: The name of a `User` who owns the document.
+          description: The `id` of a `User` who owns the document.
           required: true
           type: string
         - name: Authorization
@@ -112,12 +108,11 @@ paths:
           description: User does not exist or caller does not have permission to see the user.
     post:
       description: |
-        Creates a `Document` with a unique name. A successful response is a 302 response with a Location header
-        that has a URL pointing to the new document.
+        Creates a `Document` with a unique name.
       parameters:
         - name: owner
           in: path
-          description: The name of a `User` who owns the document.
+          description: The `id` of a `User` who owns the document.
           required: true
           type: string
         - name: Content-Type
@@ -131,7 +126,7 @@ paths:
           required: true
       responses:
         200:
-          description: A new document was created. The response JSON body contains the new document's name and other metadata.
+          description: A new document was created. The response JSON body contains the new document's `id`, name and other metadata.
           headers:
             Content-Type:
               description: Always `application/json`.
@@ -147,12 +142,12 @@ paths:
       parameters:
         - name: owner
           in: path
-          description: The name of a `User` who owns the document.
+          description: The `id` of a `User` who owns the document.
           required: true
           type: string
         - name: document
           in: path
-          description: The name of a `Document` owned by  `owner`.
+          description: The `id` of a `Document` owned by  `owner`.
           required: true
           type: string
         - name: Authorization
@@ -173,16 +168,16 @@ paths:
           description: The owner or document does not exist or caller does not have permission to see the owner or document.
     put:
       description: |
-        Creates a `Document` or updates an existing `Document`'s metadata. The response is as in GET.
+        Updates an existing `Document`'s metadata. The response is as in GET.
       parameters:
         - name: owner
           in: path
-          description: The name of a `User` who owns the document.
+          description: The `id` of a `User` who owns the document.
           required: true
           type: string
         - name: document
           in: path
-          description: The name of a `Document` owned by  `owner`, or the name of a new document to create.
+          description: The `id` of a `Document` owned by  `owner`.
           required: true
           type: string
         - name: Content-Type
@@ -196,9 +191,7 @@ paths:
           required: true
       responses:
         200:
-          description: The (existing) document was updated. The response body is as in GET.
-        201:
-          description: A new document was created. The response body is as in GET.
+          description: The document was updated. The response body is as in GET.
         403:
           description: The caller has permission to see the document but not make changes to its metadata.
         404:
@@ -209,12 +202,12 @@ paths:
       parameters:
         - name: owner
           in: path
-          description: The name of a `User` who owns the document.
+          description: The `id` of a `User` who owns the document.
           required: true
           type: string
         - name: document
           in: path
-          description: The name of a `Document` owned by  `owner`.
+          description: The `id` of a `Document` owned by  `owner`.
           required: true
           type: string
         - name: Authorization
@@ -240,12 +233,12 @@ paths:
       parameters:
         - name: owner
           in: path
-          description: The name of a `User` who owns the document.
+          description: The `id` of a `User` who owns the document.
           required: true
           type: string
         - name: document
           in: path
-          description: The name of a `Document` owned by  `owner`.
+          description: The `id` of a `Document` owned by  `owner`.
           required: true
           type: string
         - name: Authorization
@@ -270,12 +263,12 @@ paths:
       parameters:
         - name: owner
           in: path
-          description: The name of a `User` who owns the document.
+          description: The `id` of a `User` who owns the document.
           required: true
           type: string
         - name: document
           in: path
-          description: The name of a `Document` owned by  `owner`, or the name of a new document to create.
+          description: The `id` of a `Document` owned by  `owner`.
           required: true
           type: string
         - name: Content-Type
@@ -290,7 +283,7 @@ paths:
         - name: user
           in: body
           type: string
-          description: The name of the user whose permissions are being changed.
+          description: The `id` of the user whose permissions are being changed.
           required: true
         - name: access_level
           in: body
@@ -313,12 +306,12 @@ paths:
       parameters:
         - name: owner
           in: path
-          description: The name of a `User` who owns the document.
+          description: The `id` of a `User` who owns the document.
           required: true
           type: string
         - name: document
           in: path
-          description: The name of a `Document` owned by  `owner`.
+          description: The `id` of a `Document` owned by  `owner`.
           required: true
           type: string
         - name: path
@@ -330,7 +323,7 @@ paths:
         - name: Revision-Id
           in: header
           type: string
-          description: A Revision UUID. If specified, gets the content of the document at the indicated revision. Otherwise the document's content at the most recent revision is returned.
+          description: A Revision `id`. If specified, gets the content of the document at the indicated revision. Otherwise the document's content at the most recent revision is returned.
           default: ""
         - name: Accept
           in: header
@@ -345,7 +338,7 @@ paths:
           description: Document content is returned as JSON.
           headers:
             Revision-Id:
-              description: The UUID of the document's current `Revision`, or the revision specified in the Revision-Id header if the header is given. May be `singularity` to indicate that the document has not yet had any revisions yet. (Such documents always have `null` content.)
+              description: The `id` of the document's current `Revision`, or the revision specified in the Revision-Id header if the header is given. May be `singularity` to indicate that the document has not yet had any revisions yet. (Such documents always have `null` content.)
               type: string
             Access-Level:
               description: The access level that the user has on this document. Either READ, WRITE, or ADMIN.
@@ -378,12 +371,12 @@ paths:
       parameters:
         - name: owner
           in: path
-          description: The name of a `User` who owns the document.
+          description: The `id` of a `User` who owns the document.
           required: true
           type: string
         - name: document
           in: path
-          description: The name of a `Document` owned by  `owner`.
+          description: The `id` of a `Document` owned by  `owner`.
           required: true
           type: string
         - name: path
@@ -403,7 +396,7 @@ paths:
         - name: Base-Revision-Id
           in: header
           type: string
-          description: An optional `Revision` UUID that the new document content is based on. May be `singularity` indicating that the base revision is the implicit revision that exists when a document is first created. If not specified, the base revision is the document's current revision.
+          description: An optional `Revision` `id` that the new document content is based on. May be `singularity` indicating that the base revision is the implicit revision that exists when a document is first created. If not specified, the base revision is the document's current revision.
         - name: Content-Type
           in: header
           type: string
@@ -446,12 +439,12 @@ paths:
       parameters:
         - name: owner
           in: path
-          description: The name of a `User` who owns the document.
+          description: The `id` of a `User` who owns the document.
           required: true
           type: string
         - name: document
           in: path
-          description: The name of a `Document` owned by  `owner`.
+          description: The `id` of a `Document` owned by  `owner`.
           required: true
           type: string
         - name: path
@@ -471,7 +464,7 @@ paths:
         - name: Base-Revision-Id
           in: header
           type: string
-          description: An optional `Revision` UUID that the new document content is based on. May be `singularity` indicating that the base revision is the implicit revision that exists when a document is first created. If not specified, the base revision is the document's current revision.
+          description: An optional `Revision` `id` that the new document content is based on. May be `singularity` indicating that the base revision is the implicit revision that exists when a document is first created. If not specified, the base revision is the document's current revision.
         - name: Content-Type
           in: header
           type: string
@@ -503,17 +496,17 @@ paths:
       parameters:
         - name: owner
           in: path
-          description: The name of a `User` who owns the document.
+          description: The `id` of a `User` who owns the document.
           required: true
           type: string
         - name: document
           in: path
-          description: The name of a `Document` owned by  `owner`.
+          description: The `id` of a `Document` owned by  `owner`.
           required: true
           type: string
         - name: since
           in: query
-          description: An optional `Revision` UUID. If not specified, the full history of the document is returned. Otherwise only the changes made after the given revision are returned.
+          description: An optional `Revision` `id`. If not specified, the full history of the document is returned. Otherwise only the changes made after the given revision are returned.
           type: string
         - name: path
           in: query

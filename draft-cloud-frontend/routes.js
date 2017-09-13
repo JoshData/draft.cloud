@@ -100,8 +100,8 @@ exports.create_routes = function(app, sessionStore, settings) {
           anon_access_level: "WRITE"
         },
         function(doc) {
-        res.redirect("/edit/" + req.user.name + "/" + doc.name)
-      });
+          res.redirect("/edit/" + req.user.name + "/" + doc.name)
+        });
     }
   });
 
@@ -115,18 +115,29 @@ exports.create_routes = function(app, sessionStore, settings) {
       return;
     }
 
-    auth.get_document_authz(req, req.params.owner, req.params.document, function(user, owner, doc, level) {
-      if (auth.min_access("READ", level) != "READ") {
-        res.status(404).send('User or document not found or you do not have permission to see it.');
-        return;
-      }
+    // We get the owner and document names. Convert those to UUIDs because
+    // auth.get_document_authz wants UUIDs. TODO: Once we have these records,
+    // there is no need to do a second look-up in auth.get_document_authz.
+    models.User.findOne({ where: { name: req.params.owner }})
+    .then(function(owner) {
+      models.Document.findOne({ where: { userId: owner ? owner.id : -1, name: req.params.document }})
+      .then(function(document) {
+        
+        auth.get_document_authz(req, owner ? owner.uuid : "-invalid-", document ? document.uuid : "-invalid-", function(user, owner, doc, level) {
+          if (auth.min_access("READ", level) != "READ") {
+            res.status(404).send('User or document not found or you do not have permission to see it.');
+            return;
+          }
 
-      res.status(200).send(mustache.render(document_page, {
-        "user": user,
-        "owner": owner,
-        "document": doc
-      }))
-    });
+          res.status(200).send(mustache.render(document_page, {
+            "user": user,
+            "owner": owner,
+            "document": doc
+          }))
+        });
+      });      
+    });      
+
 
   });
 }

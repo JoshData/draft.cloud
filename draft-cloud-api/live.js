@@ -68,6 +68,21 @@ exports.init = function(io, sessionStore, settings) {
     // The open-document message begins a connection to monitor a document for
     // real time changes.
     socket.on('open-document', function (data, response) {
+      // We get the owner and document names. Convert those to UUIDs because
+      // auth.get_document_authz wants UUIDs. TODO: Once we have these records,
+      // there is no need to do a second look-up in auth.get_document_authz.
+      models.User.findOne({ where: { name: data.owner }})
+      .then(function(owner) {
+        models.Document.findOne({ where: { userId: owner ? owner.id : -1, name: data.document }})
+        .then(function(document) {
+          data.owner = owner ? owner.uuid : "-invalid-";
+          data.document = document ? document.uuid : "-invalid-";
+          open_document(data, response);
+        });      
+      });      
+    });
+
+    function open_document(data, response) {
       // Check that the requestor has READ permission. socket.handshake has
       // a 'headers' property that auth.get_document_authz expects for finding
       // the user's API key, which works out if the web browser knows to send
@@ -155,7 +170,7 @@ exports.init = function(io, sessionStore, settings) {
 
           });
       });
-    });
+    };
 
     function make_peer_state(state) {
       return {
