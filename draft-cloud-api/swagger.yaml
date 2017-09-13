@@ -1,40 +1,50 @@
 # This is a description of the Draft.Cloud API in Swagger format.
-
 swagger: '2.0'
 basePath: /api/v1
-
 info:
-  version: "1"
+  version: '1'
   title: Draft.Cloud API
-
 paths:
   /users:
     post:
-      description: |
-        Creates a new user, responding with a user `id`, an API key, and the API base URL for the user's documents.
+      description: >
+        Creates a new user, responding with a user `id`, an API key, and the API
+        base URL for the user's documents.
 
-        If the Draft.Cloud backend is configured to allow the creation of anonymous users,
+
+        If the Draft.Cloud backend is configured to allow the creation of
+        anonymous users,
+
         an API key is not required.
+      produces:
+        - application/json
       parameters:
         - name: Authorization
           in: header
           type: string
-          description: Optional (see description). An API key that has ADMIN access to user making the request.
+          description: >-
+            Optional (see description). An API key that has ADMIN access to user
+            making the request.
       responses:
-        200:
-          description: A user was created. The user's `id` and username and other information besides the API key
-            are returned in the JSON response body. The user's API key is returned in the `X-Api-Key` header.
+        '200':
+          description: >-
+            A user was created. The user's `id` and username and other
+            information besides the API key are returned in the JSON response
+            body. The user's API key is returned in the `X-Api-Key` header.
           headers:
             X-Api-Key:
               description: The user's API key.
               type: string
-        403:
-          description: The Draft.Cloud backend does not allow the creation of new users through the API.
-
-  /users/{user}:
+        '403':
+          description: >-
+            The Draft.Cloud backend does not allow the creation of new users
+            through the API.
+  '/users/{user}':
     get:
       description: |
         Gets `User` metadata.
+      produces:
+        - application/json
       parameters:
         - name: user
           in: path
@@ -44,22 +54,26 @@ paths:
         - name: Authorization
           in: header
           type: string
-          description: An API key that has READ access to the document. Optional if the document's anonymous access level is READ.
+          description: >-
+            An API key that has READ access to the document. Optional if the
+            document's anonymous access level is READ.
       responses:
-        200:
+        '200':
           description: The User metadata is returned as JSON.
-          headers:
-            Content-Type:
-              description: Always `application/json`.
-              type: string
           schema:
             title: User
             type: object
-        404:
-          description: User does not exist or caller does not have permission to see the document.
+        '404':
+          description: >-
+            User does not exist or caller does not have permission to see the
+            document.
     put:
       description: |
         Updates a User. The response is as in a GET.
+      consumes:
+        - application/json
+      produces:
+        - application/json
       parameters:
         - name: user
           in: path
@@ -73,20 +87,28 @@ paths:
         - name: Authorization
           in: header
           type: string
-          description: An API key that has ADMIN access to the document, or for a new document and API key for the owner of the new document.
+          description: >-
+            An API key that has ADMIN access to the document, or for a new
+            document and API key for the owner of the new document.
           required: true
       responses:
-        200:
+        '200':
           description: The User was updated. The response body is as in GET.
-        403:
-          description: The caller has permission to see the User but not make changes to its metadata.
-        404:
-          description: User does not exist or caller does not have permission to see the document.
-    
-  /documents/{owner}:
+        '403':
+          description: >-
+            The caller has permission to see the User but not make changes to
+            its metadata.
+        '404':
+          description: >-
+            User does not exist or caller does not have permission to see the
+            document.
+  '/documents/{owner}':
     get:
-      description: |
-        Gets all `Document`s owned by a user (that the requestor has permission to see).
+      description: >
+        Gets all `Document`s owned by a user (that the requestor has permission
+        to see).
+      produces:
+        - application/json
       parameters:
         - name: owner
           in: path
@@ -96,49 +118,49 @@ paths:
         - name: Authorization
           in: header
           type: string
-          description: An API key that has READ access to the document. Optional if the document's anonymous access level is READ.
+          description: >-
+            An API key that has READ access to the document. Optional if the
+            document's anonymous access level is READ.
       responses:
-        200:
+        '200':
           description: The documents are returned as a JSON array.
-          headers:
-            Content-Type:
-              description: Always `application/json`.
-              type: string
-        404:
-          description: User does not exist or caller does not have permission to see the user.
+        '404':
+          description: >-
+            User does not exist or caller does not have permission to see the
+            user.
     post:
       description: |
         Creates a `Document` with a unique name.
+      produces:
+        - application/json
       parameters:
         - name: owner
           in: path
           description: The `id` of a `User` who owns the document.
           required: true
           type: string
-        - name: Content-Type
-          in: header
-          type: string
-          description: Must be `application/json`.
         - name: Authorization
           in: header
           type: string
-          description: An API key that has ADMIN access to the document, or for a new document and API key for the owner of the new document.
+          description: >-
+            An API key that has ADMIN access to the document, or for a new
+            document and API key for the owner of the new document.
           required: true
       responses:
-        200:
-          description: A new document was created. The response JSON body contains the new document's `id`, name and other metadata.
-          headers:
-            Content-Type:
-              description: Always `application/json`.
-              type: string
-        403:
+        '200':
+          description: >-
+            A new document was created. The response JSON body contains the new
+            document's `id`, name and other metadata.
+        '403':
           description: The caller has permission to see the owner but not create documents.
-        404:
+        '404':
           description: Owner does not exist or caller does not have permission to see it.
-  /documents/{owner}/{document}:
+  '/documents/{owner}/{document}':
     get:
       description: |
         Gets `Document` metadata.
+      produces:
+        - application/json
       parameters:
         - name: owner
           in: path
@@ -153,22 +175,26 @@ paths:
         - name: Authorization
           in: header
           type: string
-          description: An API key that has READ access to the document. Optional if the document's anonymous access level is READ.
+          description: >-
+            An API key that has READ access to the document. Optional if the
+            document's anonymous access level is READ.
       responses:
-        200:
+        '200':
           description: The document metadata is returned as JSON.
-          headers:
-            Content-Type:
-              description: Always `application/json`.
-              type: string
           schema:
             title: Document
             type: object
-        404:
-          description: The owner or document does not exist or caller does not have permission to see the owner or document.
+        '404':
+          description: >-
+            The owner or document does not exist or caller does not have
+            permission to see the owner or document.
     put:
       description: |
         Updates an existing `Document`'s metadata. The response is as in GET.
+      consumes:
+        - application/json
+      produces:
+        - application/json
       parameters:
         - name: owner
           in: path
@@ -187,15 +213,21 @@ paths:
         - name: Authorization
           in: header
           type: string
-          description: An API key that has ADMIN access to the document, or for a new document and API key for the owner of the new document.
+          description: >-
+            An API key that has ADMIN access to the document, or for a new
+            document and API key for the owner of the new document.
           required: true
       responses:
-        200:
+        '200':
           description: The document was updated. The response body is as in GET.
-        403:
-          description: The caller has permission to see the document but not make changes to its metadata.
-        404:
-          description: Document does not exist or caller does not have permission to see the document.
+        '403':
+          description: >-
+            The caller has permission to see the document but not make changes
+            to its metadata.
+        '404':
+          description: >-
+            Document does not exist or caller does not have permission to see
+            the document.
     delete:
       description: |
         Deletes a `Document`.
@@ -215,94 +247,323 @@ paths:
           type: string
           description: An API key that has ADMIN access to the document.
           required: true
+      responses:
+        '200':
+          description: The document was deleted.
+        '403':
+          description: The caller has permission to see the document but not delete it.
+        '404':
+          description: >-
+            Document does not exist or caller does not have permission to see
+            the document.
+  '/documents/{owner}/{document}/team':
+    get:
+      description: |
+        Gets a list of all `User`s with READ permission on the `Document`.
+      produces:
+        - application/json
+      parameters:
+        - name: owner
+          in: path
+          description: The `id` of a `User` who owns the document.
+          required: true
+          type: string
+        - name: document
+          in: path
+          description: The `id` of a `Document` owned by  `owner`.
+          required: true
+          type: string
+        - name: Authorization
+          in: header
+          type: string
+          description: >-
+            An API key that has READ access to the document. Optional if the
+            document's anonymous access level is READ.
+      responses:
+        '200':
+          description: The Document's team members are returned as JSON.
+          schema:
+            title: Document Team
+            type: object
+        '404':
+          description: >-
+            The owner or document does not exist or caller does not have
+            permission to see the owner or document.
+    put:
+      description: |
+        Updates `User` permissions on a `Document`. The request body must be a JSON-encoded object
+        `{ user: userid, access_level: level }` containing the `id` of the user whose permissions are
+        being changed and the new access_level for the user (NONE, READ, WRITE, or ADMIN).
+      consumes: 
+        - application/json
+      produces:
+        - text/plain
+      parameters:
+        - name: owner
+          in: path
+          description: The `id` of a `User` who owns the document.
+          required: true
+          type: string
+        - name: document
+          in: path
+          description: The `id` of a `Document` owned by  `owner`.
+          required: true
+          type: string
+        - name: Content-Type
+          in: header
+          type: string
+          description: Must be `application/json`.
+        - name: Authorization
+          in: header
+          type: string
+          description: >-
+            An API key that has ADMIN access to the document and READ access to
+            the user whose permissions are being changed, unless the user is
+            being removed from the Document.
+          required: true
+      responses:
+        '200':
+          description: The document permissions were updated.
+        '400':
+          description: The access_level was invalid.
+        '403':
+          description: >-
+            The caller has permission to see the document but not make changes
+            to its metadata.
+        '404':
+          description: >-
+            Document does not exist or caller does not have permission to see
+            the document.
+  '/documents/{owner}/{document}/content{path}':
+    get:
+      description: >
+        Gets `Document` content. If a path to a subpart of the document is given
+        at the end of the URL, then only a part of the document is returned. The
+        document is returned either as JSON or as UTF-8 encoded plain text,
+        depending on the Accept header you send in the request.
+      produces: 
+        - application/json
+        - text/plain
+      parameters:
+        - name: owner
+          in: path
+          description: The `id` of a `User` who owns the document.
+          required: true
+          type: string
+        - name: document
+          in: path
+          description: The `id` of a `Document` owned by  `owner`.
+          required: true
+          type: string
+        - name: path
+          in: path
+          description: |
+            A [JSON Pointer](https://tools.ietf.org/html/rfc6901), which looks like `/x/y/15`.
+            Can be omitted.
+          type: string
+          format: binary
+          required: true
+        - name: Revision-Id
+          in: header
+          type: string
+          description: >-
+            A Revision `id`. If specified, gets the content of the document at
+            the indicated revision. Otherwise the document's content at the most
+            recent revision is returned.
+          default: ''
+        - name: Accept
+          in: header
+          type: string
+          description: >-
+            Either `text/plain` or `application/json`. (If the Accept header
+            says both formats are accepted, you may get either format back.)
+        - name: Authorization
+          in: header
+          type: string
+          description: >-
+            An API key that has READ access to the document. Optional if the
+            document's anonymous access level is READ.
+      responses:
+        '200':
+          description: Document content is returned as JSON.
+          headers:
+            Revision-Id:
+              description: >-
+                The `id` of the document's current `Revision`, or the revision
+                specified in the Revision-Id header if the header is given. May
+                be `singularity` to indicate that the document has not yet had
+                any revisions yet. (Such documents always have `null` content.)
+              type: string
+            Access-Level:
+              description: >-
+                The access level that the user has on this document. Either
+                READ, WRITE, or ADMIN.
+              type: string
+            Content-Type:
+              description: >-
+                `application/json` or `text/plain`, depending on the Accept
+                header you send. (If the Accept header says both formats are
+                accepted but text/plain is preferred, you may get
+                application/json in the response if the document's content is
+                not plain text.)
+              type: string
+        '404':
+          description: >-
+            Document does not exist or caller does not have permission to see
+            the document.
+        '406':
+          description: >-
+            The Accept header was set to `text/plain` but the document content
+            is not plain text, or an invalid content type was sent in the Accept
+            header.
+    put:
+      description: >
+        Updates the content of a `Document` with content provided in the request
+        body.
+
+        Document content is text or arbitrary JSON data provided in the request
+        body
+
+        (see the request Content-Type header parameter).
+
+
+        If a [JSON Pointer](https://tools.ietf.org/html/rfc6901) to a subpart of
+        the document is given at the end of the URL (see GET),
+
+        then the content provided in this PUT request replaces the content at
+        the location in the
+
+        document that the pointer points to and the operation in the revision in
+        the response body is
+
+        relative to that part of the document.
+
+
+        If a base revision is specified with the Base-Revision-Id header, then
+        the changes made
+
+        relative to the base revision will be merged with the changes made in
+        any Revisions that
+
+        were made after the base revision (probably by other users acting
+        simultaneously).
+
+
+        The response is a new uncommitted `Revsion` object, meaning it has not
+        yet been applied
+
+        to the document. Revisions are applied in an asynchronous manner, so the
+        document's content
+
+        and history will reflect the new Revision after a few moments.
+      consumes: 
+        - application/json
+        - text/plain
+      produces: 
+        - application/json
+        - text/plain
+      parameters:
+        - name: owner
+          in: path
+          description: The `id` of a `User` who owns the document.
+          required: true
+          type: string
+        - name: document
+          in: path
+          description: The `id` of a `Document` owned by  `owner`.
+          required: true
+          type: string
+        - name: path
+          in: path
+          description: |
+            A [JSON Pointer](https://tools.ietf.org/html/rfc6901), which looks like `/x/y/15`.
+            Can be omitted.
+          type: string
+          format: binary
+          required: true
+        - name: Revision-Comment
+          in: header
+          type: string
+          description: >-
+            An optional comment (typically explaining the purpose of the
+            Revision) that is stored with the Revision.
+        - name: Revision-Userdata
+          in: header
+          type: string
+          description: JSON-encoded arbitrary user data stored with the Revision.
+        - name: Base-Revision-Id
+          in: header
+          type: string
+          description: >-
+            An optional `Revision` `id` that the new document content is based
+            on. May be `singularity` indicating that the base revision is the
+            implicit revision that exists when a document is first created. If
+            not specified, the base revision is the document's current revision.
+        - name: Content-Type
+          in: header
+          type: string
+          description: >-
+            Either `text/plain` if you are sending a plain text document (it is
+            converted to a JSON string) or `application/json` if you are sending
+            arbitrary JSON data as the document.
+        - name: Authorization
+          in: header
+          type: string
+          description: An API key that has WRITE access to the document.
+          required: true
+      responses:
+        '201':
+          description: >-
+            A `Revision` was saved. The response is the new uncommitted
+            `Revision`.
+        '400':
+          description: The path or base revision is not valid.
+        '403':
+          description: The caller has permission to see the document but not edit it.
+        '404':
+          description: >-
+            Document does not exist or caller does not have permission to see
+            the document
+        '409':
+          description: >-
+            The document was modified after the base revision and a rebase of
+            the changes was not possible.
+    patch:
+      description: >
+        Updates the content of a `Document` with a raw JOT operation provided in
+        the request body.
+
+
+        If a [JSON Pointer](https://tools.ietf.org/html/rfc6901) to a subpart of
+        the document is given at the end of the URL (see GET),
+
+        then the operation applies to that location in the document that the
+        pointer points to and the operation in the revision in the response body
+        is
+
+        relative to that part of the document.
+
+
+        If a base revision is specified with the Base-Revision-Id header, then
+        the operation
+
+        will be transformed to apply logically as if the changes made in any
+        Revisions that
+
+        were made after the base revision were made simultaneously.
+
+
+        The response is a new uncommitted `Revsion` object, meaning it has not
+        yet been applied
+
+        to the document. Revisions are applied in an asynchronous manner, so the
+        document's content
+
+        and history will reflect the new Revision after a few moments.
       consumes:
         - application/json
       produces:
         - application/json
-      responses:
-        200:
-          description: The document was deleted.
-        403:
-          description: The caller has permission to see the document but not delete it.
-        404:
-          description: Document does not exist or caller does not have permission to see the document.
-  /documents/{owner}/{document}/team:
-    get:
-      description: |
-        Gets a list of all `User`s with READ permission on the `Document`.
-      parameters:
-        - name: owner
-          in: path
-          description: The `id` of a `User` who owns the document.
-          required: true
-          type: string
-        - name: document
-          in: path
-          description: The `id` of a `Document` owned by  `owner`.
-          required: true
-          type: string
-        - name: Authorization
-          in: header
-          type: string
-          description: An API key that has READ access to the document. Optional if the document's anonymous access level is READ.
-      responses:
-        200:
-          description: The Document's team members are returned as JSON.
-          headers:
-            Content-Type:
-              description: Always `application/json`.
-              type: string
-          schema:
-            title: Document Team
-            type: object
-        404:
-          description: The owner or document does not exist or caller does not have permission to see the owner or document.
-    put:
-      description: |
-        Updates `User` permissions on a `Document`.
-      parameters:
-        - name: owner
-          in: path
-          description: The `id` of a `User` who owns the document.
-          required: true
-          type: string
-        - name: document
-          in: path
-          description: The `id` of a `Document` owned by  `owner`.
-          required: true
-          type: string
-        - name: Content-Type
-          in: header
-          type: string
-          description: Must be `application/json`.
-        - name: Authorization
-          in: header
-          type: string
-          description: An API key that has ADMIN access to the document and READ access to the user whose permissions are being changed, unless the user is being removed from the Document.
-          required: true
-        - name: user
-          in: body
-          type: string
-          description: The `id` of the user whose permissions are being changed.
-          required: true
-        - name: access_level
-          in: body
-          type: string
-          description: The new access level for the user, one of NONE, READ, WRITE, or ADMIN.
-          required: true
-      responses:
-        200:
-          description: The document permissions were updated.
-        400:
-          description: The access_level was invalid.
-        403:
-          description: The caller has permission to see the document but not make changes to its metadata.
-        404:
-          description: Document does not exist or caller does not have permission to see the document.
-  /documents/{owner}/{document}/content{path}:
-    get:
-      description: |
-        Gets `Document` content. If a path to a subpart of the document is given at the end of the URL, then only a part of the document is returned. The document is returned either as JSON or as UTF-8 encoded plain text, depending on the Accept header you send in the request.
       parameters:
         - name: owner
           in: path
@@ -316,155 +577,30 @@ paths:
           type: string
         - name: path
           in: path
-          description: A [JSON Pointer](https://tools.ietf.org/html/rfc6901), which looks like `/x/y/15`. 
+          description: |
+            A [JSON Pointer](https://tools.ietf.org/html/rfc6901), which looks like `/x/y/15`.
+            Can be omitted.
           type: string
           format: binary
-          default: ""
-        - name: Revision-Id
-          in: header
-          type: string
-          description: A Revision `id`. If specified, gets the content of the document at the indicated revision. Otherwise the document's content at the most recent revision is returned.
-          default: ""
-        - name: Accept
-          in: header
-          type: string
-          description: Either `text/plain` or `application/json`. (If the Accept header says both formats are accepted, you may get either format back.)
-        - name: Authorization
-          in: header
-          type: string
-          description: An API key that has READ access to the document. Optional if the document's anonymous access level is READ.
-      responses:
-        200:
-          description: Document content is returned as JSON.
-          headers:
-            Revision-Id:
-              description: The `id` of the document's current `Revision`, or the revision specified in the Revision-Id header if the header is given. May be `singularity` to indicate that the document has not yet had any revisions yet. (Such documents always have `null` content.)
-              type: string
-            Access-Level:
-              description: The access level that the user has on this document. Either READ, WRITE, or ADMIN.
-              type: string
-            Content-Type:
-              description: "`application/json` or `text/plain`, depending on the Accept header you send. (If the Accept header says both formats are accepted but text/plain is preferred, you may get application/json in the response if the document's content is not plain text.)"
-              type: string
-        404:
-          description: Document does not exist or caller does not have permission to see the document.
-        406:
-          description: The Accept header was set to `text/plain` but the document content is not plain text, or an invalid content type was sent in the Accept header.
-    put:
-      description: |
-        Updates the content of a `Document` with content provided in the request body.
-        Document content is text or arbitrary JSON data provided in the request body
-        (see the request Content-Type header parameter).
-
-        If a [JSON Pointer](https://tools.ietf.org/html/rfc6901) to a subpart of the document is given at the end of the URL (see GET),
-        then the content provided in this PUT request replaces the content at the location in the
-        document that the pointer points to and the operation in the revision in the response body is
-        relative to that part of the document.
-
-        If a base revision is specified with the Base-Revision-Id header, then the changes made
-        relative to the base revision will be merged with the changes made in any Revisions that
-        were made after the base revision (probably by other users acting simultaneously).
-
-        The response is a new uncommitted `Revsion` object, meaning it has not yet been applied
-        to the document. Revisions are applied in an asynchronous manner, so the document's content
-        and history will reflect the new Revision after a few moments.
-      parameters:
-        - name: owner
-          in: path
-          description: The `id` of a `User` who owns the document.
           required: true
-          type: string
-        - name: document
-          in: path
-          description: The `id` of a `Document` owned by  `owner`.
-          required: true
-          type: string
-        - name: path
-          in: path
-          description: A [JSON Pointer](https://tools.ietf.org/html/rfc6901), which looks like `/x/y/15`. It must exist in the document at the base revision.
-          type: string
-          format: binary
-          default: ""
         - name: Revision-Comment
           in: header
           type: string
-          description: An optional comment (typically explaining the purpose of the Revision) that is stored with the Revision.
+          description: >-
+            An optional comment (typically explaining the purpose of the
+            Revision) that is stored with the Revision.
         - name: Revision-Userdata
           in: header
-          type: json
+          type: string
           description: JSON-encoded arbitrary user data stored with the Revision.
         - name: Base-Revision-Id
           in: header
           type: string
-          description: An optional `Revision` `id` that the new document content is based on. May be `singularity` indicating that the base revision is the implicit revision that exists when a document is first created. If not specified, the base revision is the document's current revision.
-        - name: Content-Type
-          in: header
-          type: string
-          description: Either `text/plain` if you are sending a plain text document (it is converted to a JSON string) or `application/json` if you are sending arbitrary JSON data as the document.
-        - name: Authorization
-          in: header
-          type: string
-          description: An API key that has WRITE access to the document.
-          required: true
-      responses:
-        201:
-          description: A `Revision` was saved. The response is the new uncommitted `Revision`.
-          headers:
-            Content-Type:
-              description: Always `application/json`.
-              type: string
-        400:
-          description: The path or base revision is not valid.
-        403:
-          description: The caller has permission to see the document but not edit it.
-        404:
-          description: Document does not exist or caller does not have permission to see the document
-        409:
-          description: The document was modified after the base revision and a rebase of the changes was not possible.
-    patch:
-      description: |
-        Updates the content of a `Document` with a raw JOT operation provided in the request body.
-        
-        If a [JSON Pointer](https://tools.ietf.org/html/rfc6901) to a subpart of the document is given at the end of the URL (see GET),
-        then the operation applies to that location in the document that the pointer points to and the operation in the revision in the response body is
-        relative to that part of the document.
-        
-        If a base revision is specified with the Base-Revision-Id header, then the operation
-        will be transformed to apply logically as if the changes made in any Revisions that
-        were made after the base revision were made simultaneously.
-        
-        The response is a new uncommitted `Revsion` object, meaning it has not yet been applied
-        to the document. Revisions are applied in an asynchronous manner, so the document's content
-        and history will reflect the new Revision after a few moments.
-      parameters:
-        - name: owner
-          in: path
-          description: The `id` of a `User` who owns the document.
-          required: true
-          type: string
-        - name: document
-          in: path
-          description: The `id` of a `Document` owned by  `owner`.
-          required: true
-          type: string
-        - name: path
-          in: path
-          description: A [JSON Pointer](https://tools.ietf.org/html/rfc6901), which looks like `/x/y/15`. It must exist in the document at the base revision.
-          type: string
-          format: binary
-          default: ""
-        - name: Revision-Comment
-          in: header
-          type: string
-          description: An optional comment (typically explaining the purpose of the Revision) that is stored with the Revision.
-        - name: Revision-Userdata
-          in: header
-          type: json
-          description: JSON-encoded arbitrary user data stored with the Revision.
-        - name: Base-Revision-Id
-          in: header
-          type: string
-          description: An optional `Revision` `id` that the new document content is based on. May be `singularity` indicating that the base revision is the implicit revision that exists when a document is first created. If not specified, the base revision is the document's current revision.
+          description: >-
+            An optional `Revision` `id` that the new document content is based
+            on. May be `singularity` indicating that the base revision is the
+            implicit revision that exists when a document is first created. If
+            not specified, the base revision is the document's current revision.
         - name: Content-Type
           in: header
           type: string
@@ -475,24 +611,29 @@ paths:
           description: An API key that has WRITE access to the document.
           required: true
       responses:
-        201:
-          description: A `Revision` was saved. The response is the new uncommitted `Revision`.
-          headers:
-            Content-Type:
-              description: Always `application/json`.
-              type: string
-        400:
+        '201':
+          description: >-
+            A `Revision` was saved. The response is the new uncommitted
+            `Revision`.
+        '400':
           description: The path or base revision is not valid.
-        403:
+        '403':
           description: The caller has permission to see the document but not edit it.
-        404:
-          description: Document does not exist or caller does not have permission to see the document
-        409:
-          description: The document was modified after the base revision and a rebase of the operation was not possible.
-  /documents/{owner}/{document}/history:
+        '404':
+          description: >-
+            Document does not exist or caller does not have permission to see
+            the document
+        '409':
+          description: >-
+            The document was modified after the base revision and a rebase of
+            the operation was not possible.
+  '/documents/{owner}/{document}/history':
     get:
-      description: |
-        Gets the revision history of a `Document`, which is an array of `Revision` objects.
+      description: >
+        Gets the revision history of a `Document`, which is an array of
+        `Revision` objects.
+      produces:
+        - application/json
       parameters:
         - name: owner
           in: path
@@ -506,22 +647,34 @@ paths:
           type: string
         - name: since
           in: query
-          description: An optional `Revision` `id`. If not specified, the full history of the document is returned. Otherwise only the changes made after the given revision are returned.
+          description: >-
+            An optional `Revision` `id`. If not specified, the full history of
+            the document is returned. Otherwise only the changes made after the
+            given revision are returned.
           type: string
         - name: path
           in: query
-          description: A [JSON Pointer](https://tools.ietf.org/html/rfc6901), which looks like `/x/y/15`, to a part of the document to get the history of, ignoring changes to other parts of the document. The path must exist in the document at the revision specified by `since`. If `since` is omitted (the full document history is returned), then `path` cannot be specified.
+          description: >-
+            A [JSON Pointer](https://tools.ietf.org/html/rfc6901), which looks
+            like `/x/y/15`, to a part of the document to get the history of,
+            ignoring changes to other parts of the document. The path must exist
+            in the document at the revision specified by `since`. If `since` is
+            omitted (the full document history is returned), then `path` cannot
+            be specified.
           type: string
         - name: Authorization
           in: header
           type: string
-          description: An API key that has READ access to the document. Optional if the document's anonymous access level is READ.
+          description: >-
+            An API key that has READ access to the document. Optional if the
+            document's anonymous access level is READ.
       responses:
-        200:
-          description: Revision history is returned as JSON, in chronological order (oldest first). If the `path` parameter is specified, the revisions are relative to that location in the document.
-          headers:
-            Content-Type:
-              description: Always `application/json`.
-              type: string
-        404:
-          description: Document does not exist or caller does not have permission to see the document
+        '200':
+          description: >-
+            Revision history is returned as JSON, in chronological order (oldest
+            first). If the `path` parameter is specified, the revisions are
+            relative to that location in the document.
+        '404':
+          description: >-
+            Document does not exist or caller does not have permission to see
+            the document
