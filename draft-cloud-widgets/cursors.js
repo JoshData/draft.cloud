@@ -29,8 +29,8 @@ exports.CursorManager.prototype.update = function(peerid, state) {
     this.options.container.appendChild(cursor.name);
     cursor.name.setAttribute('class', 'ddc-cursor-name');
     cursor.name.setAttribute('style', 'position: absolute; cursor: default; overflow: hidden; max-width: 12em; '
-                                    + 'border: 1px solid black; border-radius: .5em; padding: .125em; '
-                                    + 'color: white; font-weight: bold; font-size: 90%; white-space: nowrap; text-overflow: ellipsis;');
+                                    + 'border: 1px solid black; border-radius: .5em; padding: .25em; '
+                                    + 'color: white; font-weight: bold; font-size: 90%; line-height: 105%; white-space: nowrap; text-overflow: ellipsis;');
 
     cursor.label = peerid;
     cursor.index = -1;
