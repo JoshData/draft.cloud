@@ -25,14 +25,14 @@ var jot = require("jot");
 
 var cursors = require('./cursors.js');
 
-exports.poll_interval = 1000;
-
 exports.simple_widget = function() {
   // Track local changes.
   this.changes_start_content = null;
   this.changes = [];
   this.changes_last_content = null;
 }
+
+exports.simple_widget.prototype.poll_interval = 1000;
 
 exports.simple_widget.prototype.has_changes = function() {
   this.compute_changes();
@@ -106,12 +106,17 @@ exports.simple_widget.prototype.open = function(state) {
   this.set_readonly(state.readonly);
   this.set_document(state.content);
 
-  // Start polling for changes in the widget's contents.
-  var _this = this;
-  function poll_for_changes() {
-    _this.compute_changes();
+  // Start polling for changes in the widget's contents, unless the
+  // subclass does not require polling and calls compute_changes
+  // itself.
+  console.log(this.name, this.poll_interval)
+  if (this.poll_interval > 0) {
+    var _this = this;
+    function poll_for_changes() {
+      _this.compute_changes();
+    }
+    this.intervalId = setInterval(poll_for_changes, this.poll_interval);
   }
-  this.intervalId = setInterval(poll_for_changes, exports.poll_interval);
 
   // Initial peer states.
   Object.keys(state.peer_states).forEach(function(peerid) {

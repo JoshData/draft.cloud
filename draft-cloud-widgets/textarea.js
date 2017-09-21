@@ -126,6 +126,8 @@ exports.textarea.prototype.show_status = function(message) {
 // cursor support
 
 exports.textarea.prototype.get_cursor_char_range = function() {
+  if (this.elem != document.activeElement)
+    return null;
   return [this.elem.selectionStart, this.elem.selectionEnd-this.elem.selectionStart];
 }
 

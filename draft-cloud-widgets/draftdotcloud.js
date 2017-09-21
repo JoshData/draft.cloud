@@ -29,6 +29,10 @@ function init() {
       && elem.getAttribute("type") == "text")
       widget = require("./textarea.js").textarea;
 
+    // <form>s always get the form widget.
+    else if (elem.tagName == "FORM")
+      widget = require("./form.js").form;
+
     // <div>s can have any other widget
     else if (elem.tagName == "DIV"
       && elem.getAttribute("data-draftdotcloud-widget") == "jsoneditor")

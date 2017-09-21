@@ -42,6 +42,16 @@ exports.quill = function(elem, quill_options, baseurl) {
   // Must set this so that undo/redo skips over remote users' changes.
   if (!this.quill_options.modules.history) this.quill_options.modules.history = { };
   this.quill_options.modules.history.userOnly = true;
+
+  // If we got a <textarea> element, put a DIV below it, make the textarea
+  // hidden, and update the textarea with the Quill editor's value whenever
+  // it's changed.
+  if (elem.tagName == "TEXTAREA") {
+    this.value_elem = this.elem;
+    this.value_elem.style.display = "none";
+    this.elem = document.createElement("div");
+    this.value_elem.parentNode.insertBefore(this.elem, this.value_elem);
+  }
 }
 
 function run_browser_check() {
