@@ -1,19 +1,24 @@
+/*
+ * This module implements a widget for <textarea> and, despite
+ * the name, also <input type='text'> elements.
+ */
+
 var simple_widget = require('./simple_widget.js').simple_widget;
 var jot = require('jot');
 
 var getCaretCoordinates = require('textarea-caret');
 
-exports.textarea = function(textarea) {
-  // Set the textarea's UI to a holding state before initial content is loaded.
-  this.textarea = textarea;
-  textarea.value = "";
-  textarea.readOnly = true;
-  textarea.style.textRendering = "geometricPrecision"; // necessary on WebKit for cursor location calculation to work
+exports.textarea = function(elem) {
+  // Set the elements's UI to a holding state before initial content is loaded.
+  this.elem = elem;
+  this.elem.value = "";
+  this.elem.readOnly = true;
+  this.elem.style.textRendering = "geometricPrecision"; // necessary on WebKit for cursor location calculation to work
 
   // Record changes on keypresses of whitespace since that's a nice time to
   // send a chunk of changes to the server, preserving some logical intent.
   var _this = this;
-  textarea.addEventListener("keypress", function(e) {
+  this.elem.addEventListener("keypress", function(e) {
     if (/^\s+$/.exec(e.key))
       _this.compute_changes();
   })
@@ -31,7 +36,7 @@ exports.textarea = function(textarea) {
     }
     saved_status_badge.textContent = message;
     saved_status_badge.setAttribute("style", saved_status_badge_style); // force display to get dimensions
-    var bbox = textarea.getBoundingClientRect();
+    var bbox = elem.getBoundingClientRect();
     var dims = saved_status_badge.getBoundingClientRect();
     var top = bbox.top + bbox.height - dims.height - 2;
     var left = bbox.left + bbox.width - dims.width - 2 - 15; // 15 is for a righthand scrollbar
@@ -42,8 +47,8 @@ exports.textarea = function(textarea) {
   if (debug_random_op_interval) {
     setInterval(
       function() {
-        if (textarea.readOnly) return;
-        var doc = textarea.value;
+        if (elem.readOnly) return;
+        var doc = elem.value;
 
         // Construct a random operation toward the beginning of the
         // document and of a relatively short length.
@@ -55,10 +60,10 @@ exports.textarea = function(textarea) {
         var rangetext = doc.slice(start, start+length);
         rangetext = ""+jot.createRandomOp(rangetext).apply(rangetext);
 
-        // Apply it to the textarea.
+        // Apply it to the element.
         var op = new jot.SPLICE(start, length, rangetext);
         doc = op.apply(doc);
-        textarea.value = doc;
+        elem.value = doc;
       },
       debug_random_op_interval[1]
     )
@@ -72,13 +77,13 @@ exports.textarea.prototype.name = "Textarea Widget";
 // required methods
 
 exports.textarea.prototype.get_document = function() {
-  return this.textarea.value; 
+  return this.elem.value; 
 }
 
 exports.textarea.prototype.set_readonly = function(readonly) {
-  this.textarea.readOnly = readonly;
+  this.elem.readOnly = readonly;
   if (!readonly)
-    this.textarea.focus();
+    this.elem.focus();
 }
 
 exports.textarea.prototype.set_document = function(document, patch) {
@@ -92,22 +97,22 @@ exports.textarea.prototype.set_document = function(document, patch) {
   // can shift due to remote changes, represent it as an
   // operation, rebase it, and then pull the selection state
   // out from that.
-  var selection = [this.textarea.selectionStart, this.textarea.selectionEnd];
+  var selection = [this.elem.selectionStart, this.elem.selectionEnd];
   if (patch) {
     try {
       var r = new jot.SPLICE(
         selection[0],
         selection[1]-selection[0],
         (selection[1] != selection[0]) ? "" : "X") // any value that prevents it from becoming a no-op
-        .rebase(patch, { document: this.textarea.value });
+        .rebase(patch, { document: this.elem.value });
       selection = [r.hunks[0].offset, r.hunks[r.hunks.length-1].offset+r.hunks[r.hunks.length-1].length]; // if successful
     } catch (e) {
       console.log("could not update cursor position", e);
     }
   }
-  this.textarea.value = document;
-  this.textarea.selectionStart = selection[0];
-  this.textarea.selectionEnd = selection[1];
+  this.elem.value = document;
+  this.elem.selectionStart = selection[0];
+  this.elem.selectionEnd = selection[1];
 }
 
 exports.textarea.prototype.show_message = function(level, message) {
@@ -121,18 +126,18 @@ exports.textarea.prototype.show_status = function(message) {
 // cursor support
 
 exports.textarea.prototype.get_cursor_char_range = function() {
-  return [this.textarea.selectionStart, this.textarea.selectionEnd-this.textarea.selectionStart];
+  return [this.elem.selectionStart, this.elem.selectionEnd-this.elem.selectionStart];
 }
 
 exports.textarea.prototype.get_cursors_parent_element = function() {
-  return this.textarea.parentNode;
+  return this.elem.parentNode;
 }
 
 exports.textarea.prototype.get_peer_cursor_rects = function(index, length) {
   // pos.height is returned starting with https://github.com/component/textarea-caret-position/commit/af904838644c60a7c48b21ebcca8a533a5967074
   // which is not yet released
-  var pos = getCaretCoordinates(this.textarea, index, {debug:true});
-  return [{ top: this.textarea.offsetTop + pos.top, left: this.textarea.offsetLeft + pos.left, width: 0, height: pos.height }];
+  var pos = getCaretCoordinates(this.elem, index);
+  return [{ top: this.elem.offsetTop + pos.top, left: this.elem.offsetLeft + pos.left, width: 0, height: pos.height }];
 }
 
 exports.textarea.prototype.on_change_at_charpos = function(cb) {
@@ -140,8 +145,8 @@ exports.textarea.prototype.on_change_at_charpos = function(cb) {
   // changes, and we have no way to understand what the change
   // was exactly so we can revise the cursor positions.
   var _this = this;
-  this.textarea.addEventListener("keydown", function(e) {
+  this.elem.addEventListener("keydown", function(e) {
     var length = 1; // TODO: Not all keypresses result in same length.
-    cb([[_this.textarea.selectionStart, _this.textarea.selectionEnd-_this.textarea.selectionStart, length]]);
+    cb([[_this.elem.selectionStart, _this.elem.selectionEnd-_this.elem.selectionStart, length]]);
   })
 }

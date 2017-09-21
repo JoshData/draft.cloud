@@ -51,7 +51,7 @@
 
 		<script>
 		// auto-resize the widget to the viewport height
-		function resize() { $('#widget').height($(window).height() - $('#widget').offset().top); }
+		function resize() { $('textarea#widget, div#widget').height($(window).height() - $('#widget').offset().top); }
 		resize();
 		$(window).resize(resize);
 

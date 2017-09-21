@@ -24,6 +24,11 @@ function init() {
     if (elem.tagName == "TEXTAREA")
       widget = require("./textarea.js").textarea;
 
+    // <input type=text>s always get the (mis-named) textarea widget.
+    else if (elem.tagName == "INPUT"
+      && elem.getAttribute("type") == "text")
+      widget = require("./textarea.js").textarea;
+
     // <div>s can have any other widget
     else if (elem.tagName == "DIV"
       && elem.getAttribute("data-draftdotcloud-widget") == "jsoneditor")
