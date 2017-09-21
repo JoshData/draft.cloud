@@ -20,16 +20,17 @@ exports.quill = function(elem, quill_options, baseurl) {
 
   // Default options.
   this.quill_options = quill_options || { };
-  if (!this.quill_options.modules) this.quill_options.modules = { };
+  if (!this.quill_options.modules)
+    this.quill_options.modules = { };
+  if (!this.quill_options.formats) // formats that are closest to what's available in CommonMark
+    this.quill_options.formats = ['bold', 'italic', 'code', 'link', 'blockquote', 'header', 'list', 'code-block', 'image'];
   if (!this.quill_options.modules.toolbar)
-    this.quill_options.modules.toolbar = [
-        ['bold', 'italic'],
-        ['blockquote', 'code-block'],
-        [{ 'header': 1 }, { 'header': 2 }, { 'header': 3 }],
-        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-        [{ 'indent': '-1'}, { 'indent': '+1' }],
-        [{ 'direction': 'rtl' }],
-        ['clean']
+    this.quill_options.modules.toolbar =  [
+      ['bold', 'italic', 'code'],
+      [{ 'header': 1 }, { 'header': 2 },
+       { 'list': 'ordered' }, { 'list': 'bullet' }, 'blockquote', 'code-block'],
+      ['link', 'image'],
+      ['clean']
       ];
   if (!this.quill_options.theme)
     this.quill_options.theme = 'snow';
@@ -112,7 +113,7 @@ exports.quill.prototype.prepare_dom_async2 = function(callback) {
   var toolbar = this.elem.previousSibling;
   this.saved_state_indicator = document.createElement('span');
   this.saved_state_indicator.setAttribute("class", "ql-formats");
-  this.saved_state_indicator.setAttribute("style", "padding-top: 3px; font-style: italic; color: #666;");
+  this.saved_state_indicator.setAttribute("style", "margin-left: 1em; font-style: italic; color: #666;");
   toolbar.appendChild(this.saved_state_indicator);
 
   var _this = this;
