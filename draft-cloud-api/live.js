@@ -108,7 +108,7 @@ exports.init = function(io, sessionStore, settings) {
         // Sufficient permission.... Get the document's current content
         // and/or the Revision corresponding to what this reconnecting
         // client last saw.
-        routes.get_document_content(doc,
+        doc.get_content(
           data.path,
           data.last_seen_revision, // null or the last revision seen before disconnect
           true, /* cache, many people might be reconnecting here */
@@ -196,7 +196,7 @@ exports.init = function(io, sessionStore, settings) {
       var doc_state = socket.open_documents[data.document];
 
       // Find the base revision. If not specified, it's the current revision.
-      routes.load_revision_from_id(doc_state.document, data.base_revision, function(base_revision) {
+      models.Revision.from_uuid(doc_state.document, data.base_revision, function(base_revision) {
         routes.make_revision(
           doc_state.user,
           doc_state.document,

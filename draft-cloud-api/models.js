@@ -4,6 +4,9 @@ const credential = require('credential');
 
 const auth = require('./auth.js');
 
+var json_ptr = require('json-ptr');
+var jot = require("jot");
+
 var db;
 
 var valid_name_regex = /^[A-Za-z0-9_-]{5,64}$/;
@@ -285,6 +288,164 @@ exports.initialize_database = function(settings, ready) {
     return doc;
   }
 
+  exports.Document.prototype.get_content = function(pointer, at_revision, save_cached_content, cb) {
+    // Get the content of a document (or part of a document) at a particular revision.
+    //
+    // pointer is null or a string containing a JSON Pointer indicating the part of
+    // the document to retrieve.
+    //
+    // at_revision is null to get the most recent document content, a Revision instance,
+    // or "singularity", which represents the state of the document prior to the first
+    // Revision.
+    //
+    // Calls cb(error) or cb(null, revision, content, path), where revision is null
+    // representing the "singularity" or a Revision instance or UUID, content is the document
+    // content, and path is a data structure similar to the pointer that is used to
+    // create JOT operations at that path --- unlike pointer, it distinguishes Array and
+    // Object accesses.
+
+    var doc = this;
+
+    if (at_revision == "singularity") {
+      // This is a special value that signals the state of the document
+      // prior to the first Revision. The document is always a null value
+      // at that state.
+      if (pointer)
+        cb('Document path ' + pointer + ' cannot exist before the document is started.');
+      else
+        cb(null, null, null, []);
+      return;
+    }
+
+    if (typeof at_revision === "string") {
+      // If given a Revision UUID, look it up in the database.
+      exports.Revision.from_uuid(doc, at_revision, function(revision) {
+        if (!revision)
+            cb('Invalid revision: ' + at_revision);
+        else
+          doc.get_content(pointer, revision, save_cached_content, cb);
+      });
+      return;
+    }
+
+    // Find the most recent CachedContent, but no later
+    // than at_revision (if at_revision is not null).
+    var where = { documentId: doc.id };
+    if (at_revision)
+      where['revisionId'] = { "$lte": at_revision.id };
+    exports.CachedContent.findOne({
+      where: where,
+      order: [["revisionId", "DESC"]],
+      include: [{
+        model: exports.Revision
+      }]
+    })
+    .then(function(cache_hit) {
+      // Load all subsequent revisions. Add to the id filter to only get
+      // revisions after the cache hit's revision. The cache_hit may be null
+      // if there is no available cached content --- in which case
+      // we load all revisions from the beginning.
+      var where = {
+        documentId: doc.id,
+        committed: true
+      };
+      if (at_revision || cache_hit)
+        where["id"] = { };
+      if (at_revision)
+        where['id']["$lte"] = at_revision.id;
+      if (cache_hit)
+        where['id']["$gt"] = cache_hit.revisionId;
+      exports.Revision.findAll({
+        where: where,
+        order: [["id", "ASC"]]
+      })
+      .then(function(revs) {
+        // Documents always start with a null value at the start of the revision history.
+        var current_revision = "singularity";
+        var content = null;
+
+        // Start with the peg revision, assuming there was one.
+        if (cache_hit) {
+          content = cache_hit.document_content;
+          current_revision = cache_hit.revision;
+        }
+
+        // Apply all later revisions' operations (if any).
+        for (var i = 0; i < revs.length; i++) {
+          var op = jot.opFromJSON(revs[i].op);
+          content = op.apply(content);
+          current_revision = revs[i];
+        }
+
+        // We now have the latest content....
+
+        // If the most recent revision doesn't have cached content,
+        // store it so we don't have to do all this work again next time.
+        if (revs.length > 0 && save_cached_content) {
+          exports.CachedContent.create({
+                documentId: doc.id,
+                revisionId: current_revision.id,
+                document_content: content
+              }).then(function(user) {
+                // we're not waiting for this to finish
+              });
+        }
+
+        // Execute the JSON Pointer given in the URL. We could use
+        // json_ptr.get(content, pointer). But the PUT function needs
+        // to know whether the pointer passes through arrays or objects
+        // in order to create the correct JOT operations that represent
+        // the change. So we have to step through each part and record
+        // whether we are passing through an Object or Array.
+        var x = parse_json_pointer_path_with_content(pointer, content);
+        if (!x)
+          cb('Document path ' + pointer + ' not found.');
+        op_path = x[0];
+        content = x[1];
+
+        // Callback.
+        cb(null, current_revision, content, op_path);
+      })
+      .catch(function(err) {
+        cb("There is an error with the document.");
+      });
+    });
+  }
+
+  function parse_json_pointer_path_with_content(pointer, content) {
+    // The path is a JSON Pointer which we parse with json-ptr.
+    // Unfortunately the path components are all strings, but
+    // we need to distinguish array index accessses from object
+    // property accesses. We'll distinguish by turning the pointer
+    // into an array of strings (for objects) and integers (for
+    // arrays). We can only know the difference by looking at
+    // an actual document. So we'll step through the path and
+    // see if we are passing through arrays or objects.
+
+    var op_path = [ ];
+    if (!pointer)
+      return [op_path, content];
+
+    for (let item of json_ptr.decodePointer(pointer)) {
+      if (Array.isArray(content))
+        // This item on the path is an array index. Turn the item
+        // into a number.
+        op_path.push(parseInt(item));
+      else
+        // This item is an Object key, so we keep it as a string.
+        op_path.push(item)
+
+      // Use json-ptr to process just this part of the path. This way
+      // we get its error handling.
+      content = json_ptr.get(content, json_ptr.encodePointer([item]));
+      if (typeof content == "undefined")
+        return null;
+    }
+
+    return [op_path, content];
+  }
+
+
   // REVISIONs.
   exports.Revision = exports.db.define('revision',
     {
@@ -338,6 +499,45 @@ exports.initialize_database = function(settings, ready) {
   exports.Revision.belongsTo(exports.User);
   exports.Revision.belongsTo(exports.Document);
   exports.Revision.belongsTo(exports.Revision, {as: 'baseRevision'});
+
+  exports.Revision.from_uuid = function(doc, uuid, cb) {
+    // Gets a Revision instance from a revision UUID. If uuid is...
+    //   "singularity", then the string "singularity" is returned
+    //   "", then the most recent revision ("singularity" or a Revision instance)
+    //   a revision UUID, then that one
+    //   not valid, then null
+    // ... is passed to the callback.
+
+    // If "singularity" is passed, pass it through as a specicial revision.
+    if (uuid == "singularity")
+      cb("singularity")
+
+    // Find the named revision.
+    else if (uuid)
+      exports.Revision.findOne({
+        where: { documentId: doc.id, uuid: uuid },
+      })
+      .then(function(revision) {
+        if (!revision)
+          cb(null);
+        else
+          cb(revision);
+      });
+
+    // Get the most recent revision. If there are no revisions yet,
+    // pass forward the spcial ID "singularity".
+    else
+      exports.Revision.findOne({
+        where: { documentId: doc.id },
+        order: [["id", "DESC"]] // most recent
+      })
+      .then(function(revision) {
+        if (!revision)
+          cb("singularity");
+        else
+          cb(revision);
+      });
+  }
 
   // CACHED DOCUMENT CONTENT.
   exports.CachedContent = exports.db.define('cachedcontent',
