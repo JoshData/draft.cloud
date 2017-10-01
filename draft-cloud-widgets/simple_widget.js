@@ -214,9 +214,12 @@ exports.simple_widget.prototype.merge_remote_changes = function(patch) {
   
   // Bring any pending changes forward so that when they are next
   // requested by the client, they take into account that the
-  // remote changes have been applied.
-  this.changes_start_content = patch.apply(this.changes_start_content);
+  // remote changes have been applied. this.changes_start_content
+  // was the state of the document before pending_changes ocurred
+  // and, by contract with the Client class, also the state of the
+  // documnet before patch ocurred.
   pending_changes = pending_changes.rebase(patch, { document: this.changes_start_content });
+  this.changes_start_content = patch.apply(this.changes_start_content);
   if (pending_changes.isNoOp())
     this.changes = [];
   else
