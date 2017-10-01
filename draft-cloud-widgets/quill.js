@@ -45,7 +45,7 @@ exports.quill = function(elem, quill_options, baseurl) {
 
   // If we got a <textarea> element, put a DIV below it, make the textarea
   // hidden, and update the textarea with the Quill editor's value whenever
-  // it's changed.
+  // it's changed (TODO).
   if (elem.tagName == "TEXTAREA") {
     this.value_elem = this.elem;
     this.value_elem.style.display = "none";
@@ -136,6 +136,15 @@ exports.quill.prototype.prepare_dom_async2 = function(callback) {
   }
 
   this.logger("Quill widget created");
+
+  // For debugging...
+  var random_edit_interval = /#debug_with_random_edits=(\d+)/.exec(window.location.hash);
+  if (random_edit_interval) {
+    setInterval(
+      function() { _this.make_random_edit() },
+      random_edit_interval[1]
+    )
+  }
 
   callback();
 }
@@ -396,4 +405,55 @@ function compute_cursor_positions_shift(delta) {
     }
   });
   return changeinfo;
+}
+
+// For debugging...
+exports.quill.prototype.make_random_edit = function() {
+  // Compute random permutations on the document.
+  var doc = this.editor.getContents();
+  var delta = [];
+
+  if (doc.ops.length == 0) {
+    // Create initial content.
+    delta.push({
+      insert: (jot.createRandomValue()+"")
+    })
+  } else {
+    // Create edits.
+    var index = 0;
+    var firstindex = null;
+    doc.ops.forEach(function(op) {
+      if (Math.random() < 1/delta.length) {
+        // Make an edit here.
+        if (Math.random() < .5) {
+          // change formatting
+          delta.push({ retain: typeof op.insert == "string" ? op.insert.length : 1,
+            attributes: { bold: Math.random() < .5, italic: Math.random() < .5 } });
+        } else if (Math.random() < .1) {
+          // delete
+          delta.push({ delete: typeof op.insert == "string" ? op.insert.length : 1 });
+        } else if (Math.random() < .5) {
+          // replace text
+          delta.push({ delete: typeof op.insert == "string" ? op.insert.length : 1 });
+          delta.push({ insert: ""+jot.createRandomOp(op.insert).apply(op.insert) });
+        } else if (Math.random() < .5) {
+          // insert paragraph here
+          delta.push({ insert: "\n" });
+        } else {
+          // insert here
+          delta.push({ insert: jot.createRandomValue()+"" });
+        }
+
+        if (firstindex == null) firstindex = index;
+      } else {
+        // retain        
+        delta.push({ retain: typeof op.insert == "string" ? op.insert.length : 1 });
+      }
+
+      index += (delta[delta.length-1].insert||"").length || (delta[delta.length-1].retain||0);
+    });
+  }
+
+  this.editor.updateContents({ ops: delta }, "api");
+  this.editor.setSelection(firstindex);
 }

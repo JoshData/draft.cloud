@@ -43,29 +43,12 @@ exports.textarea = function(elem) {
     saved_status_badge.setAttribute("style", saved_status_badge_style + "; top: " + top + "px; left: " + left + "px");
   }
 
-  var debug_random_op_interval = /#randomopinterval=(\d+)/.exec(window.location.hash);
-  if (debug_random_op_interval) {
+  // For debugging...
+  var random_edit_interval = /#debug_with_random_edits=(\d+)/.exec(window.location.hash);
+  if (random_edit_interval) {
     setInterval(
-      function() {
-        if (elem.readOnly) return;
-        var doc = elem.value;
-
-        // Construct a random operation toward the beginning of the
-        // document and of a relatively short length.
-        var start = Math.floor(Math.random() * Math.random() * (doc.length+1));
-        var length = (start < doc.length) ? Math.floor(Math.random() * Math.random() * (doc.length - start + 1)) : 0;
-
-        // Construct a random operation on that part and mutate the text.
-        // Coerce to a string.
-        var rangetext = doc.slice(start, start+length);
-        rangetext = ""+jot.createRandomOp(rangetext).apply(rangetext);
-
-        // Apply it to the element.
-        var op = new jot.SPLICE(start, length, rangetext);
-        doc = op.apply(doc);
-        elem.value = doc;
-      },
-      debug_random_op_interval[1]
+      function() { make_random_edit(elem) },
+      random_edit_interval[1]
     )
   }
 }
@@ -151,4 +134,26 @@ exports.textarea.prototype.on_change_at_charpos = function(cb) {
     var length = 1; // TODO: Not all keypresses result in same length.
     cb([[_this.elem.selectionStart, _this.elem.selectionEnd-_this.elem.selectionStart, length]]);
   })
+}
+
+// For debugging...
+function make_random_edit(editor) {
+  if (elem.readOnly) return;
+
+  var doc = elem.value;
+
+  // Construct a random operation toward the beginning of the
+  // document and of a relatively short length.
+  var start = Math.floor(Math.random() * Math.random() * (doc.length+1));
+  var length = (start < doc.length) ? Math.floor(Math.random() * Math.random() * (doc.length - start + 1)) : 0;
+
+  // Construct a random operation on that part and mutate the text.
+  // Coerce to a string.
+  var rangetext = doc.slice(start, start+length);
+  rangetext = ""+jot.createRandomOp(rangetext).apply(rangetext);
+
+  // Apply it to the element.
+  var op = new jot.SPLICE(start, length, rangetext);
+  doc = op.apply(doc);
+  elem.value = doc;
 }
