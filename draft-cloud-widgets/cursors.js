@@ -69,7 +69,7 @@ exports.CursorManager.prototype.shift_cursors = function(changes) {
       var length = hunk[1];
       var newlength = hunk[2];
       var dx = newlength-length;
-      if (index+length <= cursor.index)
+      if (index+length < cursor.index)
         cursor.index += dx; // occurs before
       else if (index < cursor.index && index+length < cursor.index+cursor.length)
         1; // overlaps start, not sure what to do

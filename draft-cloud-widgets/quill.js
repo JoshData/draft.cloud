@@ -212,6 +212,7 @@ exports.quill.prototype.set_document = function(document, patch) {
   // caret/scroll position.
   this.editor.setContents(document);
 }
+
 exports.quill.prototype.show_message = function(level, message) {
   alert(message);
 }
