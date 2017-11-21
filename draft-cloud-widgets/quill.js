@@ -16,10 +16,37 @@ exports.quill = function(elem, quill_options, baseurl) {
 
   // init
   this.elem = elem;
+  this.value_elem = null;
   this.baseurl = baseurl || "";
+
+  // If we got a <textarea> element, put a DIV below it, make the textarea
+  // hidden, and update the textarea with the Quill editor's value whenever
+  // it's changed (TODO).
+  if (this.elem.tagName == "TEXTAREA") {
+    this.value_elem = this.elem;
+    this.value_elem.style.display = "none";
+    this.elem = document.createElement("div");
+    this.value_elem.parentNode.insertBefore(this.elem, this.value_elem);
+  }
+
+  // Add a DIV around elem that will handle scrolling. We need an extra one
+  // because Quill's default holds the document content, and we need a place
+  // to put cursors inside the scrolling div but outside the document. Give
+  // it relative positioning so cursor coordinates are relative to it.
+  this.scrollingContainer = document.createElement("div");
+  this.elem.parentNode.insertBefore(this.scrollingContainer, this.elem);
+  this.scrollingContainer.appendChild(this.elem);
+  this.scrollingContainer.setAttribute("style", "position: relative;");
+
+  // Add a DIV above the scrollingContainer for the toolbar so that the toolbar'
+  // position is fixed.
+  this.toolbarContainer = document.createElement("div");
+  this.toolbarContainer.setAttribute('id', "toolbar_" + Math.random().toString(36).substring(7));
+  this.scrollingContainer.parentNode.insertBefore(this.toolbarContainer, this.scrollingContainer);
 
   // Default options.
   this.quill_options = quill_options || { };
+  this.quill_options.scrollingContainer = this.scrollingContainer;
   if (!this.quill_options.modules)
     this.quill_options.modules = { };
   if (!this.quill_options.formats) // formats that are closest to what's available in CommonMark
@@ -44,16 +71,6 @@ exports.quill = function(elem, quill_options, baseurl) {
   // Must set this so that undo/redo skips over remote users' changes.
   if (!this.quill_options.modules.history) this.quill_options.modules.history = { };
   this.quill_options.modules.history.userOnly = true;
-
-  // If we got a <textarea> element, put a DIV below it, make the textarea
-  // hidden, and update the textarea with the Quill editor's value whenever
-  // it's changed (TODO).
-  if (elem.tagName == "TEXTAREA") {
-    this.value_elem = this.elem;
-    this.value_elem.style.display = "none";
-    this.elem = document.createElement("div");
-    this.value_elem.parentNode.insertBefore(this.elem, this.value_elem);
-  }
 }
 
 function run_browser_check() {
@@ -121,10 +138,19 @@ exports.quill.prototype.prepare_dom_async2 = function(callback) {
   // Initialize editor in read-only mode.
   this.editor = new Quill(this.elem, this.quill_options);
 
+  // Move the toolbar outside of the scrolling container.
+  var toolbar = this.elem.previousSibling;
+  this.toolbarContainer.appendChild(toolbar);
+
+  // Remove the 'height' on the ql-container and ql-editor divs
+  // which creates scrollbars around the document, since we use
+  // our own element for scrolling.
+  this.elem.style.height = "auto";
+  this.elem.getElementsByClassName("ql-editor")[0].style.height = "auto";
+
   // Add a span to the toolbar for showing saved state.
   // Use min-width to prevent the toolbar from jumping around
   // when the size of the element changes.
-  var toolbar = this.elem.previousSibling;
   this.saved_state_indicator = document.createElement('span');
   this.saved_state_indicator.setAttribute("class", "ql-formats");
   this.saved_state_indicator.setAttribute("style", "margin-left: 1em; font-size: 95%; letter-spacing: -.5px; font-style: italic; color: #666; min-width: 5.5em;");
@@ -134,7 +160,8 @@ exports.quill.prototype.prepare_dom_async2 = function(callback) {
 
   if (this.quill_options.sizeTo == "container") {
     // Correctly size the editor to the parent node's size minus the toolbar size.
-    function resize() { _this.elem.style.height = (_this.elem.parentNode.clientHeight - toolbar.offsetHeight) + "px"; }
+    this.scrollingContainer.setAttribute("style", "position: relative; height: 100%; overflow-y: auto;");
+    function resize() { _this.scrollingContainer.style.height = (_this.scrollingContainer.parentNode.clientHeight - toolbar.offsetHeight) + "px"; }
     window.addEventListener("resize", resize);
     resize();
   }
@@ -375,7 +402,7 @@ exports.quill.prototype.get_cursor_char_range = function() {
 }
 
 exports.quill.prototype.get_cursors_parent_element = function() {
-  return this.elem;
+  return this.scrollingContainer;
 }
 
 exports.quill.prototype.get_peer_cursor_rects = function(index, length) {
