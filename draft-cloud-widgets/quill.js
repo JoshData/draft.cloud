@@ -23,12 +23,14 @@ exports.quill = function(elem, quill_options, baseurl) {
   if (!this.quill_options.modules)
     this.quill_options.modules = { };
   if (!this.quill_options.formats) // formats that are closest to what's available in CommonMark
-    this.quill_options.formats = ['bold', 'italic', 'code', 'link', 'blockquote', 'header', 'list', 'code-block', 'image'];
+    this.quill_options.formats = ['bold', 'italic', 'code', 'link', 'blockquote', 'header', 'list', 'indent', 'code-block', 'image'];
   if (!this.quill_options.modules.toolbar)
     this.quill_options.modules.toolbar =  [
       ['bold', 'italic', 'code'],
       [{ 'header': 1 }, { 'header': 2 },
-       { 'list': 'ordered' }, { 'list': 'bullet' }, 'blockquote', 'code-block'],
+       { 'list': 'ordered' }, { 'list': 'bullet' },
+       { 'indent': '-1'}, { 'indent': '+1' },
+       'blockquote', 'code-block'],
       ['link', 'image'],
       ['clean']
       ];
