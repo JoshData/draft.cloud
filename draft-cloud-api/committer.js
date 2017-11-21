@@ -183,7 +183,7 @@ function commit_revision(document, revision, cb) {
           revision.committed = true;
           revision.save().then(function() {
             console.log("committed", document.uuid, revision.uuid);
-            cb();
+            debugging_paused_callback(cb);
           });
         }).catch(function(err) {
           // Something horrible went wrong. Don't try this Revision
@@ -195,4 +195,11 @@ function commit_revision(document, revision, cb) {
         });
     });
   });
+}
+
+function debugging_paused_callback(cb) {
+  if (!process.env.SLOW_COMMITTER)
+    cb();
+  else
+    setTimeout(cb, parseFloat(process.env.SLOW_COMMITTER));
 }
