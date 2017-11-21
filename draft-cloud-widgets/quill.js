@@ -275,9 +275,11 @@ function createDelta(current_doc, patch) {
           var attrib_delta = innerop.ops['attributes'].apply(d.attributes);
 
           // Then add back nulls for missing keys to indicate they
-          // were removed.
+          // were removed. If attrib_delta is MISSING, the whole attributes
+          // object were removed.
+          if (attrib_delta === jotobjs.MISSING) attrib_delta = {};
           for (var key in d.attributes)
-            if (!(key in attrib_delta))
+            if (attrib_delta === jotobjs.MISSING || !(key in attrib_delta))
               attrib_delta[key] = null;
 
           // Add a "retain" with attributes change.
