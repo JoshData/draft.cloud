@@ -20,6 +20,14 @@ exports.CursorManager.prototype.update = function(peerid, state) {
     var cursor = { };
     this.cursors[peerid] = cursor;
 
+    // Set metadata.
+
+    cursor.label = peerid;
+    cursor.index = -1;
+    cursor.length = 0;
+
+    // Create DOM elements.
+
     cursor.bar = document.createElement('div');
     this.options.container.appendChild(cursor.bar);
     cursor.bar.setAttribute('class', 'ddc-cursor-bar');
@@ -32,9 +40,14 @@ exports.CursorManager.prototype.update = function(peerid, state) {
                                     + 'border: 1px solid black; border-radius: .5em; padding: .25em; '
                                     + 'color: white; font-weight: bold; font-size: 90%; line-height: 105%; white-space: nowrap; text-overflow: ellipsis;');
 
-    cursor.label = peerid;
-    cursor.index = -1;
-    cursor.length = 0;
+    // Attach hover event. When the mouse moves over the cursor, pop
+    // it to an alternate location, until the user mouseovers it again,
+    // and then pop it back.
+    var _this = this;
+    cursor.name.addEventListener("mouseover", function() {
+      cursor.mouseover = !cursor.mouseover;
+      _this.update_cursor_dom(peerid);
+    })
   }
 
   // Update cursor state for any set fields.
@@ -89,7 +102,7 @@ exports.CursorManager.prototype.remove = function(peerid) {
 exports.CursorManager.prototype.update_cursor_dom = function(peerid) {
   var cursor = this.cursors[peerid];
 
-  // Update cursor bar & name DOM positions.
+  // Get cursor location.
   var rects = this.options.rects(cursor.index, cursor.length);
   if (cursor.index == -1 || rects.length == 0) {
     // Cursor is not visible.
@@ -97,12 +110,25 @@ exports.CursorManager.prototype.update_cursor_dom = function(peerid) {
     cursor.name.style.display = "none";
     return;
   }
+
+  // Update name DOM -- affects height.
+  cursor.name.textContent = cursor.label;
+
+  // Update cursor bar & name DOM positions.
   cursor.bar.style.display = "block";
   cursor.name.style.display = "block";
-  cursor.bar.style.top = rects[0].top + "px";
+  cursor.bar.style.top = (rects[0].top-1) + "px";
   cursor.bar.style.left = (rects[0].left-2) + "px";
-  cursor.bar.style.height = rects[0].height + "px";
-  cursor.name.style.top = (rects[0].top+rects[0].height) + "px";
+  cursor.bar.style.height = (rects[0].height+2) + "px";
+  if (!cursor.mouseover) {
+    // show cursor below text
+    cursor.name.style.top = (rects[0].top+rects[0].height+1) + "px";
+    cursor.name.style.borderRadius = "0 .5em .5em .5em";
+  } else {
+    // show cursor above text
+    cursor.name.style.top = (rects[0].top-cursor.name.offsetHeight-1) + "px";
+    cursor.name.style.borderRadius = ".5em .5em .5em 0";
+  }
   cursor.name.style.left = (rects[0].left-2) + "px";
 
   // Update DOM colors. Map the user's peerid stably to a color choice.
@@ -114,7 +140,5 @@ exports.CursorManager.prototype.update_cursor_dom = function(peerid) {
   cursor.bar.style.borderColor = color;
   cursor.name.style.backgroundColor = color;
   cursor.name.style.borderColor = color;
-
-  // Update name DOM.
-  cursor.name.textContent = cursor.label;
 }
+
