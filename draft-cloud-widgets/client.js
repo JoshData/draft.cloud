@@ -250,6 +250,18 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
     if (!patch.isNoOp())
       widget.merge_remote_changes(patch);
 
+
+    // Apply any ephemeral widget states that came through with revisions,
+    // execept for a revision that is from our own changes --- we're not
+    // a "peer".
+    remote_changes.forEach(function(revision) {
+      if (revision == seen_ours) return; // it's a revision we sent
+      if (revision.userdata && typeof revision.userdata.widget_state == "object") {
+        for (let peerid in revision.userdata.widget_state)
+          widget.on_peer_state_updated(peerid, revision.author, revision.userdata.widget_state[peerid]);
+      }
+    });
+
     // Update Document State
     // =====================
     remote_changes = [];
@@ -283,7 +295,8 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
         
         widget.status("saving");
 
-        channel_methods.push(widget_base_revision, patch, function(err, revision) {
+        channel_methods.push(widget_base_revision, patch, widget.get_ephemeral_state(),
+          function(err, revision) {
           // We've gotten back the revision ID for the patch we
           // submitted. Remember it for later when we process
           // remote changes, so we can identify when we see
@@ -305,14 +318,24 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
           waiting_for_local_change_to_save = false;
           merge_remote_changes();
         })
+      
+      } else {
+        // Check if the ephemeral_state changed. The ephemeral state
+        // includes cursor information. Since the ephemeral state is
+        // propagated faster than document changes, we need to prevent
+        // cursor movements from propagating ahead of the changes that
+        // the movement caused (i.e. typing text will cause the cursor
+        // to move forward but the cursor movement on other clients should
+        // occur along with the insertion of text, not before (or after).)
+        // So we don't send ephemeral state if we have unsaved changes
+        // in the pipeline. The state is, instead, sent along with the
+        // revision.
+        var es = widget.get_ephemeral_state();
+        if (jot.cmp(ephemeral_state, es) != 0) {
+          channel_methods.send_state(es);
+          ephemeral_state = es;
+        }
       }
-    }
-
-    // Check if the ephemeral_state changed.
-    var es = widget.get_ephemeral_state();
-    if (jot.cmp(ephemeral_state, es) != 0) {
-      channel_methods.send_state(es);
-      ephemeral_state = es;
     }
   }
 

@@ -111,7 +111,7 @@ function open(owner_name, document_name, api_key, cbobj) {
     last_seen_revision = data.revisions[data.revisions.length-1].id;
   });
 
-  function push(base_revision, patch, cb) {
+  function push(base_revision, patch, widget_state, cb) {
     // The Client class calls this function to submit a JOT operation to
     // the server. The server will record an *uncommitted* Revision and
     // send that back in the socket callback function.
@@ -132,6 +132,7 @@ function open(owner_name, document_name, api_key, cbobj) {
       document: document_id,
       base_revision: base_revision,
       patch: patch.toJSON(),
+      widget_state: widget_state,
       comment: null,
       userdata: null
     }, function(data) {

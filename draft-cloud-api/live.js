@@ -195,6 +195,11 @@ exports.init = function(io, sessionStore, settings) {
       // Load the document.
       var doc_state = socket.open_documents[data.document];
 
+      // Add the widget state to the userdata.
+      var userdata = (data.userdata || {});
+      userdata.widget_state = { };
+      userdata.widget_state[socket.id] = data.widget_state;
+
       // Find the base revision. If not specified, it's the current revision.
       models.Revision.from_uuid(doc_state.document, data.base_revision, function(base_revision) {
         routes.make_revision(
@@ -204,7 +209,7 @@ exports.init = function(io, sessionStore, settings) {
           op,
           doc_state.doc_pointer,
           data.comment,
-          data.userdata,
+          userdata,
           {
             _status: null,
             status: function(code) { this._status = code; return this; },

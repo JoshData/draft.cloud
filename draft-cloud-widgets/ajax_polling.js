@@ -94,7 +94,7 @@ exports.open = function(owner_name, document_name, api_key, cbobj) {
       poll_remote_changes(); // kick it off
 
       // Define the push function to send new changes to the server.
-      function push(base_revision, patch, cb) {
+      function push(base_revision, patch, widget_state, cb) {
         $.ajax({
           url: document_url(owner_name, document_name, "content"),
           method: "PATCH",
