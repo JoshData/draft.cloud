@@ -122,10 +122,12 @@ exports.quill.prototype.prepare_dom_async2 = function(callback) {
   this.editor = new Quill(this.elem, this.quill_options);
 
   // Add a span to the toolbar for showing saved state.
+  // Use min-width to prevent the toolbar from jumping around
+  // when the size of the element changes.
   var toolbar = this.elem.previousSibling;
   this.saved_state_indicator = document.createElement('span');
   this.saved_state_indicator.setAttribute("class", "ql-formats");
-  this.saved_state_indicator.setAttribute("style", "margin-left: 1em; font-style: italic; color: #666;");
+  this.saved_state_indicator.setAttribute("style", "margin-left: 1em; font-size: 95%; letter-spacing: -.5px; font-style: italic; color: #666; min-width: 5.5em;");
   toolbar.appendChild(this.saved_state_indicator);
 
   var _this = this;

@@ -122,6 +122,9 @@ exports.simple_widget.prototype.open = function(state) {
   Object.keys(state.peer_states).forEach(function(peerid) {
     _this.on_peer_state_updated(peerid, state.peer_states[peerid].user, state.peer_states[peerid].state);
   })
+
+  // Show initial status.
+  this.show_status("No Changes");
 };
 
 exports.simple_widget.prototype.document_closed = function() {
