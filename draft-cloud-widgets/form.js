@@ -120,3 +120,15 @@ exports.form.prototype.on_peer_state_updated = function(peerid, user, state) {
   for (var w in this.widgets)
     this.widgets[w].widget.on_peer_state_updated(peerid, user, (state === null) ? state : (state[w] || null));
 }
+
+exports.form.prototype.get_change_flag = function() {
+  for (var w in this.widgets)
+    if (this.widgets[w].widget.get_change_flag())
+      return true;
+  return false;
+}
+
+exports.form.prototype.clear_change_flag = function() {
+  for (var w in this.widgets)
+    this.widgets[w].widget.clear_change_flag();
+}

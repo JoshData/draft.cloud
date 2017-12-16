@@ -44,6 +44,10 @@ exports.simple_widget.prototype.compute_changes = function() {
   // content has changed. If the content has changed, a JOT operation
   // is constructed and stored in widget.changes.
 
+  // Clear the subclass's flag that there are content changes
+  // that have not yet been picked up by this function.
+  this.clear_change_flag();
+
   // Get the widget's current document content.
   var current_content = this.get_document();
 
@@ -59,6 +63,13 @@ exports.simple_widget.prototype.compute_changes = function() {
 
   // Make the current content the new base for future diffs.
   this.changes_last_content = current_content;
+}
+
+exports.simple_widget.prototype.get_change_flag = function() {
+  return false;
+}
+
+exports.simple_widget.prototype.clear_change_flag = function() {
 }
 
 exports.simple_widget.prototype.initialize = function(logger, callback) {
@@ -109,7 +120,6 @@ exports.simple_widget.prototype.open = function(state) {
   // Start polling for changes in the widget's contents, unless the
   // subclass does not require polling and calls compute_changes
   // itself.
-  console.log(this.name, this.poll_interval)
   if (this.poll_interval > 0) {
     var _this = this;
     function poll_for_changes() {
@@ -142,12 +152,11 @@ exports.simple_widget.prototype.pop_changes = function() {
   // that have been made by the end user since the last call to
   // pop_changes and since any previous calls to merge_remote_changes.
   // It is called at frequent intervals to poll for changes in the
-  // widget.
+  // widget to be sent to the Draft.Cloud server.
 
-  if (this.changes.length == 0) {
-    // Nothing new.
+  // Nothing new.
+  if (this.changes.length == 0)
     return new jot.NO_OP();
-  }
 
   // Form a JOT operation.
   var op = new jot.LIST(this.changes).simplify()
@@ -232,15 +241,12 @@ exports.simple_widget.prototype.merge_remote_changes = function(patch) {
 exports.simple_widget.prototype.status = function(state) {
   // state is "saving" or "saved"
 
-  // Check synchronously for any new edits in the widget.
-  this.compute_changes();
-
   // If there was any error saving, it's permanent.
   if (state == "error")
     this.show_status("Could Not Save");
 
-  // If there are any edits, then the document is unsaved.
-  else if (this.changes.length > 0)
+  // If there are any edits (checking synchronously), then the document is unsaved.
+  else if (this.has_changes())
     this.show_status("Not Saved");
 
   // Or we could be saving changes that have been given

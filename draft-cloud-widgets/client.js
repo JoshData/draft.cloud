@@ -295,7 +295,11 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
         
         widget.status("saving");
 
-        channel_methods.push(widget_base_revision, patch, widget.get_ephemeral_state(),
+        // Update local copy of ephemeral_state so that we don't re-send it when
+        // we do a diff on state later. Send the ephemeral state with this revision.
+        ephemeral_state = widget.get_ephemeral_state();
+
+        channel_methods.push(widget_base_revision, patch, ephemeral_state,
           function(err, revision) {
           // We've gotten back the revision ID for the patch we
           // submitted. Remember it for later when we process
@@ -318,7 +322,13 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
           waiting_for_local_change_to_save = false;
           merge_remote_changes();
         })
-      
+
+        
+      } else if (widget.get_change_flag()) {
+        // Don't send ephemeral state, like cursors, if there are changes
+        // to document content that weren't yet available in pop_changes,
+        // see below.
+
       } else {
         // Check if the ephemeral_state changed. The ephemeral state
         // includes cursor information. Since the ephemeral state is

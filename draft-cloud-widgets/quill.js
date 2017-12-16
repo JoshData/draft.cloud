@@ -166,6 +166,12 @@ exports.quill.prototype.prepare_dom_async2 = function(callback) {
     resize();
   }
 
+  // Listen for text-change events.
+  this.change_flag = false;
+  this.editor.on("text-change", function(delta, oldDelta, source) {
+    _this.change_flag = true;
+  })
+
   this.logger("Quill widget created");
 
   // For debugging...
@@ -242,6 +248,7 @@ exports.quill.prototype.set_document = function(document, patch) {
   // Fall back to calling .setContents() and blowing away the user's current
   // caret/scroll position.
   this.editor.setContents(document);
+  this.change_flag = false;
 }
 
 exports.quill.prototype.show_message = function(level, message) {
@@ -250,6 +257,14 @@ exports.quill.prototype.show_message = function(level, message) {
 
 exports.quill.prototype.show_status = function(message) {
   this.saved_state_indicator.textContent = message;
+}
+
+exports.quill.prototype.get_change_flag = function() {
+  return this.change_flag;
+}
+
+exports.quill.prototype.clear_change_flag = function() {
+  this.change_flag = false;
 }
 
 function createDelta(current_doc, patch) {
