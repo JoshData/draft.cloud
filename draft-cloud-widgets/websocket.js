@@ -107,6 +107,7 @@ function open(owner_name, document_name, api_key, cbobj) {
 
   socket.on('new-revisions', function (data) {
     if (data.document != document_id) return; // for a different open-document stream
+    if (data.revisions.length == 0) return; // no data?
     cbobj.pull(data.revisions);
     last_seen_revision = data.revisions[data.revisions.length-1].id;
   });
@@ -123,7 +124,7 @@ function open(owner_name, document_name, api_key, cbobj) {
       // If the socket isn't open, just queue a call to this function
       // with the same arguments for when the socket reconnects.
       socket_reconnect_actions.push(function() {
-        push(base_revision, patch, cb);
+        push(base_revision, patch, widget_state, cb);
       })
       return;
     }
