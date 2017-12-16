@@ -31,14 +31,17 @@ exports.CursorManager.prototype.update = function(peerid, state) {
     cursor.bar = document.createElement('div');
     this.options.container.appendChild(cursor.bar);
     cursor.bar.setAttribute('class', 'ddc-cursor-bar');
-    cursor.bar.setAttribute('style', 'position: absolute; width: 0; height: 0; border-left: 2px solid black;');
+    cursor.bar.setAttribute('style', 'position: absolute; z-index: 2000; width: 0; height: 0; border-left: 2px solid black;');
 
     cursor.name = document.createElement('div');
     this.options.container.appendChild(cursor.name);
     cursor.name.setAttribute('class', 'ddc-cursor-name');
-    cursor.name.setAttribute('style', 'position: absolute; cursor: default; overflow: hidden; max-width: 12em; '
+    cursor.name.setAttribute('style', 'position: absolute; z-index: 3000; cursor: default; overflow: hidden; max-width: 12em; '
                                     + 'border: 1px solid black; border-radius: .5em; padding: .25em; '
                                     + 'color: white; font-weight: bold; font-size: 90%; line-height: 105%; white-space: nowrap; text-overflow: ellipsis;');
+
+    // Create an array to later hold multi-line selection range rectangles.
+    cursor.range_rects = [];
 
     // Attach hover event. When the mouse moves over the cursor, pop
     // it to an alternate location, until the user mouseovers it again,
@@ -95,6 +98,7 @@ exports.CursorManager.prototype.remove = function(peerid) {
   var cursor = this.cursors[peerid];
   cursor.bar.parentNode.removeChild(cursor.bar);
   cursor.name.parentNode.removeChild(cursor.name);
+  cursor.range_rects.forEach(function(item) { item.parentNode.removeChild(item); })
   delete this.cursors[peerid];
 }
 
@@ -108,6 +112,8 @@ exports.CursorManager.prototype.update_cursor_dom = function(peerid) {
     // Cursor is not visible.
     cursor.bar.style.display = "none";
     cursor.name.style.display = "none";
+    cursor.range_rects.forEach(function(item) { item.parentNode.removeChild(item); })
+    cursor.range_rects = [];
     return;
   }
 
@@ -131,6 +137,35 @@ exports.CursorManager.prototype.update_cursor_dom = function(peerid) {
   }
   cursor.name.style.left = (rects[0].left-2) + "px";
 
+  // Create divs for range selections.
+  var nrects = 0;
+  if (rects.length > 1 || rects[0].width > 0) {
+    var _this = this;
+    rects.forEach(function(rect) {
+      // Create a new div if we don't have one.
+      if (nrects >= cursor.range_rects.length) {
+        cursor.range_rects.push(document.createElement('div'));
+        _this.options.container.appendChild(cursor.range_rects[nrects]);
+      }
+
+      var r = cursor.range_rects[nrects];
+      r.setAttribute('class', 'ddc-cursor-bar');
+      r.setAttribute('style', 'display: block; position: absolute; z-index: 1000; width: 0; height: 0;');
+      r.style.top = rect.top + "px";
+      r.style.left = rect.left + "px";
+      r.style.height = rect.height + "px";
+      r.style.width = rect.width + "px";
+
+      nrects++;
+    })
+  }
+
+  // Remove any range rect divs that are no longer in use.
+  for (var i = nrects; i < cursor.range_rects.length; i++) {
+    var r = cursor.range_rects.pop();
+    r.parentNode.removeChild(r);
+  }
+
   // Update DOM colors. Map the user's peerid stably to a color choice.
   // Since peerid's are random, we can use that as a numerical starting
   // point.
@@ -140,5 +175,9 @@ exports.CursorManager.prototype.update_cursor_dom = function(peerid) {
   cursor.bar.style.borderColor = color;
   cursor.name.style.backgroundColor = color;
   cursor.name.style.borderColor = color;
+  cursor.range_rects.forEach(function(item) {
+    item.style.backgroundColor = color;
+    item.style.opacity = .25;
+  })
 }
 

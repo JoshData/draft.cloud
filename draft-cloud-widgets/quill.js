@@ -421,7 +421,45 @@ exports.quill.prototype.get_cursors_parent_element = function() {
 }
 
 exports.quill.prototype.get_peer_cursor_rects = function(index, length) {
-  return [this.editor.getBounds(index, length)];
+  // Quill.getBounds returns a single rectangle that compasses the
+  // selection range. For multi-line selections, the bounding box
+  // includes the start of the first selected line and the end of
+  // the last selected line, which is incorrect. We need to return
+  // multiple rectangles, at a minimum: the rectangle for the first
+  // line from the start of the selection to the end of the line,
+  // the retangle for middle lines all of which are selected, and
+  // the rectangle for the last line up to the end of the selection
+  
+  var rects = [this.editor.getBounds(index, length)];
+
+  // Get the cursor position of the start position. If it is at a
+  // different left/top than the bounding-box rect, insert a new
+  // rect at the start and adjust the bounding-box rect to not
+  // include it. There's an edge case when an empty line is selected
+  // at the start or end of the selection, the single-point selection's
+  // top/bottom don't match the bounding box top/bottom, and in those
+  // cases the bounding box is better so don't revise it.
+  var start = this.editor.getBounds(index, 0);
+  if (start.left != rects[0].left && start.top == rects[0].top) {
+    start.width = rects[0].left + rects[0].width - start.left; // extent point select to end of line
+    rects[0].top += start.height; // start bounding box below this line
+    rects[0].height -= start.height;
+    rects.unshift(start);
+  }
+  
+  // Get the cursor position of the end position. If it is at a
+  // different right/bottom than the bounding-box rect, insert a new
+  // rect at the end and adjust the bounding-box rect to not
+  // include it.
+  var end = this.editor.getBounds(index+length, 0);
+  if (end.right != rects[rects.length-1].right && end.bottom == rects[rects.length-1].bottom) {
+    end.width = end.left - rects[rects.length-1].left; // extent point select back to start of line
+    end.left = rects[rects.length-1].left;
+    rects[rects.length-1].height -= end.height; // start bounding box below this line
+    rects.push(end);
+  }
+
+  return rects;
 }
 
 exports.quill.prototype.on_change_at_charpos = function(cb) {
