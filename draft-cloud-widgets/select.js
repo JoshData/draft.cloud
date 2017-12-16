@@ -44,12 +44,17 @@ exports.select.prototype.set_readonly = function(readonly) {
 }
 
 exports.select.prototype.set_document = function(document, patch) {
-  // simple select
-  if (!this.elem.multiple || (typeof document != "object")) {
-    this.elem.value = document;
+  // simple select widget or document value is a string
+  if (!this.elem.multiple || (typeof document == "string")) {
+    this.elem.value = (document+""); // explicitly coerce to string
 
   } else {
     // multiple select
+
+    // Ensure we have the right data type - an object with keys
+    // representing the selected options.
+    if (document == null || typeof document != "object")
+      document = { };
 
     // Update the selected state of each option.
     for (var i = 0; i < this.elem.options.length; i++) {

@@ -92,8 +92,12 @@ exports.form.prototype.set_readonly = function(readonly) {
 
 exports.form.prototype.set_document = function(document, patch) {
   // Pass the value down.
-  for (var w in this.widgets)
-    this.widgets[w].widget.set_document(document[w] || null, patch ? patch.drilldown(w) : null);
+  for (var w in this.widgets) {
+    var widget_doc = null;
+    if (document != null && typeof document == "object" && w in document)
+      widget_doc = document[w];
+    this.widgets[w].widget.set_document(widget_doc, patch ? patch.drilldown(w) : null);
+  }
 }
 
 exports.form.prototype.show_message = function(level, message) {
