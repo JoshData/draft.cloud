@@ -13,8 +13,7 @@ Install node and packages:
 	cd draft.cloud
 	npm install
 
-	npm uninstall sqlite3 # it causes pkg mgmt issues
-	npm install pg # requires Postgresql's JSON column type, pg 6.4.4 until https://github.com/sequelize/sequelize/issues/8043 is fixed
+	npm install pg # requires Postgresql's JSON column type
 
 Configure Draft.Cloud:
 
