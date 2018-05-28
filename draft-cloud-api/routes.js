@@ -198,6 +198,7 @@ exports.create_routes = function(app, settings) {
 
   var document_list_route = api_path_root + '/documents/:owner';
   var document_route = document_list_route + '/:document';
+  var document_content_route = document_route + '/content:pointer(/[\\w\\W]*)?';
 
   function authz_document(req, res, must_exist, min_level, cb) {
     // Checks authorization for document URLs. The callback is called
@@ -260,6 +261,8 @@ exports.create_routes = function(app, settings) {
       api_urls: {
         document: api_public_base_url + document_route.replace(/:owner/, owner.uuid)
           .replace(/:document/, doc.uuid),
+        content: api_public_base_url + document_content_route.replace(/:owner/, owner.uuid)
+          .replace(/:document/, doc.uuid).replace(/:pointer.*/, ''),
         debugger: api_public_base_url + document_route.replace(/:owner/, owner.uuid)
           .replace(/:document/, doc.uuid) + "/debug"
       },
@@ -471,8 +474,6 @@ exports.create_routes = function(app, settings) {
     })
   }
 
-  var document_content_route = document_route + '/content:pointer(/[\\w\\W]*)?';
-
   function parse_json_pointer_path(doc, pointer, base_revision, cb) {
     // Parse the "pointer", which is a JSON Pointer to a part of a
     // document. The only way to get a path we can process is to get
@@ -498,7 +499,7 @@ exports.create_routes = function(app, settings) {
     authz_document_content(req, res, "READ", function(user, owner, doc, access_level) {
       doc.get_content(
         req.params.pointer,
-        req.headers['Revision-Id'],
+        req.headers['revision-id'],
         true, // cache the content at this revision
         function(err, revision, content) {
 
@@ -510,6 +511,9 @@ exports.create_routes = function(app, settings) {
         // Send a header with the ID of the revision that this content came from,
         // so that if the user submits new content we know what the base revision was.
         res.header("Revision-Id", revision ? revision.uuid : "singularity")
+
+        // Send the user's access level in a header so the user knows what operations
+        // are permitted on the document.
         res.header("Access-Level", access_level)
 
         // What content type should be used for the response? Get the preferred

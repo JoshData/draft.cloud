@@ -102,13 +102,13 @@ run_tests(function(apitest) {
     var api_key = headers['x-api-key'];
 
     // user profile
-    apitest(
+    apitest( // no api key
       "GET", user.api_urls.profile, null,
       { },
       404, "text/plain",
       function(body, headers, test) {
     });
-    apitest(
+    apitest( // ok
       "GET", user.api_urls.profile, null,
       { "Authorization": api_key },
       200, "application/json",
@@ -117,12 +117,12 @@ run_tests(function(apitest) {
     });
     
     // documents list (currently empty)
-    apitest(
+    apitest( // no api key
       "GET", user.api_urls.documents, null, { },
       404, "text/plain",
       function(body, headers, test) {
     });
-    apitest(
+    apitest( // ok
       "GET", user.api_urls.documents, null,
       { "Authorization": api_key },
       200, "application/json",
@@ -132,7 +132,7 @@ run_tests(function(apitest) {
     });
 
     // update user's name and profile and check we get it back
-    apitest(
+    apitest( // update
       "PUT", user.api_urls.profile,
       { "name": "test-user-1", "profile": { "key": "value" } },
       { "Authorization": api_key },
@@ -141,7 +141,7 @@ run_tests(function(apitest) {
         test.equal(body.name, "test-user-1");
         test.strictSame(body.profile, { "key": "value" });
     });
-    apitest(
+    apitest( // check
       "GET", user.api_urls.profile, null,
       { "Authorization": api_key },
       200, "application/json",
@@ -151,12 +151,12 @@ run_tests(function(apitest) {
     });
 
     // create a document
-    apitest(
+    apitest( // no api key
       "POST", user.api_urls.documents, null, {},
       404, "text/plain",
       function(body, headers, test) {
     });
-    apitest(
+    apitest( // ok
       "POST", user.api_urls.documents,
       { "name": "test-document-1" },
       { "Authorization": api_key },
@@ -166,12 +166,12 @@ run_tests(function(apitest) {
         var doc = body;
 
         // update document metadata
-        apitest(
+        apitest( // no api key
           "PUT", doc.api_urls.document, null, {},
           404, "text/plain",
           function(body, headers, test) {
         });
-        apitest(
+        apitest( // update
           "PUT", doc.api_urls.document,
           { "name": "test-doc-1" },
           { "Authorization": api_key },
@@ -179,7 +179,7 @@ run_tests(function(apitest) {
           function(body, headers, test) {
             test.equal(body.name, "test-doc-1");
         });
-        apitest(
+        apitest( // check
           "GET", doc.api_urls.document, null,
           { "Authorization": api_key },
           200, "application/json",
@@ -188,21 +188,69 @@ run_tests(function(apitest) {
         });
 
         // delete
-        apitest(
+        apitest( // no api key
           "DELETE", doc.api_urls.document, null, {},
           404, "text/plain",
           function(body, headers, test) {
         });
-        apitest(
+        apitest( // ok
           "DELETE", doc.api_urls.document, null,
           { "Authorization": api_key },
           200, "text/plain",
           function(body, headers, test) {
         });
-    });
-  });
+    }); // document
+
+    // create another document
+    apitest(
+      "POST", user.api_urls.documents,
+      { "name": "test-document-2" },
+      { "Authorization": api_key },
+      200, "application/json",
+      function(body, headers, test) {
+        test.equal(body.name, "test-document-2");
+        var doc = body;
+
+        // get content
+        apitest( // no api key
+          "GET", doc.api_urls.content, null, {},
+          404, "text/plain",
+          function(body, headers, test) {
+        });
+        apitest( // invalid revision
+          "GET", doc.api_urls.content, null,
+          { 'Revision-Id': 'invalid', "Authorization": api_key },
+          404, "text/plain",
+          function(body, headers, test) {
+        });
+        apitest( // ok
+          "GET", doc.api_urls.content, null,
+          { "Authorization": api_key },
+          200, "application/json",
+          function(body, headers, test) {
+            test.equal(body, null); // new documents always start as null
+            test.equal(headers['revision-id'], 'singularity');
+            test.equal(headers['access-level'], 'ADMIN');
+        });
+        apitest( // ok - with revision
+          "GET", doc.api_urls.content, null,
+          { "Revision-Id": "singularity", "Authorization": api_key },
+          200, "application/json",
+          function(body, headers, test) {
+            test.equal(body, null); // new documents always start as null
+            test.equal(headers['revision-id'], 'singularity');
+        });
+
+        // TODO: Get content with a JSON pointer.
+
+        // TODO: Get content with an Accepts: text/plain header.
+
+    }); // document
+  
+  }); // user
 
   // TODO: Check creating an owned user.
 
+  // TODO: Check document team permissions.
 
 })

@@ -318,11 +318,11 @@ exports.initialize_database = function(settings, ready) {
     // the document to retrieve.
     //
     // at_revision is null to get the most recent document content, a Revision instance,
-    // or "singularity", which represents the state of the document prior to the first
-    // Revision.
+    // a UUID of a revision, or "singularity", which represents the state of the document
+    // prior to the first Revision.
     //
     // Calls cb(error) or cb(null, revision, content, path), where revision is null
-    // representing the "singularity" or a Revision instance or UUID, content is the document
+    // representing the "singularity" or a Revision instance, content is the document
     // content, and path is a data structure similar to the pointer that is used to
     // create JOT operations at that path --- unlike pointer, it distinguishes Array and
     // Object accesses.
@@ -384,7 +384,7 @@ exports.initialize_database = function(settings, ready) {
       })
       .then(function(revs) {
         // Documents always start with a null value at the start of the revision history.
-        var current_revision = "singularity";
+        var current_revision = null;
         var content = null;
 
         // Start with the peg revision, assuming there was one.
