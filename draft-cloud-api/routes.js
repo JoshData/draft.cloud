@@ -45,6 +45,13 @@ exports.start_test_server = function(cb) {
   });
 }
 
+function res_send_plain(res, status_code, message) {
+  res
+    .status(status_code)
+    .set('Content-Type', 'text/plain')
+    .send(message)
+    .end();
+}
 
 function unhandled_error_handler(res) {
   return (function(err) {
@@ -52,7 +59,7 @@ function unhandled_error_handler(res) {
     console.log("UNHANDLED ERROR at", res.req.url);
     console.log(err);
     console.log("-------------------" + "-".repeat(res.req.url.length))
-    res.status(500).send('An internal error occurred.');
+    res_send_plain(res, 500, 'An internal error occurred.');
   });
 }
 
@@ -76,13 +83,13 @@ exports.create_routes = function(app, settings) {
 
     auth.check_request_authorization(req, function(req_user, requestor_api_key) {
       if (!req_user && !settings.allow_anonymous_user_creation) {
-        res.status(403).send('You are not allowed to create a new user.');
+        res_send_plain(res, 403, 'You are not allowed to create a new user.');
         return;
       }
 
       // If the API key lowers access...
       if (requestor_api_key && auth.min_access("ADMIN", requestor_api_key.access_level) != "ADMIN") {
-        res.status(403).send('You are not allowed to create a new user with this API key.');
+        res_send_plain(res, 403, 'You are not allowed to create a new user with this API key.');
         return;
       }
 
@@ -121,11 +128,11 @@ exports.create_routes = function(app, settings) {
         // The user's access level is lower than the minimum access level required.
         if (auth.min_access("READ", level) == "READ")
           // The user has READ access but a higher level was required.
-          res.status(403).send('You do not have ' +  min_level + ' permission for this user. You have ' + level + '.');
+          res_send_plain(res, 403, 'You do not have ' +  min_level + ' permission for this user. You have ' + level + '.');
         else
           // The user does not have READ access, so we do not reveal whether or not
           // a document exists here.
-          res.status(404).send('User not found or you do not have permission to see them.');
+          res_send_plain(res, 404, 'User not found or you do not have permission to see them.');
         return;
       }
 
@@ -155,7 +162,7 @@ exports.create_routes = function(app, settings) {
     // Validate/sanitize input.
     req.body = models.User.clean_user_dict(req.body);
     if (typeof req.body == "string")
-      return res.status(400).send(req.body);
+      return res_send_plain(res, 400, req.body);
 
     authz_user(req, res, req.params.user, "ADMIN", function(requestor, target) {
       // Update user's globally unique name.
@@ -204,11 +211,11 @@ exports.create_routes = function(app, settings) {
         // The user's access level is lower than the minimum access level required.
         if (auth.min_access("READ", level) == "READ")
           // The user has READ access but a higher level was required.
-          res.status(403).send('You do not have ' +  min_level + ' permission on this document. You have ' + level + '.');
+          res_send_plain(res, 403, 'You do not have ' +  min_level + ' permission on this document. You have ' + level + '.');
         else
           // The user does not have READ access, so we do not reveal whether or not
           // a document exists here.
-          res.status(404).send('User or document not found or you do not have permission to see it.');
+          res_send_plain(res, 404, 'User or document not found or you do not have permission to see it.');
         return;
       }
 
@@ -217,7 +224,7 @@ exports.create_routes = function(app, settings) {
         // Document doesn't exist but must. Since the user would at least have READ access
         // if the document existed, or else we would have given a different error above,
         // we can reveal that the document doesn't exist.
-        res.status(404).send('Document does not exist.');
+        res_send_plain(res, 404, 'Document does not exist.');
         return;
       }
 
@@ -298,7 +305,7 @@ exports.create_routes = function(app, settings) {
     // Validate/sanitize input.
     req.body = models.Document.clean_document_dict(req.body);
     if (typeof req.body == "string")
-      return res.status(400).send(req.body);
+      return res_send_plain(res, 400, req.body);
 
     // Check authorization to create the document.
     authz_document(req, res, false, "ADMIN", function(user, owner, doc) {
@@ -323,7 +330,7 @@ exports.create_routes = function(app, settings) {
     // Validate/sanitize input.
     req.body = models.Document.clean_document_dict(req.body);
     if (typeof req.body == "string")
-      return res.status(400).send(req.body);
+      return res_send_plain(res, 400, req.body);
 
     // Check authorization to update the document.
     authz_document(req, res, true, "ADMIN", function(user, owner, doc) {
@@ -365,7 +372,7 @@ exports.create_routes = function(app, settings) {
       doc.set("name", null);
       doc.save().then(function() {
         doc.destroy().then(function() {
-          res.send('document deleted')
+          res_send_plain(res, 200, 'document deleted');
         });
       })
       .catch(unhandled_error_handler(res));
@@ -414,9 +421,9 @@ exports.create_routes = function(app, settings) {
     // for the user if they are being removed.
 
     if (typeof req.body != "object")
-      return res.status(400).send(req.body);
+      return res_send_plain(res, 400, req.body);
     if (!auth.is_access_level(req.body.access_level))
-      return res.status(400).send("invalid access level: " + req.body.access_level);
+      return res_send_plain(res, 400, "invalid access level: " + req.body.access_level);
 
     authz_document(req, res, true, "ADMIN", function(user, owner, doc) {
       authz_user(req, res, req.body.user, req.body.access_level != "NONE" ? "READ" : "NONE", function(_, target) {
@@ -429,12 +436,12 @@ exports.create_routes = function(app, settings) {
         }).then(function(dp) {
           if (!dp && req.body.access_level == "NONE") {
             // No permission and none requested - nothing to do.
-            res.status(200).send("no change");
+            res_send_plain(res, 200, "no change");
             return;
           } else if (req.body.access_level == "NONE") {
             // Kill an existing permission.
             dp.destroy().then(function() {
-                res.status(200).send("removed");
+                res_send_plain(res, 200, "removed");
             });
             return;
           }
@@ -445,7 +452,7 @@ exports.create_routes = function(app, settings) {
           dp.userId = target.id;
           dp.access_level = req.body.access_level;
           dp.save().then(function(err) {
-            res.status(200).send("saved");
+            res_send_plain(res, 200, "saved");
           })
           .catch(unhandled_error_handler(res))
         })
@@ -496,7 +503,7 @@ exports.create_routes = function(app, settings) {
         function(err, revision, content) {
 
         if (err) {
-          res.status(404).send(err);
+          res_send_plain(res, 404, err);
           return;
         }
 
@@ -510,7 +517,7 @@ exports.create_routes = function(app, settings) {
         var format = req.accepts(["json", "text"])
         if (!format) {
           // No recognized content type provided.
-          res.status(406).send("Invalid content type in Accept: header.");
+          res_send_plain(res, 406, "Invalid content type in Accept: header.");
           return;
         }
 
@@ -520,7 +527,7 @@ exports.create_routes = function(app, settings) {
             format = "json";
           else {
             // The document cannot be sent as plain text.
-            res.status(406).send("The document is not plain-text.");
+            res_send_plain(res, 406, "The document is not plain-text.");
             return;
           }
         }
@@ -532,7 +539,7 @@ exports.create_routes = function(app, settings) {
         // Or as text, if text is the preferred accepted format. Coerce the
         // data to a string.
         else if (format == "text")
-          res.send(""+content);
+          res_send_plain(res, 200, ""+content);
         
       });
     })
@@ -632,7 +639,7 @@ exports.create_routes = function(app, settings) {
     if (!req._body) {
       // _body is set when bodyparser parses a body. If it's not truthy, then
       // we did not get a valid content-type header.
-      res.status(400).send("Invalid PUT body content type.");
+      res_send_plain(res, 400, "Invalid PUT body content type.");
       return;
     }
 
@@ -642,7 +649,7 @@ exports.create_routes = function(app, settings) {
       try {
         userdata = JSON.parse(req.headers['revision-userdata']);
       } catch(e) {
-        res.status(400).send("Invalid userdata: " + e);
+        res_send_plain(res, 400, "Invalid userdata: " + e);
         return;
       }
     }
@@ -653,14 +660,14 @@ exports.create_routes = function(app, settings) {
       models.Revision.from_uuid(doc, req.headers['base-revision-id'], function(base_revision) {
         // Invalid ID.
         if (!base_revision) {
-          res.status(400).send("Invalid base revision ID.")
+          res_send_plain(res, 400, "Invalid base revision ID.")
           return;
         }
 
         // Get the content of the document as of the base revision.
         doc.get_content(req.params.pointer, base_revision, false /* dont cache */, function(err, revision, content, op_path) {
           if (err) {
-            res.status(404).send(err);
+            res_send_plain(res, 404, err);
             return;
           }
 
@@ -668,11 +675,11 @@ exports.create_routes = function(app, settings) {
           // operation.
           make_operation_from_diff(req.params.pointer, content, req.body, function(err, op) {
             if (err)
-              res.status(400).send(err);
+              res_send_plain(res, 400, err);
             else if (!op)
               // The document wasn't changed - don't take any action.
               // (There is a similar response if the result of the rebase is a no-op too.)
-              res.status(200).send("no change");
+              res_send_plain(res, 200, "no change");
             else
               // Make a new revision.
               exports.make_revision(
@@ -710,7 +717,7 @@ exports.create_routes = function(app, settings) {
       try {
         op = jot.opFromJSON(req.body);
       } catch (err) {
-        res.status(400).send(err)
+        res_send_plain(res, 400, err)
       }
 
       // parse the userdata, same as in the PUT route
@@ -719,7 +726,7 @@ exports.create_routes = function(app, settings) {
         try {
           userdata = JSON.parse(req.headers['revision-userdata']);
         } catch(e) {
-          res.status(400).send("Invalid userdata: " + e);
+          res_send_plain(res, 400, "Invalid userdata: " + e);
           return;
         }
       }
@@ -730,7 +737,7 @@ exports.create_routes = function(app, settings) {
         models.Revision.from_uuid(doc, req.headers['base-revision-id'], function(base_revision) {
           // Invalid base revision ID.
           if (!base_revision) {
-            res.status(400).send("Invalid base revision ID.")
+            res_send_plain(res, 400, "Invalid base revision ID.")
             return;
           }
 
@@ -759,7 +766,7 @@ exports.create_routes = function(app, settings) {
       models.Revision.from_uuid(doc, req.query['since'] || "singularity", function(base_revision) {
         // Invalid ID.
         if (!base_revision) {
-          res.status(400).send("Invalid base revision ID.")
+          res_send_plain(res, 400, "Invalid base revision ID.")
           return;
         }
 
@@ -796,7 +803,7 @@ exports.create_routes = function(app, settings) {
 
             // Error parsing path.
             if (err) {
-              res.status(400).send(err)
+              res_send_plain(res, 400, err)
               return;
             }
 
@@ -827,7 +834,10 @@ exports.create_routes = function(app, settings) {
     // Requires READ permission on the document (and the document must exist).
     authz_document(req, res, true, "READ", function(user, owner, doc) {
       var mustache = require("mustache");
-      res.status(200).send(mustache.render(debug_template, {
+      res
+      .status(200)
+      .set('Content-Type', 'text/html')
+      .send(mustache.render(debug_template, {
         "user": user,
         "owner": owner,
         "document": doc

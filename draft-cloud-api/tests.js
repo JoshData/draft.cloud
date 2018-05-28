@@ -105,7 +105,7 @@ run_tests(function(apitest) {
     apitest(
       "GET", user.api_urls.profile, null,
       { },
-      404, "text/html",
+      404, "text/plain",
       function(body, headers, test) {
     });
     apitest(
@@ -119,7 +119,7 @@ run_tests(function(apitest) {
     // documents list (currently empty)
     apitest(
       "GET", user.api_urls.documents, null, { },
-      404, "text/html",
+      404, "text/plain",
       function(body, headers, test) {
     });
     apitest(
@@ -153,7 +153,7 @@ run_tests(function(apitest) {
     // create a document
     apitest(
       "POST", user.api_urls.documents, null, {},
-      404, "text/html",
+      404, "text/plain",
       function(body, headers, test) {
     });
     apitest(
@@ -168,7 +168,7 @@ run_tests(function(apitest) {
         // update document metadata
         apitest(
           "PUT", doc.api_urls.document, null, {},
-          404, "text/html",
+          404, "text/plain",
           function(body, headers, test) {
         });
         apitest(
@@ -190,13 +190,13 @@ run_tests(function(apitest) {
         // delete
         apitest(
           "DELETE", doc.api_urls.document, null, {},
-          404, "text/html",
+          404, "text/plain",
           function(body, headers, test) {
         });
         apitest(
           "DELETE", doc.api_urls.document, null,
           { "Authorization": api_key },
-          200, "text/html",
+          200, "text/plain",
           function(body, headers, test) {
         });
     });
