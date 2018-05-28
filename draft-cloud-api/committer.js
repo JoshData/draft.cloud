@@ -6,7 +6,14 @@ var models = require("./models.js");
 var jot = require("jot");
 
 exports.begin = function() {
-  setInterval(commit_uncommitted_revisions, 100);
+  console.log("Starting committer.");
+  interval = setInterval(commit_uncommitted_revisions, 100);
+  return {
+    close: function() {
+      console.log("Shutting down committer.");
+      clearInterval(interval);
+    }
+  }
 }
 
 exports.notify = function() {

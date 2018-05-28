@@ -9,6 +9,43 @@ var models = require("./models.js");
 
 var jot = require("jot");
 
+// Create a test server.
+exports.start_test_server = function(cb) {
+  // Start the HTTP server.
+  var http = require('http');
+  var express = require('express');
+  models.initialize_database({ database: "sqlite::memory:" }, function() {
+
+    // Start the background process that commits revisions.
+    var committer = require('./committer.js').begin();
+
+    // Config.
+    var bind_host = "127.0.0.1";
+    var bind_port = 8001;
+    var baseurl = "http://" + bind_host + ":" + bind_port;
+
+    // Start the HTTP server.
+    var app = express();
+    exports.create_routes(app, {
+      url: baseurl,
+      allow_anonymous_user_creation: true
+    });
+
+    // Start listening.
+    var server = http.createServer(app);
+    server.listen(bind_port, bind_host);
+    server.on('listening', function() {
+      console.log("Test server started on " + bind_host + ":" + bind_port + ".");
+      cb(bind_host, bind_port, function() {
+        console.log("Shutting down test server.");
+        server.close();
+        committer.close();
+      })
+    });
+  });
+}
+
+
 function unhandled_error_handler(res) {
   return (function(err) {
     console.log("-------------------" + "-".repeat(res.req.url.length))
@@ -252,8 +289,7 @@ exports.create_routes = function(app, settings) {
   });
 
   app.post(document_list_route, bodyParser.json(), function (req, res) {
-    // Create a document. A document name may not be specified in the request body ---
-    // a unique, random, unguessable name is assigned.
+    // Create a document.
     //
     // See https://github.com/expressjs/body-parser#bodyparserjsonoptions for
     // default restrictions on the request body payload.
@@ -324,7 +360,8 @@ exports.create_routes = function(app, settings) {
     // Requires ADMIN permission on the document.
     authz_document(req, res, true, "ADMIN", function(user, owner, doc) {
       // First clear the document's name so that it cannot cause uniqueness
-      // constraint violations with a new document of the same name.
+      // constraint violations with a new document of the same name since
+      // the database row isn't actually deleted.
       doc.set("name", null);
       doc.save().then(function() {
         doc.destroy().then(function() {
