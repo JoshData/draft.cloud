@@ -126,16 +126,9 @@ function commit_revision(document, revision, cb) {
         // Load the JOT operation.
         var op = jot.opFromJSON(revision.op);
 
-        // If this operation occurred at a sub-path on the document, then wrap the
-        // operation within APPLY operations to get down to that path. op_path has been
-        // constructed so that the elements are either numbers or strings, and jot.APPLY
-        // will use that distinction to select whether it is the APPLY for sequences
-        // (the element is a number, an index) or objects (the element is a string, a key).
-        for (var i = op_path.length-1; i >= 0; i--)
-          op = new jot.APPLY(op_path[i], op);
-
         // Validate the operation. It should apply without error to the document
-        // at the base revision.
+        // at the base revision. If revision.doc_pointer was set, then the document
+        // content is for that pointer.
         try {
           op.apply(content);
         } catch (e) {
@@ -147,6 +140,14 @@ function commit_revision(document, revision, cb) {
           });
           return;
         }
+
+        // If this operation occurred at a sub-path on the document, then wrap the
+        // operation within APPLY operations to get down to that path. op_path has been
+        // constructed so that the elements are either numbers or strings, and jot.APPLY
+        // will use that distinction to select whether it is the APPLY for sequences
+        // (the element is a number, an index) or objects (the element is a string, a key).
+        for (var i = op_path.length-1; i >= 0; i--)
+          op = new jot.APPLY(op_path[i], op);
 
         // Rebase against all of the subsequent operations after the base revision to
         // the current revision. Find all of the subsequent operations.
@@ -170,22 +171,37 @@ function commit_revision(document, revision, cb) {
           try {
             // Rebase.
             op = op.rebase(base_ops, { document: content });
+          } catch (e) {
+            // Don't commit it.
+            revision.error = true;
+            revision.save().then(function() {
+              console.error("rebase failed", document.uuid, revision.uuid, e);
+              cb();
+            });
+            return;
+          }
 
+          if (0 && op_path.length == 0) {
+          try {
             // Although rebase should always give us a good result, sanity check
             // that a) the operation can be composed with the prior operations and
             // b) it can apply to the current document content. We sanity check
             // two ways to be sure we don't corrupt the document. We're just
             // checking for thrown exceptions.
+            // TODO: This won't work if the doc_pointer was set because right now
+            // op and base_ops apply to the whole document but content is only
+            // the part of the document targetted by doc_pointer.
             op.apply(base_ops.apply(content)); // (content + base_ops) + op
             base_ops.compose(op).apply(content); // content + (base_ops+op)
           } catch (e) {
-            // This Revision had an invalid operation. Don't commit it.
+            // Don't commit it.
             revision.error = true;
             revision.save().then(function() {
               console.error("sanity check failed", document.uuid, revision.uuid, e);
               cb();
             });
             return;
+          }
           }
 
           // Make a revision.

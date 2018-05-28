@@ -7,16 +7,21 @@ function run_tests(tests) {
   routes.start_test_server(function(hostname, port, finished) {
     function api_request(method, path, body, headers, expected_response_code, expected_response_type, test, cb) {
       var postData;
-      if (!body)
+      var contentType;
+      if (!body) {
         postData = '';
-      else if (typeof body == "string")
+        contentType = "text/plain";
+      } else if (typeof body == "string") {
         postData = body;
-      else
+        contentType = "text/plain";
+      } else {
         postData = JSON.stringify(body);
+        contentType = "application/json";
+      }
       postData = Buffer.from(postData);
 
       var request_headers = {
-        'Content-Type': 'application/json',
+        'Content-Type': contentType,
         'Content-Length': Buffer.byteLength(postData),
       };
       for (let key in headers)
@@ -207,7 +212,7 @@ run_tests(function(apitest) {
         });
     }); // document
 
-    // create another document
+    // create a text document
     apitest(
       "POST", user.api_urls.documents,
       { "name": "test-document-2" },
@@ -256,7 +261,7 @@ run_tests(function(apitest) {
         apitest( // with plain text body
           "PUT", doc.api_urls.content,
           "Hello world!",
-          { "Content-Type": "text/plain", "Authorization": api_key },
+          { "Authorization": api_key },
           201, "application/json",
           function(body, headers, test) {
             var initial_revision_id = body.id;
@@ -279,8 +284,7 @@ run_tests(function(apitest) {
             apitest( // with further changes & userdata
               "PUT", doc.api_urls.content,
               "Hello cruel world!",
-              { "Content-Type": "text/plain",
-                "Revision-UserData": '{ "key": "value" }',
+              { "Revision-UserData": '{ "key": "value" }',
                 "Authorization": api_key },
               201, "application/json",
               function(body, headers, test) {
@@ -306,8 +310,7 @@ run_tests(function(apitest) {
             apitest( // with changes against the first revision, which will be rebased
               "PUT", doc.api_urls.content,
               "Hello fine world!",
-              { "Content-Type": "text/plain",
-                "Base-Revision-Id": body.id,
+              { "Base-Revision-Id": body.id,
                 "Authorization": api_key },
               201, "application/json",
               function(body, headers, test) {
@@ -367,16 +370,78 @@ run_tests(function(apitest) {
                 });
             });
         });
+    }); // document
 
+    // create a JSON document 
+    apitest(
+      "POST", user.api_urls.documents,
+      { "name": "test-document-3" },
+      { "Authorization": api_key },
+      200, "application/json",
+      function(body, headers, test) {
+        var doc = body;
 
-        // TODO: Get content with a JSON pointer.
+        // set initial content
+        apitest(
+          "PUT", doc.api_urls.content,
+          { "key": "Hello world!" },
+          { "Authorization": api_key },
+          201, "application/json",
+          function(body, headers, test) {
+            var initial_revision_id = body.id;
+            test.ok(body.id)
+            test.same(body.author.id, user.id);
+            test.same(body.status, "pending");
 
-        // TODO: Update content with a JSON pointer.
+            require('./committer.js').force_commit_now();
 
-        // TODO: Get content with an Accepts: text/plain header.
+            // check it was committed
+            apitest(
+              "GET", doc.api_urls.document + "/revision/" + body.id, null,
+              { "Authorization": api_key },
+              200, "application/json",
+              function(body, headers, test) {
+                test.equal(body.status, "committed");
+                test.same(body.op, { _ver: 1, _type: 'values.SET', value: { key: 'Hello world!' } });
+            });
+
+            // update using pointer
+            apitest(
+              "PUT", doc.api_urls.content + "/key",
+              "Hello cruel world!",
+              { "Authorization": api_key },
+              201, "application/json",
+              function(body, headers, test) {
+                require('./committer.js').force_commit_now();
+                apitest(
+                  "GET", doc.api_urls.document + "/revision/" + body.id, null,
+                  { "Authorization": api_key },
+                  200, "application/json",
+                  function(body, headers, test) {
+                    test.equal(body.status, "committed");
+                    test.same(body.op, {"_ver":1,"_type":"objects.APPLY","ops":{"key":{"_type":"sequences.PATCH","hunks":[{"offset":6,"length":0,"op":{"_type":"values.SET","value":"cruel "}}]}}});
+                });
+
+                // check updated content
+                apitest(
+                  "GET", doc.api_urls.content, null,
+                  { "Authorization": api_key },
+                  200, "application/json",
+                  function(body, headers, test) {
+                    test.same(body, { key: "Hello cruel world!" });
+                });
+                apitest( // with pointer & Acccept header
+                  "GET", doc.api_urls.content + "/key", null,
+                  { "Accept": "text/plain", "Authorization": api_key },
+                  200, "text/plain",
+                  function(body, headers, test) {
+                    test.same(body, "Hello cruel world!");
+                });
+            });
+        });
 
     }); // document
-  
+
   }); // user
 
   // TODO: Check creating an owned user.
