@@ -62,6 +62,28 @@ exports.initialize_database = function(settings, ready) {
     });
   exports.User.belongsTo(exports.User, {as: 'owner'});
 
+  exports.User.clean_user_dict = function(user) {
+    // Validate that user-supplied fields are valid.
+
+    // Did we get an object?
+    if (!user || typeof user != "object")
+      return "Must supply an object.";
+
+    // Name must be at least a subset of what express routes will
+    // recognize as a parameter.
+    if (typeof user.name != "undefined") {
+      if (typeof user.name != "string" || !valid_name_regex.test(user.name))
+        return "Invalid user name. " + valid_name_text;
+    }
+
+    // Profile, if specified, must be an object.
+    if ((typeof user.profile != "undefined" && typeof user.profile != "object") || user.profile === null)
+      return "Invalid profile object."
+
+    // Return cleaned object.
+    return user;
+  }
+
   // API KEYs.
   exports.UserApiKey = exports.db.define('user_api_key',
     {

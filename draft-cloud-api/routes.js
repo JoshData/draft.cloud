@@ -106,7 +106,7 @@ exports.create_routes = function(app, settings) {
     // Requires ADMIN permission on the user.
 
     // Validate/sanitize input.
-    req.body = models.Document.clean_document_dict(req.body);
+    req.body = models.User.clean_user_dict(req.body);
     if (typeof req.body == "string")
       return res.status(400).send(req.body);
 
