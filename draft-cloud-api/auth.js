@@ -85,7 +85,7 @@ exports.get_user_authz = function(req, user_uuid, cb) {
         level = "ADMIN";
 
       // A User is an ADMIN to their sub-accounts.
-      if (requestor && requestor.id == target.ownerId)
+      else if (requestor && requestor.id == target.ownerId)
         level = "ADMIN";
 
       else

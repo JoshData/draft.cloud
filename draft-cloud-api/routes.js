@@ -46,7 +46,7 @@ exports.create_routes = function(app, settings) {
           length: 48,
           charset: 'alphanumeric'
         }),
-        ownerId: req_user ? req_user.id : 0,
+        ownerId: req_user ? req_user.id : null,
       }).then(function(user) {
         // Create an initial API key for this user.
         models.UserApiKey.createApiKey(user, .001, function(obj, api_key) {
@@ -98,7 +98,7 @@ exports.create_routes = function(app, settings) {
   });
 
   app.put(user_route, bodyParser.json(), function (req, res) {
-    // Update's a user.
+    // Updates a user.
     //
     // See https://github.com/expressjs/body-parser#bodyparserjsonoptions for
     // default restrictions on the request body payload.
