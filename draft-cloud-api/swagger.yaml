@@ -627,6 +627,43 @@ paths:
           description: >-
             The document was modified after the base revision and a rebase of
             the operation was not possible.
+  '/documents/{owner}/{document}/revision/{revision}':
+    get:
+      description: >
+        Gets a `Revision` objects.
+      produces:
+        - application/json
+      parameters:
+        - name: owner
+          in: path
+          description: The `id` of a `User` who owns the document.
+          required: true
+          type: string
+        - name: document
+          in: path
+          description: The `id` of a `Document` owned by  `owner`.
+          required: true
+          type: string
+        - name: revision
+          in: path
+          description: >-
+            A `Revision` `id`.
+          required: true
+          type: string
+        - name: Authorization
+          in: header
+          type: string
+          description: >-
+            An API key that has READ access to the document. Optional if the
+            document's anonymous access level is READ.
+      responses:
+        '200':
+          description: >-
+            The revision is returned as JSON.
+        '404':
+          description: >-
+            Document does not exist or caller does not have permission to see
+            the document
   '/documents/{owner}/{document}/history':
     get:
       description: >

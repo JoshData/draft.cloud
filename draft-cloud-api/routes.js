@@ -263,6 +263,8 @@ exports.create_routes = function(app, settings) {
           .replace(/:document/, doc.uuid),
         content: api_public_base_url + document_content_route.replace(/:owner/, owner.uuid)
           .replace(/:document/, doc.uuid).replace(/:pointer.*/, ''),
+        history: api_public_base_url + document_route.replace(/:owner/, owner.uuid)
+          .replace(/:document/, doc.uuid) + "/history",
         debugger: api_public_base_url + document_route.replace(/:owner/, owner.uuid)
           .replace(/:document/, doc.uuid) + "/debug"
       },
@@ -577,7 +579,7 @@ exports.create_routes = function(app, settings) {
     .then(function(rev) {
       // Send response.
       rev.user = user; // fill in model
-      res.status(201).json(exports.make_revision_response(rev, null));
+      res.status(201).json(exports.make_revision_response(rev, []));
 
       // Alert committer to look for new revisions.
       require("./committer.js").notify();
@@ -587,6 +589,8 @@ exports.create_routes = function(app, settings) {
 
   function drill_down_operation(op, op_path) {
     // Drill down and unwrap the operation.
+    if (op_path.length == 0)
+      return op;
     op = jot.opFromJSON(op);
     op_path.forEach(function(key) {
       op = op.drilldown(key);
@@ -759,6 +763,20 @@ exports.create_routes = function(app, settings) {
       })
     }
   )
+
+  app.get(document_route + '/revision/:revision', function (req, res) {
+    // Gets the revision. Useful for checking if a revision was committed.
+    authz_document(req, res, true, "READ", function(user, owner, doc) {
+      models.Revision.from_uuid(doc, req.params.revision, function(revision) {
+        // Invalid ID.
+        if (!revision) {
+          res_send_plain(res, 400, "Invalid revision ID.")
+          return;
+        }
+        res.json(exports.make_revision_response(revision, []));
+      });
+    })
+  })
 
   app.get(document_route + '/history', function (req, res) {
     // Gets the history of a document. The response is a list of changes, in

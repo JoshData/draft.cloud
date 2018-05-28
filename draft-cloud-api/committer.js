@@ -20,6 +20,10 @@ exports.notify = function() {
   has_new_uncommitted_revisions = true;
 }
 
+exports.force_commit_now = function() {
+  commit_uncommitted_revisions();
+}
+
 var has_new_uncommitted_revisions = true;
 var is_committing = false;
 

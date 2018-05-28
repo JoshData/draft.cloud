@@ -6,7 +6,13 @@ function run_tests(tests) {
   // Start the test server and create a function to make API calls.
   routes.start_test_server(function(hostname, port, finished) {
     function api_request(method, path, body, headers, expected_response_code, expected_response_type, test, cb) {
-      var postData = body ? JSON.stringify(body) : "";
+      var postData;
+      if (!body)
+        postData = '';
+      else if (typeof body == "string")
+        postData = body;
+      else
+        postData = JSON.stringify(body);
       postData = Buffer.from(postData);
 
       var request_headers = {
@@ -241,7 +247,131 @@ run_tests(function(apitest) {
             test.equal(headers['revision-id'], 'singularity');
         });
 
+        // update content
+        apitest( // no api key
+          "PUT", doc.api_urls.content, null, { },
+          404, "text/plain",
+          function(body, headers, test) {
+        });
+        apitest( // with plain text body
+          "PUT", doc.api_urls.content,
+          "Hello world!",
+          { "Content-Type": "text/plain", "Authorization": api_key },
+          201, "application/json",
+          function(body, headers, test) {
+            var initial_revision_id = body.id;
+            test.ok(body.id)
+            test.same(body.author.id, user.id);
+            test.same(body.status, "pending");
+
+            require('./committer.js').force_commit_now();
+
+            // check it was committed
+            apitest(
+              "GET", doc.api_urls.document + "/revision/" + body.id, null,
+              { "Authorization": api_key },
+              200, "application/json",
+              function(body, headers, test) {
+                test.equal(body.status, "committed");
+                test.same(body.op, { _ver: 1, _type: 'values.SET', value: 'Hello world!' });
+            });
+
+            apitest( // with further changes & userdata
+              "PUT", doc.api_urls.content,
+              "Hello cruel world!",
+              { "Content-Type": "text/plain",
+                "Revision-UserData": '{ "key": "value" }',
+                "Authorization": api_key },
+              201, "application/json",
+              function(body, headers, test) {
+                test.ok(body.id)
+                test.same(body.author.id, user.id);
+                test.same(body.status, "pending");
+                test.same(body.userdata, { "key": "value" });
+
+                require('./committer.js').force_commit_now();
+
+                // check it was committed
+                apitest(
+                  "GET", doc.api_urls.document + "/revision/" + body.id, null,
+                  { "Authorization": api_key },
+                  200, "application/json",
+                  function(body, headers, test) {
+                    test.ok(body.id)
+                    test.equal(body.status, "committed");
+                    test.same(body.op, {"_ver":1,"_type":"sequences.PATCH","hunks":[{"offset":6,"length":0,"op":{"_type":"values.SET","value":"cruel "}}]});
+                });
+            });
+
+            apitest( // with changes against the first revision, which will be rebased
+              "PUT", doc.api_urls.content,
+              "Hello fine world!",
+              { "Content-Type": "text/plain",
+                "Base-Revision-Id": body.id,
+                "Authorization": api_key },
+              201, "application/json",
+              function(body, headers, test) {
+                test.ok(body.id)
+                test.same(body.author.id, user.id);
+                test.same(body.status, "pending");
+
+                require('./committer.js').force_commit_now();
+
+                // check it was committed
+                apitest(
+                  "GET", doc.api_urls.document + "/revision/" + body.id, null,
+                  { "Authorization": api_key },
+                  200, "application/json",
+                  function(body, headers, test) {
+                    var final_revision_id = body.id;
+                    test.ok(body.id)
+                    test.equal(body.status, "committed");
+                    test.same(body.op, {"_ver":1,"_type":"sequences.PATCH","hunks":[{"offset":12,"length":0,"op":{"_type":"values.SET","value":"fine "}}]});
+
+                    // check updated content
+                    apitest( // ok - requesting text
+                      "GET", doc.api_urls.content, null,
+                      { "Accept": "text/plain", "Authorization": api_key },
+                      200, "text/plain",
+                      function(body, headers, test) {
+                        test.equal(body, "Hello cruel fine world!");
+                        test.equal(headers['revision-id'], final_revision_id);
+                    });
+                    apitest( // ok - requesting JSON
+                      "GET", doc.api_urls.content, null,
+                      { "Authorization": api_key },
+                      200, "application/json",
+                      function(body, headers, test) {
+                        test.equal(body, "Hello cruel fine world!");
+                        test.equal(headers['revision-id'], final_revision_id);
+                    });
+                    apitest( // ok - with revision
+                      "GET", doc.api_urls.content, null,
+                      { "Revision-Id": initial_revision_id, "Authorization": api_key },
+                      200, "application/json",
+                      function(body, headers, test) {
+                        test.equal(body, "Hello world!");
+                        test.equal(headers['revision-id'], initial_revision_id);
+                    });
+
+                    // check history
+                    apitest( // ok
+                      "GET", doc.api_urls.history, null,
+                      { "Authorization": api_key },
+                      200, "application/json",
+                      function(body, headers, test) {
+                        test.equal(body.length, 3);
+                        test.equal(body[0].id, initial_revision_id);
+                        test.equal(body[2].id, final_revision_id);
+                    });
+                });
+            });
+        });
+
+
         // TODO: Get content with a JSON pointer.
+
+        // TODO: Update content with a JSON pointer.
 
         // TODO: Get content with an Accepts: text/plain header.
 

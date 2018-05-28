@@ -539,12 +539,17 @@ exports.initialize_database = function(settings, ready) {
     else if (uuid)
       exports.Revision.findOne({
         where: { documentId: doc.id, uuid: uuid },
+        include: [{ model: exports.User }]
       })
       .then(function(revision) {
         if (!revision)
           cb(null);
         else
           cb(revision);
+      })
+      .catch(function(err) {
+        console.log(err);
+        cb(null);
       });
 
     // Get the most recent revision. If there are no revisions yet,
