@@ -1,6 +1,7 @@
 // Websocket API.
 
 var expressCookieParser = require('cookie-parser');
+const Sequelize = require('sequelize');
 
 var jot = require("jot");
 var auth = require("./auth.js");
@@ -140,7 +141,7 @@ exports.init = function(io, sessionStore, settings) {
               models.Revision.findAll({
                 where: {
                   documentId: doc.id,
-                  id: { "$gt": revision.id },
+                  id: { [Sequelize.Op.gt]: revision.id },
                   committed: true
                 },
                 order: [["id", "ASC"]],
@@ -289,8 +290,8 @@ exports.emit_revisions = function(doc, revs) {
           documentId: doc.id,
           committed: true,
           id: {
-            $gt: state.last_seen_revision.id,
-            $lt: revs[0].id
+            [Sequelize.Op.gt]: state.last_seen_revision.id,
+            [Sequelize.Op.lt]: revs[0].id
           }
         },
         order: [["id", "ASC"]],

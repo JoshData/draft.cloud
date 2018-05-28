@@ -1,4 +1,5 @@
 var async = require("async");
+const Sequelize = require('sequelize');
 
 var models = require("./models.js");
 
@@ -53,7 +54,7 @@ function commit_uncommitted_revisions() {
     models.Document.findAll({
       where: {
         id: {
-          $in: Object.keys(revsbydoc)
+          [Sequelize.Op.in]: Object.keys(revsbydoc)
         }
       }
     })
@@ -143,7 +144,7 @@ function commit_revision(document, revision, cb) {
             documentId: document.id,
             committed: true,
             id: {
-              "$gt": revision.baseRevisionId == null ? 0 : revision.baseRevisionId,
+              [Sequelize.Op.gt]: revision.baseRevisionId == null ? 0 : revision.baseRevisionId,
             }
           },
           order: [["id", "ASC"]]

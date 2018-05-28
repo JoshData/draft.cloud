@@ -21,6 +21,7 @@ exports.initialize_database = function(settings, ready) {
     settings.database || "sqlite://db.sqlite",
     {
       dialectOptions: settings.database_connection_options,
+      operatorsAliases: false,
       logging: settings.database_logging ? console.log : null
     }
   );
@@ -332,7 +333,7 @@ exports.initialize_database = function(settings, ready) {
     // than at_revision (if at_revision is not null).
     var where = { documentId: doc.id };
     if (at_revision)
-      where['revisionId'] = { "$lte": at_revision.id };
+      where['revisionId'] = { [Sequelize.Op.lte]: at_revision.id };
     exports.CachedContent.findOne({
       where: where,
       order: [["revisionId", "DESC"]],
@@ -352,9 +353,9 @@ exports.initialize_database = function(settings, ready) {
       if (at_revision || cache_hit)
         where["id"] = { };
       if (at_revision)
-        where['id']["$lte"] = at_revision.id;
+        where['id'][Sequelize.Op.lte] = at_revision.id;
       if (cache_hit)
-        where['id']["$gt"] = cache_hit.revisionId;
+        where['id'][Sequelize.Op.gt] = cache_hit.revisionId;
       exports.Revision.findAll({
         where: where,
         order: [["id", "ASC"]]

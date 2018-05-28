@@ -2,6 +2,7 @@ var fs = require('fs')
 var bodyParser = require('body-parser')
 var randomstring = require("randomstring");
 var json_ptr = require('json-ptr');
+const Sequelize = require('sequelize');
 
 var auth = require("./auth.js");
 var models = require("./models.js");
@@ -706,7 +707,7 @@ exports.create_routes = function(app, settings) {
           committed: true
         };
         if (base_revision != "singularity")
-          where['id'] = { "$gt": base_revision.id };
+          where['id'] = { [Sequelize.Op.gt]: base_revision.id };
         models.Revision.findAll({
           where: where,
           order: [["id", "ASC"]],
