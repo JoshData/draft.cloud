@@ -9,6 +9,16 @@ var models = require("./models.js");
 
 var jot = require("jot");
 
+function unhandled_error_handler(res) {
+  return (function(err) {
+    console.log("-------------------" + "-".repeat(res.req.url.length))
+    console.log("UNHANDLED ERROR at", res.req.url);
+    console.log(err);
+    console.log("-------------------" + "-".repeat(res.req.url.length))
+    res.status(500).send('An internal error occurred.');
+  });
+}
+
 // Export a function that creates routes on the express app.
 
 exports.create_routes = function(app, settings) {
@@ -59,7 +69,7 @@ exports.create_routes = function(app, settings) {
             .status(200)
             .json(exports.form_user_response_body(user));
         });
-      });
+      }).catch(unhandled_error_handler(res));
     });
   });
 
@@ -122,7 +132,7 @@ exports.create_routes = function(app, settings) {
         res
         .status(200)
         .json(exports.form_user_response_body(target));
-      })
+      }).catch(unhandled_error_handler(res));
     });
   })
 
@@ -189,7 +199,11 @@ exports.create_routes = function(app, settings) {
       }),
       anon_access_level: doc.anon_access_level || auth.DEFAULT_NEW_DOCUMENT_ANON_ACCESS_LEVEL,
       userdata: doc.userdata || {}
-    }).then(cb);
+    })
+    .then(cb)
+    .catch(function(err) {
+       cb(null, err);
+    });
   }
 
   exports.make_document_json = function(owner, doc) {
@@ -232,7 +246,8 @@ exports.create_routes = function(app, settings) {
         res
         .status(200)
         .json(docs);
-      });
+      })
+      .catch(unhandled_error_handler(res));
     })
   });
 
@@ -251,7 +266,11 @@ exports.create_routes = function(app, settings) {
 
     // Check authorization to create the document.
     authz_document(req, res, false, "ADMIN", function(user, owner, doc) {
-      exports.create_document(owner, req.body, function(doc) {
+      exports.create_document(owner, req.body, function(doc, err) {
+        if (err) {
+          unhandled_error_handler(res)(err);
+          return;
+        }
         res.status(200).json(exports.make_document_json(owner, doc));
       });
     })
@@ -284,6 +303,7 @@ exports.create_routes = function(app, settings) {
         .status(200)
         .json(exports.make_document_json(owner, doc));
       })
+      .catch(unhandled_error_handler(res));
     })
   })
 
@@ -311,6 +331,7 @@ exports.create_routes = function(app, settings) {
           res.send('document deleted')
         });
       })
+      .catch(unhandled_error_handler(res));
     })
   })
 
@@ -344,6 +365,7 @@ exports.create_routes = function(app, settings) {
         .status(200)
         .json(team);
       })
+      .catch(unhandled_error_handler(res));
     })
   })
 
@@ -387,8 +409,10 @@ exports.create_routes = function(app, settings) {
           dp.access_level = req.body.access_level;
           dp.save().then(function(err) {
             res.status(200).send("saved");
-          });
-        });
+          })
+          .catch(unhandled_error_handler(res))
+        })
+        .catch(unhandled_error_handler(res))
       });
     })
   })
@@ -510,6 +534,7 @@ exports.create_routes = function(app, settings) {
       // Alert committer to look for new revisions.
       require("./committer.js").notify();
     })
+    .catch(unhandled_error_handler(res))
   }
 
   function drill_down_operation(op, op_path) {
@@ -753,6 +778,7 @@ exports.create_routes = function(app, settings) {
             res.json(revs);
           })
         })
+        .catch(unhandled_error_handler(res))
       });
     })
   })

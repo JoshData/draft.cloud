@@ -99,7 +99,12 @@ exports.create_routes = function(app, sessionStore, settings) {
           // make the document public by default since it will get an unguessable address anyway
           anon_access_level: "WRITE"
         },
-        function(doc) {
+        function(doc, err) {
+          if (err) {
+            console.log(err);
+            res.status(500).send('An internal error occurred.');
+            return;
+          }
           res.redirect("/edit/" + req.user.name + "/" + doc.name)
         });
     }
