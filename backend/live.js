@@ -148,7 +148,7 @@ exports.init = function(io, sessionStore, settings) {
 
             // Send.
             response({
-              user: routes.form_user_response_body(user),
+              user: user ? routes.form_user_response_body(user) : null,
               document: routes.make_document_json(owner, doc),
               access_level: level,
               content: content,
@@ -196,7 +196,7 @@ exports.init = function(io, sessionStore, settings) {
 
     function make_peer_state(state) {
       return {
-        user: { id: state.user.uuid, name: state.user.name, display_name: state.user.profile && state.user.profile.display_name },
+        user: state.user ? { id: state.user.uuid, name: state.user.name, display_name: state.user.profile && state.user.profile.display_name } : null,
         state: state.ephemeral_state,
       }
     }
