@@ -68,6 +68,21 @@ exports.create_routes = function(app, settings) {
   var api_public_base_url = settings.url;
   var api_path_root = "/api/v1";
 
+  // AUTHORIZATION MIDDLEWARE
+
+  app.use(function(req, res, next) {
+    if (req.headers['authorization'])
+      models.UserApiKey.validateApiKey(
+        req.headers['authorization'],
+        function(user, user_api_key) {
+          req.user = user;
+          req.user_api_key = user_api_key;
+          next();
+      });
+    else
+      next();
+  })
+
   // USER CREATION
 
   var user_route = api_path_root + '/users/:user';

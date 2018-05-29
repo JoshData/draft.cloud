@@ -44,19 +44,7 @@ function get_document_from_uuid(owner, document_uuid, cb) {
 }
 
 exports.check_request_authorization = function(req, cb) {
-  // Is the request authenticated? If an Authorization header contains
-  // a valid API key, then the callback is called with a User and an
-  // UserApiKey instance.
-  if (req.headers['authorization'])
-    models.UserApiKey.validateApiKey(req.headers['authorization'], cb);
-
-  // If the request already has a user set from a passport session,
-  // use that (with no explicit API key).
-  else if (req.user)
-    cb(req.user, null);
-
-  else
-    cb() // not authorized
+  cb(req.user, req.user_api_key);
 }
 
 exports.get_user_authz = function(req, user_uuid, cb) {

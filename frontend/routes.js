@@ -27,8 +27,8 @@ exports.create_routes = function(app, sessionStore, settings) {
   passport.deserializeUser(function(id, done) {
     models.User.findById(id)
       .then(function(user) {
-      done(null, user);
-    });
+        done(null, user);
+      });
   });
 
   if (settings.GITHUB_CLIENT_ID && settings.GITHUB_CLIENT_SECRET) {

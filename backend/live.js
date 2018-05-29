@@ -40,6 +40,19 @@ exports.init = function(io, sessionStore, settings) {
   var EXPRESS_SID_KEY = 'connect.sid';
   io.use(function(socket, next) {
     var request = socket.request;
+
+    // Check an Authorization header for an API key.
+    if (request.headers['authorization']) {
+      models.UserApiKey.validateApiKey(
+        request.headers['authorization'],
+        function(user, user_api_key) {
+          request.user = user;
+          request.user_api_key = user_api_key;
+          next();
+      });
+      return;
+    }
+
     if (!request.headers.cookie)
       return next();
     cookieParser(request, {}, function(parseErr) {
@@ -52,7 +65,7 @@ exports.init = function(io, sessionStore, settings) {
         if (session && session.passport && session.passport.user) {
           models.User.findById(session.passport.user)
             .then(function(user) {
-              socket.handshake.user = user;
+              request.user = user;
               next();
           });
           return;
@@ -79,22 +92,29 @@ exports.init = function(io, sessionStore, settings) {
         .then(function(document) {
           data.owner = owner ? owner.uuid : "-invalid-";
           data.document = document ? document.uuid : "-invalid-";
+
+          // If an API key is specified in the socket's message in data.api_key, use that.
+          if (data.api_key) {
+            models.UserApiKey.validateApiKey(
+              data.api_key,
+              function(user, user_api_key) {
+                socket.request.user = user;
+                socket.request.user_api_key = user_api_key;
+                open_document(data, response);
+            });
+            return;
+          }
+
           open_document(data, response);
         });      
       });      
     });
 
     function open_document(data, response) {
-      // Check that the requestor has READ permission. socket.handshake has
-      // a 'headers' property that auth.get_document_authz expects for finding
-      // the user's API key, which works out if the web browser knows to send
-      // that header. (It'll come on websocket requests too.) But if an API key
-      // is specified in the socket's message, use that.
-      if (data.api_key)
-        req_ish = { headers: { authorization: data.api_key } }
-      else
-        req_ish = socket.handshake;
-      auth.get_document_authz(req_ish, data.owner, data.document, function(user, owner, doc, level) {
+      // Check that the requestor has READ permission. auth.get_document_authz
+      // expects its first argument to be a request-like object with a 'user'
+      // property.
+      auth.get_document_authz(socket.request, data.owner, data.document, function(user, owner, doc, level) {
         if (auth.min_access("READ", level) != "READ") {
           // No READ permission. Fatal.
           response({ error: "You do not have permission to read this document."});
