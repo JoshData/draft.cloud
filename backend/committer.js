@@ -95,7 +95,8 @@ function queue_revision(rev, on_committed) {
 }
 
 exports.sync = function(cb) {
-  // Wait for all pending revisions to be committed --- useful for tests.
+  // Wait for all pending revisions to be committed --- useful for
+  // graceful shutdowns and tests.
   if (document_queues.length == 0)
     cb();
   else

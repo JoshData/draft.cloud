@@ -50,5 +50,50 @@ require("./backend/models.js")
   // Initialize the front-end.
   app.use('', express.static(require('path').join(__dirname, 'public_html')))
 
+  // Register a SIGINT handler to gracefully shut down
+  // the application. Some considerations:
+  //
+  // The HTTP server won't finish shutting down until all
+  // connections are closed, but socket.io doesn't have a
+  // facility to forcibly terminate connections. socket.io's
+  // close() method causes clients to immediately reconnect.
+  // (https://github.com/socketio/socket.io/issues/1602)
+  // So we have to track open connections and do it ourself.
+  //
+  // The committer queue will finish up on its own once
+  // it stops receiving new revisions. Node won't quit
+  // until it's done, and will quit when it's done, so
+  // there's nothing to do there.
+  var open_connections = {};
+  server.on('connection', function(conn) {
+      var key = conn.remoteAddress + ':' + conn.remotePort;
+      open_connections[key] = conn;
+      conn.on('close', function() {
+          delete open_connections[key];
+      });
+  });
+  process.on('SIGINT', function() {
+    console.log("\nGracefully shutting down from SIGINT (Ctrl-C)..." );
+
+    // Don't take any new HTTP requests. This has a callback
+    // but it doesn't finish until all of the open websocket
+    // connections are forced to close, which we do next.
+    server.close();
+
+    // Ask all clients to gracefully send their last set
+    // of changes and lock down.
+    websocketio.emit("wrap-it-up", "The document server is going off-line. Apologies for the inconvenience.");
+
+    // This doesn't seem to do anything.
+    websocketio.close();
+
+    // Forcibly close after a timeout.
+    setTimeout(function() {
+      for (var key in open_connections) {
+        console.log("terminating ", key);
+        open_connections[key].destroy();
+      }
+    }, 1000);
+  })
 });
 

@@ -103,6 +103,11 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
           if (closed) return;
           widget.show_message("error", message);
           close_client();
+        },
+        wrap_it_up: function(message) {
+          // Server is asking us to send our final changes.
+          widget.show_message("error", message);
+          close_client_gracefully();
         }
       });        
     },
@@ -284,7 +289,7 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
   }
 
   // Run an async method to process outgoing local changes.
-  function push_local_changes() {
+  function push_local_changes(cb) {
     // Stop and don't schedule more polling if we're closed.
     if (closed) return;
 
@@ -331,7 +336,11 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
           // process remote changes if there are any.
           waiting_for_local_change_to_save = false;
           merge_remote_changes();
+
+          if (cb)
+            cb();
         })
+        return;
 
         
       } else if (widget.get_change_flag()) {
@@ -357,6 +366,23 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
         }
       }
     }
+
+    if (cb)
+      cb();
+  }
+
+  function close_client_gracefully() {
+    // Wrap up the widget.
+    widget.document_closed();
+
+    // Stop pushing changes but do one last round.
+    clearInterval(pushIntervalObj);
+    push_local_changes(function() {
+      // Once the last change is submitted, close the channel.
+      channel_methods.close();
+      channel_methods.terminate();
+      closed = true;
+    })
   }
 
   function close_client() {

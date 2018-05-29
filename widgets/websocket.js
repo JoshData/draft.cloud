@@ -85,6 +85,9 @@ function open(owner_name, document_name, api_key, cbobj) {
               socket.emit('close-document', {
                 document: document_id
               });
+            },
+            terminate: function() {
+              socket.close();
             }
           }
         );
@@ -99,11 +102,15 @@ function open(owner_name, document_name, api_key, cbobj) {
     });
   });
 
+  // Server asks us to gracefully close.
+  socket.on("wrap-it-up", function(message) {
+    cbobj.wrap_it_up(message);
+  })
+
   // Track that we're now disconnected.
   socket.on("disconnect", function() {
     socket_is_open = false;
   });
-
 
   socket.on('new-revisions', function (data) {
     if (data.document != document_id) return; // for a different open-document stream

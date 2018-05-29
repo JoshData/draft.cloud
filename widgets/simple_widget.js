@@ -138,7 +138,8 @@ exports.simple_widget.prototype.open = function(state) {
 };
 
 exports.simple_widget.prototype.document_closed = function() {
-  // Stop polling.
+  // Stop polling. Do a final poll.
+  this.compute_changes();
   if (this.intervalId)
     clearInterval(this.intervalId);
 

@@ -63,7 +63,7 @@ exports.init = function(io, sessionStore, settings) {
   });
 
 
-  io.sockets.on('connection', function (socket) {
+  io.on('connection', function (socket) {
     // Set state.
     socket.open_documents = { };
     
@@ -262,11 +262,13 @@ exports.init = function(io, sessionStore, settings) {
     socket.on('close-document', function (data) {
       close_document(data.document);
     });
-    
+
     socket.on('disconnect', function() {
       // Remove this socket from the global object containing all sockets listening
       // for document changes.
       Object.keys(socket.open_documents).forEach(close_document);
+      socket.conn.request.socket.destroy();
+      console.log(socket.id, "closed")
     });
   });
 };
