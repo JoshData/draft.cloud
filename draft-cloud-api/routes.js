@@ -492,8 +492,7 @@ exports.create_routes = function(app, settings) {
   app.get(document_content_route, function (req, res) {
     // Fetch (the content of) a document. If a JSON Pointer is given at the end
     // of the path, then only return that part of the document. A JSON document
-    // is returned. READ access is required. The Revision-Id header can be used
-    // to 
+    // is returned. READ access is required.
     authz_document_content(req, res, "READ", function(user, owner, doc, access_level) {
       doc.get_content(
         req.params.pointer,
@@ -708,7 +707,8 @@ exports.create_routes = function(app, settings) {
       try {
         op = jot.opFromJSON(req.body);
       } catch (err) {
-        res_send_plain(res, 400, err)
+        res_send_plain(res, 400, err);
+        return;
       }
 
       // parse the userdata, same as in the PUT route

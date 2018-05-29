@@ -318,7 +318,7 @@ exports.initialize_database = function(settings, ready) {
     // the document to retrieve.
     //
     // at_revision is null to get the most recent document content, a Revision instance,
-    // a UUID of a revision, or "singularity", which represents the state of the document
+    // or "singularity", which represents the state of the document
     // prior to the first Revision.
     //
     // Calls cb(error) or cb(null, revision, content, path), where revision is null
@@ -432,6 +432,9 @@ exports.initialize_database = function(settings, ready) {
       .catch(function(err) {
         cb("There is an error with the document.");
       });
+    })
+    .catch(function(err) {
+      cb("There is an error with the document cache.");
     });
   }
 
