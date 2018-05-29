@@ -38,6 +38,28 @@ exports.make_revision_async = function(user, doc, base_revision, op, pointer, co
   .catch(cb);
 }
 
+exports.make_revision_sync = function(user, doc, base_revision, op, pointer, comment, userdata, cb) {
+  // Schedule an asynchronous commit of the revision and call the
+  // callback once it is committed.
+  var rev = models.Revision.build({
+    userId: user.id,
+    documentId: doc.id,
+    baseRevisionId: base_revision == "singularity" ? null : base_revision.id,
+    doc_pointer: pointer,
+    op: op.toJSON(),
+    comment: comment,
+    userdata: userdata
+  })
+  rev.user = user; // fill in model - expected by cb
+  rev.document = doc; // fill in model - expected by commit_revision
+  rev.baseRevision = base_revision; // fill in model - expected by commit_revision
+  
+  // Queue revision.
+  queue_revision(rev, function(err) {
+    cb(err, rev);
+  });
+}
+
 function queue_revision(rev, on_committed) {
   // rev is a models.Revision.
 
@@ -125,12 +147,8 @@ exports.commit_uncommitted_revisions = function(cb) {
           var revs = revsbydoc[doc.id];
           async.eachSeries(
             revs,
-            function(rev, cb) { commit_revision(rev, cb); },
+            commit_revision,
             function(err) {
-              // Notify all listening websocket clients of the committed revisions
-              // for this document. (Some revisions might be marked as having
-              // had an error and therefore not committed.)
-              require("../draft-cloud-api/live.js").emit_revisions(doc, revs);
               cb();
               if (err) console.error(err);
             }
@@ -153,7 +171,8 @@ function commit_revision(revision, cb) {
     function error_handler(err) {
       console.error("unhandled error committing", revision.document.uuid, revision.uuid, err);
       revision.error = true;
-      revision.save();
+      if (!revision.isNewRecord) // already in database? update it.
+        revision.save();
       cb(err);
     }
 

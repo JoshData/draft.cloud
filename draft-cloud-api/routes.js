@@ -668,7 +668,7 @@ exports.create_routes = function(app, settings) {
               res_send_plain(res, 200, "no change");
             else
               // Make a new revision.
-              committer.make_revision_async(
+              committer.make_revision_sync(
                 user,
                 doc,
                 base_revision,
@@ -733,7 +733,7 @@ exports.create_routes = function(app, settings) {
           }
 
           // Make a new revision.
-          committer.make_revision_async(
+          committer.make_revision_sync(
             user,
             doc,
             base_revision,

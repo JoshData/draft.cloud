@@ -281,9 +281,7 @@ run_tests(function(apitest) {
             var initial_revision_id = body.id;
             test.ok(body.id)
             test.same(body.author.id, user.id);
-            test.same(body.status, "pending");
-
-            require('./committer.js').sync(function() { // wait for revisions to be committed
+            test.same(body.status, "committed");
 
             // check it was committed
             apitest(
@@ -304,10 +302,8 @@ run_tests(function(apitest) {
               function(body, headers, test) {
                 test.ok(body.id)
                 test.same(body.author.id, user.id);
-                test.same(body.status, "pending");
+                test.same(body.status, "committed");
                 test.same(body.userdata, { "key": "value" });
-
-                require('./committer.js').sync(function() { // wait for revisions to be committed
 
                 // check it was committed
                 apitest(
@@ -319,8 +315,6 @@ run_tests(function(apitest) {
                     test.equal(body.status, "committed");
                     test.same(body.op, {"_ver":1,"_type":"sequences.PATCH","hunks":[{"offset":6,"length":0,"op":{"_type":"values.SET","value":"cruel "}}]});
                 });
-
-                }); // committer.sync()
             });
 
             apitest( // with changes against the first revision, which will be rebased
@@ -332,9 +326,8 @@ run_tests(function(apitest) {
               function(body, headers, test) {
                 test.ok(body.id)
                 test.same(body.author.id, user.id);
-                test.same(body.status, "pending");
-
-                require('./committer.js').sync(function() { // wait for revisions to be committed
+                test.same(body.status, "committed");
+                var final_revision_id = body.id;
 
                     // check it was committed
                     apitest(
@@ -342,7 +335,6 @@ run_tests(function(apitest) {
                       { "Authorization": api_key },
                       200, "application/json",
                       function(body, headers, test) {
-                        var final_revision_id = body.id;
                         test.ok(body.id)
                         test.equal(body.status, "committed");
                         test.same(body.op, {"_ver":1,"_type":"sequences.PATCH","hunks":[{"offset":12,"length":0,"op":{"_type":"values.SET","value":"fine "}}]});
@@ -385,11 +377,8 @@ run_tests(function(apitest) {
                         test.equal(body[2].id, final_revision_id);
                     });
 
-                }); // committer.sync()
-
             });
 
-            }); // committer.sync()
         });
     }); // document
 
@@ -412,9 +401,7 @@ run_tests(function(apitest) {
             var initial_revision_id = body.id;
             test.ok(body.id)
             test.same(body.author.id, user.id);
-            test.same(body.status, "pending");
-
-            require('./committer.js').sync(function() { // wait for revisions to be committed
+            test.same(body.status, "committed");
 
             // check it was committed
             apitest(
@@ -435,8 +422,6 @@ run_tests(function(apitest) {
               function(body, headers, test) {
                 var previous_revision_id = body.id;
                 
-                require('./committer.js').sync(function() { // wait for revisions to be committed
-
                 // check it was committed
                 apitest(
                   "GET", doc.api_urls.document + "/revision/" + body.id, null,
@@ -482,8 +467,6 @@ run_tests(function(apitest) {
                   { "Authorization": api_key },
                   201, "application/json",
                   function(body, headers, test) {
-                    require('./committer.js').sync(function() { // wait for revisions to be committed
-
                     // check it was committed
                     apitest(
                       "GET", doc.api_urls.document + "/revision/" + body.id, null,
@@ -525,14 +508,9 @@ run_tests(function(apitest) {
                         test.same(body.length, 1);
                         test.same(body[0].op, op);
                     });
-                    }); // committer.sync()
-
                 });
 
-                }); // committer.sync()
             });
-
-            }); // committer.sync()
         });
 
     }); // document

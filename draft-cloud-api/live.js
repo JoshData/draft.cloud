@@ -204,7 +204,7 @@ exports.init = function(io, sessionStore, settings) {
 
       // Find the base revision. If not specified, it's the current revision.
       models.Revision.from_uuid(doc_state.document, data.base_revision, function(base_revision) {
-        committer.make_revision_async(
+        committer.make_revision_sync(
           doc_state.user,
           doc_state.document,
           base_revision,
@@ -213,10 +213,16 @@ exports.init = function(io, sessionStore, settings) {
           data.comment,
           userdata,
           function(err, rev) {
-            if (err)
+            if (err) {
               response({ error: "There was an error committing the revision." });
-            else
-              response({ revision: routes.make_revision_response(rev, []) });
+              return;
+            }
+
+            // Send the committed revision as a response to the document-patch request.
+            response({ revision: routes.make_revision_response(rev, []) });
+
+            // Send the revision out to all connected clients (including this one).
+            emit_revisions(rev.document, [rev]);
           });
       });
     });
@@ -265,7 +271,7 @@ exports.init = function(io, sessionStore, settings) {
   });
 };
 
-exports.emit_revisions = function(doc, revs) {
+function emit_revisions(doc, revs) {
   // Send this revision out to all websockets listening on this document.
   document_watchers.get(doc.uuid).forEach(function(socket) {
     // Notify this client about this new set of revisions.
