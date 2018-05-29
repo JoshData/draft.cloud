@@ -13,6 +13,8 @@ Install node and packages:
 	cd draft.cloud
 	npm install
 
+If running with a Postgres database:
+
 	npm install pg # requires Postgresql's JSON column type
 
 Configure Draft.Cloud:
@@ -43,3 +45,9 @@ Configure nginx and supervisor:
 
 	sudo ln -sf /home/draftdotcloud/draft.cloud/conf/nginx.conf /etc/nginx/sites-enabled/draftdotcloud
 	sudo ln -sf /home/draftdotcloud/draft.cloud/conf/supervisor.ini /etc/supervisor/conf.d/draftdotcloud.conf
+
+## Development
+
+Run tests:
+
+	npm test

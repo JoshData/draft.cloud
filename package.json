@@ -33,7 +33,7 @@
   },
   "author": "Joshua Tauberer",
   "scripts": {
-    "test": "tap tests/*.js"
+    "test": "node_modules/tap/bin/run.js */tests.js"
   },
   "bugs": {
     "url": "https://github.com/joshdata/draft.cloud/issues"
