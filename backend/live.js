@@ -14,19 +14,19 @@ var document_watchers = {
 
   add: function(doc, socket) {
     if (!(doc in this._map))
-      this._map[doc] = [ ];
-    this._map[doc].push(socket);
+      this._map[doc] = { };
+    this._map[doc][socket.id] = socket;
     console.log("doc", doc, "now watched by", socket.id);
   },
   remove: function(doc, socket) {
-    if (doc in this._map) {
+    if (doc in this._map && socket.id in this._map[doc]) {
+      delete this._map[doc][socket.id];
       console.log("doc", doc, "no longer watched by", socket.id);
-      this._map[doc] = this._map[doc].filter(function(s) { return s !== socket });
     }
   },
   get: function(doc) {
     if (doc in this._map)
-      return this._map[doc];
+      return Object.values(this._map[doc]);
     else
       return [];
   }
