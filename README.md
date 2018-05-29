@@ -41,6 +41,15 @@ Test functionality:
 	node index.js
 	  ^C it once it starts running
 
+Testing using the command line & browser:
+
+	draft-cloud-api/req POST '' users
+	export API_KEY=(copy X-Api-Key header here)
+	draft-cloud-api/req POST '' documents/(copy user id here)
+	
+
+## Deployment
+
 Configure nginx and supervisor:
 
 	sudo ln -sf /home/draftdotcloud/draft.cloud/conf/nginx.conf /etc/nginx/sites-enabled/draftdotcloud
