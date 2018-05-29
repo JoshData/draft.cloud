@@ -79,7 +79,17 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
             merge_remote_changes();
         },
         peer_state_updated: function(peerid, user, state) {
-          widget.on_peer_state_updated(peerid, user, state);
+          // Ignore if the widget is in a dirty state because we can't
+          // adjust cursor locations --- we don't know what revision
+          // they were current as of and even if we did, we don't know
+          // what changes have been made in the widget that might require
+          // adjusting peer cursor positions. TODO: Are we losing something
+          // important?
+          if (waiting_for_local_change_to_save || widget.get_change_flag())
+            return;
+          
+          else
+            widget.on_peer_state_updated(peerid, user, state);
         },
         nonfatal_error: function(message) {
           if (closed) return;
