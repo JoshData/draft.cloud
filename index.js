@@ -7,7 +7,7 @@ var express = require('express');
 var settings = JSON.parse(fs.readFileSync("local/environment.json"))
 
 // Prep the database.
-require("./draft-cloud-api/models.js")
+require("./backend/models.js")
   .initialize_database(settings, function() {
 
   // Start the HTTP server.
@@ -20,11 +20,11 @@ require("./draft-cloud-api/models.js")
   app.use(require('helmet')())
 
   // Initialize the back-end API routes.
-  require("./draft-cloud-api/routes.js")
+  require("./backend/routes.js")
     .create_routes(app, settings);
 
   // Initialize the front-end web routes.
-  require("./draft-cloud-frontend/routes.js")
+  require("./frontend/routes.js")
     .create_routes(app, sessionStore, settings);
 
   // Start listening.
@@ -44,7 +44,7 @@ require("./draft-cloud-api/models.js")
   // Initialize the back-end websocket handler, which must be
   // after we start listening.
   var websocketio = require('socket.io').listen(server);
-  require("./draft-cloud-api/live.js")
+  require("./backend/live.js")
     .init(websocketio, sessionStore, settings);
 
   // Initialize the front-end.

@@ -4,9 +4,9 @@ var passport = require("passport");
 var GitHubStrategy = require('passport-github2').Strategy;
 var mustache = require("mustache");
 
-var models = require("../draft-cloud-api/models.js");
-var auth = require("../draft-cloud-api/auth.js");
-var apiroutes = require("../draft-cloud-api/routes.js");
+var models = require("../backend/models.js");
+var auth = require("../backend/auth.js");
+var apiroutes = require("../backend/routes.js");
 
 // Export a function that creates routes on the express app.
 

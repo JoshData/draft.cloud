@@ -43,9 +43,9 @@ Test functionality:
 
 Testing using the command line & browser:
 
-	draft-cloud-api/req POST '' users
+	backend/req POST '' users
 	export API_KEY=(copy X-Api-Key header here)
-	draft-cloud-api/req POST '' documents/(copy user id here)
+	backend/req POST '' documents/(copy user id here)
 	
 
 ## Deployment
