@@ -218,7 +218,7 @@ exports.simple_widget.prototype.merge_remote_changes = function(patch) {
   var pending_changes = new jot.LIST(this.changes).simplify();
 
   // Bring the patch forward for any pending changes.
-  var patch1 = patch.rebase(pending_changes, { document: this.changes_start_content });
+  var patch1 = patch.rebase(pending_changes, { document: this.changes_start_content }).simplify();
 
   // Update the document.
   this.changes_last_content = patch1.apply(this.changes_last_content);

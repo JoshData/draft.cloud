@@ -253,6 +253,9 @@ function commit_revision(revision, cb) {
           }
           }
 
+          // Ensure operation is simplified.
+          op = op.simplify();
+
           // Make a revision.
           revision.op = op.toJSON();
           revision.baseRevisionId = null; // reset

@@ -8,6 +8,7 @@ var simple_widget = require('./simple_widget.js').simple_widget;
 var jot = require('jot');
 var jotvals = require('jot/jot/values.js');
 var jotseqs = require('jot/jot/sequences.js');
+var jotlists = require('jot/jot/lists.js');
 var jotobjs = require('jot/jot/objects.js');
 
 exports.quill = function(elem, quill_options, baseurl) {
@@ -236,12 +237,31 @@ exports.quill.prototype.set_document = function(document, patch) {
   // to apply patch, then just fall back to setContents.
   if (patch) {
     try {
-      var delta = createDelta(this.get_document(), patch);
-      this.editor.updateContents(delta, 'api');
+      // The top-level of the patch must be an APPLY on an 'ops'
+      // key with a single PATCH operation or a LIST of operations.
+      if (!(patch instanceof jotobjs.APPLY)) throw "not an APPLY";
+      if (!("ops" in patch.ops)) throw "not an APPLY on 'ops'";
+      var ops;
+      if (patch.ops['ops'] instanceof jotseqs.PATCH)
+        ops = [patch.ops['ops']];
+      else if (patch.ops['ops'] instanceof jotlists.LIST)
+        ops = patch.ops['ops'].ops.filter(function(item) {
+          if (!(item instanceof jotseqs.PATCH))
+            throw "not an APPLY on 'ops' with PATCH or LIST or PATCHES";
+          return true;
+        });
+      else
+        throw "not an APPLY on 'ops' with PATCH or LIST";
+      var _this = this;
+      ops.forEach(function(op) {
+        var delta = createDelta(_this.get_document(), op);
+        _this.editor.updateContents(delta, 'api');
+      })
       return; // success
     } catch (e) {
       // fail, fall through to below
-      console.log(e);
+      this.logger("error applying " + patch.inspect() + ":");
+      this.logger(e);
     }
   }
 
@@ -276,15 +296,8 @@ function createDelta(current_doc, patch) {
   // We'll need to compare the operation to the current document
   // structure in order to create a Quill Delta instance.
 
-  // The top-level of the patch must be an APPLY on an 'ops'
-  // key with a single PATCH operation (TODO: Or maybe list?).
-  if (!(patch instanceof jotobjs.APPLY)) throw "not an APPLY";
-  if (!("ops" in patch.ops)) throw "not an APPLY on 'ops'";
-  if (!(patch.ops['ops'] instanceof jotseqs.PATCH)) throw "not an APPLY on 'ops' with PATCH";
-  
   // Move to the operations on the 'ops' attribute at the top
   // of the document structure.
-  patch = patch.ops['ops'];
   current_doc = current_doc.ops;
 
   // Create a new Delta instance. (There's a whole library for this
