@@ -587,7 +587,7 @@ exports.create_routes = function(app, settings) {
     .catch(unhandled_error_handler(res))
   }
 
-  function drill_down_operation(op, op_path) {
+  function drill_down_operation(op, op_path, noop_to_null) {
     // Drill down and unwrap the operation.
     if (op_path.length == 0)
       return op;
@@ -595,10 +595,12 @@ exports.create_routes = function(app, settings) {
     op_path.forEach(function(key) {
       op = op.drilldown(key);
     });
+    if (noop_to_null && op.isNoOp())
+      return null;
     return op.toJSON();
   }
 
-  exports.make_revision_response = function(rev, op_path) {
+  exports.make_revision_response = function(rev, op_path, noop_to_null) {
     var ret = {
       createdAt: rev.createdAt,
       id: rev.uuid,
@@ -612,7 +614,9 @@ exports.create_routes = function(app, settings) {
 
     if (rev.committed) {
       ret.status = "committed";
-      ret.op = drill_down_operation(rev.op, op_path);
+      ret.op = drill_down_operation(rev.op, op_path, noop_to_null);
+      if (ret.op == null)
+        return null;
     } else if (rev.error) {
       ret.status = "error";
     } else {
@@ -829,17 +833,15 @@ exports.create_routes = function(app, settings) {
               return;
             }
 
-            // Decode JSON and re-map to the API output format.
+            // Decode JSON and re-map to the API output format,
+            // dropping revisions that are no-ops on the path if
+            // a path was given.
             revs = revs.map(function(rev) {
-              return exports.make_revision_response(rev, op_path);
+              return exports.make_revision_response(rev, op_path, op_path.length > 0);
             });
-
-            // Filter out no-op revisions, which are operations
-            // that only applied to parts of the document outside
-            // of the specified path.
             revs = revs.filter(function(rev) {
-              return rev.op._type.class != "NO_OP";
-            })
+              return rev != null; // no-op
+            });
 
             res.json(revs);
           })

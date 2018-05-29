@@ -222,6 +222,20 @@ run_tests(function(apitest) {
         test.equal(body.name, "test-document-2");
         var doc = body;
 
+        // check that it appears in the user's document list
+        apitest(
+          "GET", user.api_urls.documents, null,
+          { "Authorization": api_key },
+          200, "application/json",
+          function(body, headers, test) {
+            test.ok(Array.isArray(body), "response is array");
+            // Since the tests may run out of order, we don't
+            // know how many array elements to expect, but
+            // we should find the new document in it.
+            body = body.filter((item) => item.id == doc.id);
+            test.equal(body.length, 1, "found document in result");
+        });
+
         // get content
         apitest( // no api key
           "GET", doc.api_urls.content, null, {},
@@ -412,7 +426,10 @@ run_tests(function(apitest) {
               { "Authorization": api_key },
               201, "application/json",
               function(body, headers, test) {
+                var previous_revision_id = body.id;
                 require('./committer.js').force_commit_now();
+
+                // check it was committed
                 apitest(
                   "GET", doc.api_urls.document + "/revision/" + body.id, null,
                   { "Authorization": api_key },
@@ -420,6 +437,16 @@ run_tests(function(apitest) {
                   function(body, headers, test) {
                     test.equal(body.status, "committed");
                     test.same(body.op, {"_ver":1,"_type":"objects.APPLY","ops":{"key":{"_type":"sequences.PATCH","hunks":[{"offset":6,"length":0,"op":{"_type":"values.SET","value":"cruel "}}]}}});
+                });
+
+                // check using history with 'since' and 'path'
+                apitest(
+                  "GET", doc.api_urls.history + "?since=" + initial_revision_id + "&path=/key", null,
+                  { "Authorization": api_key },
+                  200, "application/json",
+                  function(body, headers, test) {
+                    test.same(body.length, 1);
+                    test.same(body[0].op, {"_ver":1,"_type":"sequences.PATCH","hunks":[{"offset":6,"length":0,"op":{"_type":"values.SET","value":"cruel "}}]});
                 });
 
                 // check updated content
@@ -436,6 +463,60 @@ run_tests(function(apitest) {
                   200, "text/plain",
                   function(body, headers, test) {
                     test.same(body, "Hello cruel world!");
+                });
+
+                // update using PATCH
+                const jot = require("jot");
+                var op = new jot.APPLY("key2", new jot.SET("value2")).toJSON();
+                apitest(
+                  "PATCH", doc.api_urls.content,
+                  op,
+                  { "Authorization": api_key },
+                  201, "application/json",
+                  function(body, headers, test) {
+                    require('./committer.js').force_commit_now();
+
+                    // check it was committed
+                    apitest(
+                      "GET", doc.api_urls.document + "/revision/" + body.id, null,
+                      { "Authorization": api_key },
+                      200, "application/json",
+                      function(body, headers, test) {
+                        test.equal(body.status, "committed");
+                        test.same(body.op, op);
+                    });
+
+                    // check updated content
+                    apitest(
+                      "GET", doc.api_urls.content, null,
+                      { "Authorization": api_key },
+                      200, "application/json",
+                      function(body, headers, test) {
+                        test.same(body, { key: "Hello cruel world!", key2: "value2" });
+                    });
+
+                    // get history with 'since' and 'path', which is evaluated
+                    // at the 'since' revision. 'key2' doesn't exist at previous_revision_id,
+                    // so we can check 'key' instead. There have been no changes to
+                    // 'key' since then.
+                    apitest(
+                      "GET", doc.api_urls.history + "?since=" + previous_revision_id + "&path=/key", null,
+                      { "Authorization": api_key },
+                      200, "application/json",
+                      function(body, headers, test) {
+                        test.same(body, []);
+                    });
+
+
+                    // get history with 'since' without a path.
+                    apitest(
+                      "GET", doc.api_urls.history + "?since=" + previous_revision_id, null,
+                      { "Authorization": api_key },
+                      200, "application/json",
+                      function(body, headers, test) {
+                        test.same(body.length, 1);
+                        test.same(body[0].op, op);
+                    });                    
                 });
             });
         });
