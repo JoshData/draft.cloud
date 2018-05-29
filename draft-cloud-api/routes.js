@@ -6,6 +6,7 @@ const Sequelize = require('sequelize');
 
 var auth = require("./auth.js");
 var models = require("./models.js");
+var committer = require("./committer.js");
 
 var jot = require("jot");
 
@@ -15,10 +16,6 @@ exports.start_test_server = function(cb) {
   var http = require('http');
   var express = require('express');
   models.initialize_database({ database: "sqlite::memory:" }, function() {
-
-    // Start the background process that commits revisions.
-    var committer = require('./committer.js').begin();
-
     // Config.
     var bind_host = "127.0.0.1";
     var bind_port = 8001;
@@ -39,7 +36,6 @@ exports.start_test_server = function(cb) {
       cb(bind_host, bind_port, function() {
         console.log("Shutting down test server.");
         server.close();
-        committer.close();
       })
     });
   });
@@ -565,28 +561,6 @@ exports.create_routes = function(app, settings) {
     cb(null, op);
   }
 
-  exports.make_revision = function(user, doc, base_revision, op, pointer, comment, userdata, res) {
-    // Record an uncommitted transaction.
-    models.Revision.create({
-      userId: user.id,
-      documentId: doc.id,
-      baseRevisionId: base_revision == "singularity" ? null : base_revision.id,
-      doc_pointer: pointer,
-      op: op.toJSON(),
-      comment: comment,
-      userdata: userdata
-    })
-    .then(function(rev) {
-      // Send response.
-      rev.user = user; // fill in model
-      res.status(201).json(exports.make_revision_response(rev, []));
-
-      // Alert committer to look for new revisions.
-      require("./committer.js").notify();
-    })
-    .catch(unhandled_error_handler(res))
-  }
-
   function drill_down_operation(op, op_path, noop_to_null) {
     // Drill down and unwrap the operation.
     if (op_path.length == 0)
@@ -694,7 +668,7 @@ exports.create_routes = function(app, settings) {
               res_send_plain(res, 200, "no change");
             else
               // Make a new revision.
-              exports.make_revision(
+              committer.make_revision_async(
                 user,
                 doc,
                 base_revision,
@@ -702,7 +676,12 @@ exports.create_routes = function(app, settings) {
                 req.params.pointer,
                 req.headers['revision-comment'],
                 userdata,
-                res);
+                function(err, rev) {
+                  if (err)
+                    unhandled_error_handler(res)
+                  else
+                    res.status(201).json(exports.make_revision_response(rev, []));
+                })
           })
         });
 
@@ -754,7 +733,7 @@ exports.create_routes = function(app, settings) {
           }
 
           // Make a new revision.
-          exports.make_revision(
+          committer.make_revision_async(
             user,
             doc,
             base_revision,
@@ -762,7 +741,12 @@ exports.create_routes = function(app, settings) {
             req.params.pointer,
             req.headers['revision-comment'],
             userdata,
-            res);
+            function(err, rev) {
+              if (err)
+                unhandled_error_handler(res)
+              else
+                res.status(201).json(exports.make_revision_response(rev, []));
+            })
         });
       })
     }

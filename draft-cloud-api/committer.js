@@ -1,43 +1,86 @@
 var async = require("async");
 const Sequelize = require('sequelize');
+const Queue = require('queue');
 
 var models = require("./models.js");
 
 var jot = require("jot");
 
-exports.begin = function() {
-  console.log("Starting committer.");
-  interval = setInterval(commit_uncommitted_revisions, 100);
-  return {
-    close: function() {
-      console.log("Shutting down committer.");
-      clearInterval(interval);
-    }
-  }
+// Revisions must be committed serially for each document, but
+// can be committed out of order across documents. Create a Queue
+// for each document, with each Queue permitting no concurrency.
+var document_queues = { };
+var sync_queue = [];
+
+exports.make_revision_async = function(user, doc, base_revision, op, pointer, comment, userdata, cb) {
+  // Record an uncommitted transaction, return it, and schedule
+  // an asynchronous commit (i.e. cb is called as soon as the
+  // uncommitted revision is written to the database).
+  models.Revision.create({
+    userId: user.id,
+    documentId: doc.id,
+    baseRevisionId: base_revision == "singularity" ? null : base_revision.id,
+    doc_pointer: pointer,
+    op: op.toJSON(),
+    comment: comment,
+    userdata: userdata
+  })
+  .then(function(rev) {
+    // Return to caller.
+    rev.user = user; // fill in model - expected by cb
+    rev.document = doc; // fill in model - expected by commit_revision
+    rev.baseRevision = base_revision; // fill in model - expected by commit_revision
+    cb(null, rev);
+    
+    // Queue revision.
+    queue_revision(rev, function() { });
+  })
+  .catch(cb);
 }
 
-exports.notify = function() {
-  has_new_uncommitted_revisions = true;
+function queue_revision(rev, on_committed) {
+  // rev is a models.Revision.
+
+  // Get or create the Queue for this document.
+  var queue;
+  if (rev.documentId in document_queues)
+    queue = document_queues[rev.documentId];
+  else
+    queue = document_queues[rev.documentId] = new Queue({
+      concurrency: 1,
+      autostart: true
+    })
+
+  // Add revision to queue.
+  queue.push(function(cb) {
+    // Commit this revision.
+    commit_revision(rev, function(err) {
+      on_committed(); // caller wants to know when revision is committed to the database
+      cb(); // queue wants to know when this job is done
+
+      // If this was the last one in the queue, delete the queue.
+      if (queue.length == 0) {
+        delete document_queues[rev.documentId];
+
+        // If this was the last queue, call the sync callbacks.
+        if (document_queues.length == 0) {
+          sync_queue.forEach((item) => item());
+          sync_queue = [];
+        }
+      }
+    });
+  });
 }
 
-exports.force_commit_now = function() {
-  commit_uncommitted_revisions();
+exports.sync = function(cb) {
+  // Wait for all pending revisions to be committed --- useful for tests.
+  if (document_queues.length == 0)
+    cb();
+  else
+    sync_queue.push(cb);
 }
 
-var has_new_uncommitted_revisions = true;
-var is_committing = false;
-
-function commit_uncommitted_revisions() {
-  // Don't go if there's another call to commit_uncommitted_revisions
-  // in progress, or if there are no uncommitted revisions to process.
-  if (is_committing || !has_new_uncommitted_revisions) return;
-  is_committing = true;
-
-  // Reset this flag. Set it to false early to avoid a race condition
-  // that would lead to never knowing that a new change came in. Better
-  // to err on the side of thinking there is a change when there is none.
-  has_new_uncommitted_revisions = false;
-
+exports.commit_uncommitted_revisions = function(cb) {
   // Pull all uncommitted revisions.
   models.Revision.findAll({
     where: {
@@ -47,6 +90,10 @@ function commit_uncommitted_revisions() {
     order: [["documentId", "ASC"], ["id", "ASC"]],
     include: [{
       model: models.User
+    }, {
+      model: models.Document
+    }, {
+      model: models.Revision
     }]
   })
   .then(function(revs) {
@@ -78,7 +125,7 @@ function commit_uncommitted_revisions() {
           var revs = revsbydoc[doc.id];
           async.eachSeries(
             revs,
-            function(rev, cb) { commit_revision(doc, rev, cb); },
+            function(rev, cb) { commit_revision(rev, cb); },
             function(err) {
               // Notify all listening websocket clients of the committed revisions
               // for this document. (Some revisions might be marked as having
@@ -92,34 +139,31 @@ function commit_uncommitted_revisions() {
         function(err) {
           // All documents are done processing.
           // Unblock.
-          is_committing = false;
+          if (err)
+            cosole.log(err);
+          cb();
         })
-    });
-  });
+    })
+    .catch(cb);
+  })
+  .catch(cb);
 }
 
-function commit_revision(document, revision, cb) {
-  // Load the base revision.
-  models.Revision.findOne({
-    where: { documentId: document.id, id: revision.baseRevisionId },
-  })
-  .then(function(baseRevision) {
-    if (baseRevision == null)
-      baseRevision = "singularity";
+function commit_revision(revision, cb) {
+    function error_handler(err) {
+      console.error("unhandled error committing", revision.document.uuid, revision.uuid, err);
+      revision.error = true;
+      revision.save();
+      cb(err);
+    }
 
     // Load the document at the base revision.
-    document.get_content(revision.doc_pointer, baseRevision, false /* don't cache */,
+    revision.document.get_content(revision.doc_pointer, revision.baseRevision, false /* don't cache */,
       function(err, doc_revision, content, op_path) {
         // There should not be any errors...
         if (err) {
-          // There is an error with document content. This should never happen
-          // since we check Revisions before committing them. It is too late to
-          // do anything about this. Mark the new Revision as an error so we
-          // don't keep trying to commit it.
-          console.error("error loading document content", err);
-          revision.error = true;
-          revision.save();
-          cb(err);
+          // There is an error with document content.
+          error_handler(err);
           return;
         }
 
@@ -132,12 +176,7 @@ function commit_revision(document, revision, cb) {
         try {
           op.apply(content);
         } catch (e) {
-          // This Revision had an invalid operation. Don't commit it.
-          revision.error = true;
-          revision.save().then(function() {
-            console.error("invalid operation submitted", document.uuid, revision.uuid, e);
-            cb();
-          });
+          error_handler(e);
           return;
         }
 
@@ -153,7 +192,7 @@ function commit_revision(document, revision, cb) {
         // the current revision. Find all of the subsequent operations.
         models.Revision.findAll({
           where: {
-            documentId: document.id,
+            documentId: revision.document.id,
             committed: true,
             id: {
               [Sequelize.Op.gt]: revision.baseRevisionId == null ? 0 : revision.baseRevisionId,
@@ -172,12 +211,7 @@ function commit_revision(document, revision, cb) {
             // Rebase.
             op = op.rebase(base_ops, { document: content });
           } catch (e) {
-            // Don't commit it.
-            revision.error = true;
-            revision.save().then(function() {
-              console.error("rebase failed", document.uuid, revision.uuid, e);
-              cb();
-            });
+            error_handler(e);
             return;
           }
 
@@ -195,11 +229,7 @@ function commit_revision(document, revision, cb) {
             base_ops.compose(op).apply(content); // content + (base_ops+op)
           } catch (e) {
             // Don't commit it.
-            revision.error = true;
-            revision.save().then(function() {
-              console.error("sanity check failed", document.uuid, revision.uuid, e);
-              cb();
-            });
+            error_handler(e);
             return;
           }
           }
@@ -209,20 +239,15 @@ function commit_revision(document, revision, cb) {
           revision.baseRevisionId = null; // reset
           revision.doc_pointer = null; // reset
           revision.committed = true;
-          revision.save().then(function() {
-            console.log("committed", document.uuid, revision.uuid);
+          revision.save().then(function(saved_rev) {
+            // Log.
+            console.log("committed", revision.document.uuid, revision.uuid);
+
+            // Indicate this revision is finished.
             debugging_paused_callback(cb);
-          });
-        }).catch(function(err) {
-          // Something horrible went wrong. Don't try this Revision
-          // again.
-          console.error("unhandled error committing", document.uuid, revision.uuid, err);
-          revision.error = true;
-          revision.save();
-          cb(err);
-        });
+          }).catch(error_handler);
+        }).catch(error_handler);
     });
-  });
 }
 
 function debugging_paused_callback(cb) {

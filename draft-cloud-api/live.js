@@ -7,6 +7,7 @@ var jot = require("jot");
 var auth = require("./auth.js");
 var models = require("./models.js");
 var routes = require("./routes.js");
+var committer = require("./committer.js");
 
 var document_watchers = {
   _map: { },
@@ -203,7 +204,7 @@ exports.init = function(io, sessionStore, settings) {
 
       // Find the base revision. If not specified, it's the current revision.
       models.Revision.from_uuid(doc_state.document, data.base_revision, function(base_revision) {
-        routes.make_revision(
+        committer.make_revision_async(
           doc_state.user,
           doc_state.document,
           base_revision,
@@ -211,18 +212,11 @@ exports.init = function(io, sessionStore, settings) {
           doc_state.doc_pointer,
           data.comment,
           userdata,
-          {
-            _status: null,
-            status: function(code) { this._status = code; return this; },
-            send: function(message) {
-              // An error ocurred.
-              response({ error: message, code: this._status });
-            },
-            json: function(data) {
-              response({
-                revision: data
-              });
-            }
+          function(err, rev) {
+            if (err)
+              response({ error: "There was an error committing the revision." });
+            else
+              response({ revision: routes.make_revision_response(rev, []) });
           });
       });
     });
