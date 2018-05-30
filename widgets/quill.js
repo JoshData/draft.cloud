@@ -457,7 +457,7 @@ exports.quill.prototype.get_peer_cursor_rects = function(index, length) {
   // top/bottom don't match the bounding box top/bottom, and in those
   // cases the bounding box is better so don't revise it.
   var start = this.editor.getBounds(index, 0);
-  if (start.left != rects[0].left && start.top == rects[0].top) {
+  if (start.left > rects[0].left && start.top == rects[0].top) {
     start.width = rects[0].left + rects[0].width - start.left; // extent point select to end of line
     rects[0].top += start.height; // start bounding box below this line
     rects[0].height -= start.height;
@@ -469,7 +469,7 @@ exports.quill.prototype.get_peer_cursor_rects = function(index, length) {
   // rect at the end and adjust the bounding-box rect to not
   // include it.
   var end = this.editor.getBounds(index+length, 0);
-  if (end.right != rects[rects.length-1].right && end.bottom == rects[rects.length-1].bottom) {
+  if (end.right < rects[rects.length-1].right && end.bottom == rects[rects.length-1].bottom) {
     end.width = end.left - rects[rects.length-1].left; // extent point select back to start of line
     end.left = rects[rects.length-1].left;
     rects[rects.length-1].height -= end.height; // start bounding box below this line
