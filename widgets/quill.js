@@ -143,11 +143,15 @@ exports.quill.prototype.prepare_dom_async2 = function(callback) {
   var toolbar = this.elem.previousSibling;
   this.toolbarContainer.appendChild(toolbar);
 
-  // Remove the 'height' on the ql-container and ql-editor divs
-  // which creates scrollbars around the document, since we use
-  // our own element for scrolling.
+  // Remove the 'height' on the ql-container and ql-editor divs, which otherwise
+  // creates scrollbars around the document, since we use our own element for scrolling.
+  // Remove the border because our container has the border. Set a min height to
+  // fill our container so that the whole area gets a text cursor.
   this.elem.style.height = "auto";
+  this.elem.style.minHeight = "100%";
+  this.elem.style.border = "none";
   this.elem.getElementsByClassName("ql-editor")[0].style.height = "auto";
+  this.elem.getElementsByClassName("ql-editor")[0].style.minHeight = "100%";
 
   // Add a span to the toolbar for showing saved state.
   // Use min-width to prevent the toolbar from jumping around
