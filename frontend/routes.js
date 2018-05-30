@@ -91,7 +91,9 @@ exports.create_routes = function(app, sessionStore, settings) {
   app.get("/", function (req, res) {
     if (!req.user) {
       // Landing page.
-      res.status(200).send(mustache.render(index_html, {}));
+      res.status(200).send(mustache.render(index_html, {
+        "github_login_path": github_login_path,
+      }));
     } else {
       // Does user have any documents?
       models.Document.findAll({
@@ -146,6 +148,12 @@ exports.create_routes = function(app, sessionStore, settings) {
         }
       });
     }
+  });
+
+  // Start a new document.
+  app.get("/logout", function (req, res) {
+    req.logout();
+    res.redirect("/")
   });
 
   // Start a new document.

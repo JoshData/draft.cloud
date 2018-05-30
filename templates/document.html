@@ -1,55 +1,88 @@
-<html>
-	<head>
-		<title>{{owner.name}}/{{document.name}} - Draft.Cloud</title>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 
-        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
-        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous">
-        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css" integrity="sha256-VBrFgheoreGl4pKmWgZh3J23pJrhNlSUOBek+8Z2Gv0=" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css" integrity="sha384-WskhaSGFgHYWDcbwN70/dfYBj47jz9qbsMId/iRN3ewGhXQFZCSftd1LZCfmhktB" crossorigin="anonymous">
 
-        <style type="text/css">
-    	body, .ql-editor {
-		font-size: 16px;
-    	}
-		footer {
-			cursor: default;
-			padding: 3px 5px;
-			font-size: 11.5px;
-			background-color: #FFC;
-			color: #444;
-		}
-        </style>
-	</head>
-	<body>
+    <title>Draft.Cloud: {{owner.name}}/{{document.name}}</title>
 
-	<div id="editor">
-	<div class="draftdotcloud-widget"
-		data-draftdotcloud-widget="quill"
-		data-draftdotcloud-owner="{{owner.name}}"
-		data-draftdotcloud-document="{{document.name}}"
-		></div>
-        <script>draftdotcloud_widget_options = {
-          sizeTo: "container",
-          placeholder: "Share this page with anyone you would like to edit with."
-        };</script>
-	</div>
+    <style type="text/css">
+      @import url('https://fonts.googleapis.com/css?family=Macondo');
 
-	<footer>
-	Thanks for trying Draft.Cloud. This website is a prototype. Documents may be deleted 30 days after their last edit.
-	</footer>
+      body, .ql-editor {
+        font-size: 16px;
+      }
 
-        <script src="https://code.jquery.com/jquery-3.1.1.min.js" integrity="sha256-hVVnYaiADRTO2PzUGmuLJr8BLUSjGIZsDYGmIJLv2b8=" crossorigin="anonymous"></script>
-        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+      .navbar {
+      }
 
-        <script src="/socket.io/socket.io.js"> </script>
-        <script src="/draftdotcloud.js"> </script>
+      .navbar-brand {
+          font-family: 'Macondo', sans-serif;                
+      }
 
-	<script>
-	function resize_widget() {
-		$('#editor').height(window.innerHeight - $('footer').outerHeight());
-	}
-	resize_widget();
-	$(window).resize(resize_widget);
-	</script>
+      footer {
+        cursor: default;
+        padding: 3px 5px;
+        font-size: 11.5px;
+        background-color: #FFC;
+        color: #444;
+      }
+    </style>        
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+      <a class="navbar-brand" href="/">Draft.Cloud</a>
+      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
 
-	</body>
+      <span class="navbar-text">
+        {{owner.name}} / 
+        {{document.name}}
+      </span>
+
+      <div class="collapse navbar-collapse" id="navbarSupportedContent">
+        <ul class="navbar-nav mr-auto">
+          <li class="nav-item">
+            <a class="nav-link" href="/logout">Log out</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/apidocs/v1">API Docs</a>
+          </li>
+        </ul>
+      </div>
+    </nav>
+
+    <div id="editor">
+    <div class="draftdotcloud-widget"
+      data-draftdotcloud-widget="quill"
+      data-draftdotcloud-owner="{{owner.name}}"
+      data-draftdotcloud-document="{{document.name}}"
+      ></div>
+          <script>draftdotcloud_widget_options = {
+            sizeTo: "container",
+            placeholder: "Share this page’s address with anyone you would like to edit with."
+          };</script>
+    </div>
+
+    <footer>
+    Thanks for trying Draft.Cloud. This website is a prototype. Documents may be deleted 30 days after their last edit.
+    </footer>
+
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js" integrity="sha384-smHYKdLADwkXOn1EmN1qk/HfnUcbVRZyYmZ4qpPea6sjB/pTJ0euyQp0Mk8ck+5T" crossorigin="anonymous"></script>
+    <script src="/draftdotcloud.js"> </script>
+
+    <script>
+    function resize_widget() {
+      $('#editor').height(window.innerHeight - $('footer').outerHeight());
+    }
+    resize_widget();
+    $(window).resize(resize_widget);
+    </script>
+
+  </body>
 </html>
