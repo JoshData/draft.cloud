@@ -33,10 +33,10 @@ exports.create_routes = function(app, sessionStore, settings) {
       });
   });
 
+  var github_login_path = "/auth/github";
+  var github_callback_path = github_login_path + "/callback";
   if (settings.GITHUB_CLIENT_ID && settings.GITHUB_CLIENT_SECRET) {
     // Github login.
-    var github_login_path = "/auth/github";
-    var github_callback_path = github_login_path + "/callback";
     passport.use(new GitHubStrategy({
         clientID: settings.GITHUB_CLIENT_ID,
         clientSecret: settings.GITHUB_CLIENT_SECRET,
