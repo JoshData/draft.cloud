@@ -36,7 +36,10 @@ function get_document_from_uuid(owner, document_uuid, cb) {
     where: {
       userId: owner.id,
       uuid: document_uuid
-    }
+    },
+    include: [
+      { model: models.User }
+    ]
   })
   .then(function(doc) {
     cb(doc);

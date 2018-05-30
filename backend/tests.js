@@ -174,6 +174,7 @@ run_tests(function(apitest) {
       200, "application/json",
       function(body, headers, test) {
         test.equal(body.name, "test-document-1");
+        test.equal(body.owner.id, user.id);
         var doc = body;
 
         // update document metadata

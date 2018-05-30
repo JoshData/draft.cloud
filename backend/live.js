@@ -149,7 +149,7 @@ exports.init = function(io, sessionStore, settings) {
             // Send.
             response({
               user: user ? routes.form_user_response_body(user) : null,
-              document: routes.make_document_json(owner, doc),
+              document: routes.make_document_json(doc),
               access_level: level,
               content: content,
               revision: revision ? revision.uuid : "singularity",

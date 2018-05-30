@@ -256,32 +256,35 @@ exports.create_routes = function(app, settings) {
       anon_access_level: doc.anon_access_level || auth.DEFAULT_NEW_DOCUMENT_ANON_ACCESS_LEVEL,
       userdata: doc.userdata || {}
     })
-    .then(cb)
+    .then(function(doc) {
+      doc.user = owner; // fill in
+      cb(doc);
+    })
     .catch(function(err) {
        cb(null, err);
     });
   }
 
-  exports.make_document_json = function(owner, doc) {
+  exports.make_document_json = function(doc) {
     return {
       id: doc.uuid,
       name: doc.name,
       created: doc.createdAt,
       anon_access_level: doc.anon_access_level,
-      owner: exports.form_user_response_body(owner),
+      owner: exports.form_user_response_body(doc.user),
       userdata: doc.userdata,
       api_urls: {
-        document: api_public_base_url + document_route.replace(/:owner/, owner.uuid)
+        document: api_public_base_url + document_route.replace(/:owner/, doc.user.uuid)
           .replace(/:document/, doc.uuid),
-        content: api_public_base_url + document_content_route.replace(/:owner/, owner.uuid)
+        content: api_public_base_url + document_content_route.replace(/:owner/, doc.user.uuid)
           .replace(/:document/, doc.uuid).replace(/:pointer.*/, ''),
-        history: api_public_base_url + document_route.replace(/:owner/, owner.uuid)
+        history: api_public_base_url + document_route.replace(/:owner/, doc.user.uuid)
           .replace(/:document/, doc.uuid) + "/history",
-        debugger: api_public_base_url + document_route.replace(/:owner/, owner.uuid)
+        debugger: api_public_base_url + document_route.replace(/:owner/, doc.user.uuid)
           .replace(/:document/, doc.uuid) + "/debug"
       },
       web_urls: {
-        document: settings.url + "/edit/:owner/:document".replace(/:owner/, owner.name)
+        document: settings.url + "/edit/:owner/:document".replace(/:owner/, doc.user.name)
           .replace(/:document/, doc.name)
       }
     };
@@ -297,11 +300,14 @@ exports.create_routes = function(app, settings) {
       var docs = models.Document.findAll({
         where: {
           userId: owner.id
-        }
+        },
+        include: [
+          { model: models.User }
+        ]
       })
       .then(function(docs) {
         // Turn the documents into API JSON.
-        docs = docs.map(function(item) { return exports.make_document_json(owner, item); });
+        docs = docs.map(exports.make_document_json);
 
         // Emit response.
         res
@@ -331,7 +337,7 @@ exports.create_routes = function(app, settings) {
           unhandled_error_handler(res)(err);
           return;
         }
-        res.status(200).json(exports.make_document_json(owner, doc));
+        res.status(200).json(exports.make_document_json(doc));
       });
     })
   });
@@ -361,7 +367,7 @@ exports.create_routes = function(app, settings) {
       doc.save().then(function() {
         res
         .status(200)
-        .json(exports.make_document_json(owner, doc));
+        .json(exports.make_document_json(doc));
       })
       .catch(unhandled_error_handler(res));
     })
@@ -374,7 +380,7 @@ exports.create_routes = function(app, settings) {
     authz_document(req, res, true, "READ", function(user, owner, doc) {
       res
       .status(200)
-      .json(exports.make_document_json(owner, doc));
+      .json(exports.make_document_json(doc));
     })
   })
 
