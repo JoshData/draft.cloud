@@ -187,7 +187,17 @@ exports.create_routes = function(app, settings) {
         res
         .status(200)
         .json(exports.form_user_response_body(target));
-      }).catch(unhandled_error_handler(res));
+      })
+      .catch(err => {
+        try {
+          if (err.name == "SequelizeUniqueConstraintError" && err.fields.indexOf("name") >= 0) {
+            res_send_plain(res, 400, 'There is already a user with that name.');
+            return;
+          }
+        } catch (e) {
+          unhandled_error_handler(res)
+        }
+      });
     });
   })
 
@@ -371,7 +381,16 @@ exports.create_routes = function(app, settings) {
         .status(200)
         .json(exports.make_document_json(doc));
       })
-      .catch(unhandled_error_handler(res));
+      .catch(err => {
+        try {
+          if (err.name == "SequelizeUniqueConstraintError" && err.fields.indexOf("name") >= 0) {
+            res_send_plain(res, 400, 'There is already a document with that name.');
+            return;
+          }
+        } catch (e) {
+          unhandled_error_handler(res)
+        }
+      });
     })
   })
 
