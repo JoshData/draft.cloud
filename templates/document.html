@@ -57,7 +57,7 @@
             <a class="nav-link" href="/logout">Log out</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" href="/apidocs/v1">API Docs</a>
+            <a class="nav-link" href="#" onclick="show_api_info(); return false;">API</a>
           </li>
         </ul>
       </div>
@@ -78,6 +78,48 @@
     <footer>
     Thanks for trying Draft.Cloud. This website is a prototype. Documents may be deleted 30 days after their last edit.
     </footer>
+
+    <div id="api-info" class="modal" tabindex="-1" role="dialog">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">API</h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <p>Software developers, you can read, write, and patch this document using a RESTful HTTP API!</p>
+            <table class="table">
+              <tr>
+                <th>sample</th>
+                <td>
+                  <a href="/api/v1/documents/{{owner.uuid}}/{{document.uuid}}">GET /api/v1/documents/{{owner.uuid}}/{{document.uuid}}</a>
+                  <div style="font-size: 95%; line-height: 125%;">
+                    This link will work in your browser because you are logged in with a cookie. Get an API key to access this URL from your application.
+                    </div>
+                </td>
+              </tr>
+              <tr>
+                <th>docs</th>
+                <td><a href="/apidocs/v1">API Documentation</a></td>
+              </tr>
+              <tr>
+                <th>owner id</th>
+                <td>{{owner.uuid}}</td>
+              </tr>
+              <tr>
+                <th>document id</th>
+                <td>{{document.uuid}}</td>
+              </tr>
+            </table>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <script
         src="https://code.jquery.com/jquery-3.3.1.min.js"
@@ -140,6 +182,10 @@
         "Give this document a short name so it has a pretty URL.",
         "/api/v1/documents/{{user.uuid}}/{{document.uuid}}");
       {{/can_rename_document}}
+
+      function show_api_info() {
+        $('#api-info').modal();
+      }
     </script>
 
   </body>
