@@ -266,6 +266,7 @@ exports.create_routes = function(app, settings) {
     return {
       id: doc.uuid,
       name: doc.name,
+      created: doc.createdAt,
       anon_access_level: doc.anon_access_level,
       owner: exports.form_user_response_body(owner),
       userdata: doc.userdata,
@@ -280,8 +281,8 @@ exports.create_routes = function(app, settings) {
           .replace(/:document/, doc.uuid) + "/debug"
       },
       web_urls: {
-        document: api_public_base_url + "/:owner/:document".replace(/:owner/, owner.uuid)
-          .replace(/:document/, doc.uuid)
+        document: settings.url + "/edit/:owner/:document".replace(/:owner/, owner.name)
+          .replace(/:document/, doc.name)
       }
     };
   }
@@ -590,7 +591,7 @@ exports.create_routes = function(app, settings) {
 
   exports.make_revision_response = function(rev, op_path, noop_to_null) {
     var ret = {
-      createdAt: rev.createdAt,
+      created: rev.createdAt,
       id: rev.uuid,
       author: {
         id: rev.user.uuid,

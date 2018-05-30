@@ -57,6 +57,7 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
           if (closed) { methods.close(); callback("already closed"); callback = null; return; } // closed before calledback
 
           logger("document opened by " + user.name + " with " + doc.access_level + " access");
+          console.log("draft.cloud:", user, "opened", doc);
 
           // Set global state.
           the_user = user;
