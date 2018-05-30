@@ -768,20 +768,6 @@ exports.create_routes = function(app, settings) {
     }
   )
 
-  app.get(document_route + '/revision/:revision', function (req, res) {
-    // Gets the revision. Useful for checking if a revision was committed.
-    authz_document(req, res, true, "READ", function(user, owner, doc) {
-      models.Revision.from_uuid(doc, req.params.revision, function(revision) {
-        // Invalid ID.
-        if (!revision) {
-          res_send_plain(res, 400, "Invalid revision ID.")
-          return;
-        }
-        res.json(exports.make_revision_response(revision, []));
-      });
-    })
-  })
-
   app.get(document_route + '/history', function (req, res) {
     // Gets the history of a document. The response is a list of changes, in
     // chronological order (oldest first). If ?since= is in the URL, then the
@@ -847,6 +833,20 @@ exports.create_routes = function(app, settings) {
           })
         })
         .catch(unhandled_error_handler(res))
+      });
+    })
+  })
+
+  app.get(document_route + '/history/:revision', function (req, res) {
+    // Gets the revision. Useful for checking if a revision was committed.
+    authz_document(req, res, true, "READ", function(user, owner, doc) {
+      models.Revision.from_uuid(doc, req.params.revision, function(revision) {
+        // Invalid ID.
+        if (!revision) {
+          res_send_plain(res, 400, "Invalid revision ID.")
+          return;
+        }
+        res.json(exports.make_revision_response(revision, []));
       });
     })
   })

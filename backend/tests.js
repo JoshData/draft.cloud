@@ -285,7 +285,7 @@ run_tests(function(apitest) {
 
             // check it was committed
             apitest(
-              "GET", doc.api_urls.document + "/revision/" + body.id, null,
+              "GET", doc.api_urls.document + "/history/" + body.id, null,
               { "Authorization": api_key },
               200, "application/json",
               function(body, headers, test) {
@@ -307,7 +307,7 @@ run_tests(function(apitest) {
 
                 // check it was committed
                 apitest(
-                  "GET", doc.api_urls.document + "/revision/" + body.id, null,
+                  "GET", doc.api_urls.document + "/history/" + body.id, null,
                   { "Authorization": api_key },
                   200, "application/json",
                   function(body, headers, test) {
@@ -331,7 +331,7 @@ run_tests(function(apitest) {
 
                     // check it was committed
                     apitest(
-                      "GET", doc.api_urls.document + "/revision/" + body.id, null,
+                      "GET", doc.api_urls.document + "/history/" + body.id, null,
                       { "Authorization": api_key },
                       200, "application/json",
                       function(body, headers, test) {
@@ -405,7 +405,7 @@ run_tests(function(apitest) {
 
             // check it was committed
             apitest(
-              "GET", doc.api_urls.document + "/revision/" + body.id, null,
+              "GET", doc.api_urls.document + "/history/" + body.id, null,
               { "Authorization": api_key },
               200, "application/json",
               function(body, headers, test) {
@@ -424,7 +424,7 @@ run_tests(function(apitest) {
                 
                 // check it was committed
                 apitest(
-                  "GET", doc.api_urls.document + "/revision/" + body.id, null,
+                  "GET", doc.api_urls.document + "/history/" + body.id, null,
                   { "Authorization": api_key },
                   200, "application/json",
                   function(body, headers, test) {
@@ -469,7 +469,7 @@ run_tests(function(apitest) {
                   function(body, headers, test) {
                     // check it was committed
                     apitest(
-                      "GET", doc.api_urls.document + "/revision/" + body.id, null,
+                      "GET", doc.api_urls.document + "/history/" + body.id, null,
                       { "Authorization": api_key },
                       200, "application/json",
                       function(body, headers, test) {
