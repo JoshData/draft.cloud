@@ -12,6 +12,8 @@ var db;
 var valid_name_regex = /^[A-Za-z0-9_-]{5,64}$/;
 var valid_name_text = "Names may only contain the characters A-Z, a-z, 0-9, underscore, and hyphen and must be between 5 and 64 characters inclusive.";
 
+exports.valid_name_text = valid_name_text;
+
 exports.initialize_database = function(settings, ready) {
   // Replace the ssl.ca field with file contents.
   if (settings.database_connection_options && settings.database_connection_options.ssl && settings.database_connection_options.ssl.ca)

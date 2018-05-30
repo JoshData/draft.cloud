@@ -210,7 +210,10 @@ exports.create_routes = function(app, sessionStore, settings) {
           res.status(200).send(mustache.render(document_page, {
             "user": user,
             "owner": owner,
-            "document": doc
+            "document": doc,
+            "can_rename_owner": user.id == owner.id,
+            "can_rename_document": level == "ADMIN",
+            "valid_name_text": models.valid_name_text,
           }))
         });
       });      

@@ -22,6 +22,13 @@
           font-family: 'Macondo', sans-serif;                
       }
 
+      .editable {
+        cursor: pointer;
+      }
+        .editable:hover {
+          color: #00A;
+        }
+
       footer {
         cursor: default;
         padding: 3px 5px;
@@ -38,9 +45,10 @@
         <span class="navbar-toggler-icon"></span>
       </button>
 
-      <span class="navbar-text">
-        {{owner.name}} / 
-        {{document.name}}
+      <span class="navbar-text" style="margin-right: 2em">
+        <span id="document-owner-name">{{owner.name}}</span>
+        / 
+        <span id="document-name">{{document.name}}</span>
       </span>
 
       <div class="collapse navbar-collapse" id="navbarSupportedContent">
@@ -71,17 +79,67 @@
     Thanks for trying Draft.Cloud. This website is a prototype. Documents may be deleted 30 days after their last edit.
     </footer>
 
-    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+    <script
+        src="https://code.jquery.com/jquery-3.3.1.min.js"
+        integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
+        crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js" integrity="sha384-smHYKdLADwkXOn1EmN1qk/HfnUcbVRZyYmZ4qpPea6sjB/pTJ0euyQp0Mk8ck+5T" crossorigin="anonymous"></script>
     <script src="/draftdotcloud.js"> </script>
 
     <script>
-    function resize_widget() {
-      $('#editor').height(window.innerHeight - $('footer').outerHeight());
-    }
-    resize_widget();
-    $(window).resize(resize_widget);
+      function resize_widget() {
+        $('#editor').height(window.innerHeight - $('footer').outerHeight());
+      }
+      resize_widget();
+      $(window).resize(resize_widget);
+
+      function make_editable(elem, title, explanation, apiendpoint) {
+        elem.addClass('editable');
+        elem.attr("title", title);
+        elem.click(function() {
+          // Prompt. Check for cancel or no change.
+          var old_name = $(elem).text();
+          var new_name = prompt(title + "? " + explanation + " {{valid_name_text}}", old_name);
+          if (!new_name || new_name == old_name)
+            return;
+
+          // Submit.
+          jQuery.ajax({
+            method: "PUT",
+            url: apiendpoint,
+            data : JSON.stringify({ "name": new_name }),
+            contentType: 'application/json',
+            success: function(res) {
+              // Update label & browser URL.
+              elem.text(res.name);
+              window.history.pushState(null, "", "/edit/" + $('#document-owner-name').text() + "/" + $('#document-name').text());
+            },
+            error: function(xhr, error, message) {
+              if (/^text\/plain(;|$)/.test(xhr.getResponseHeader("content-type")))
+                alert(xhr.responseText)
+              else
+                alert(message);
+            }
+          })
+        });
+      }
+
+      {{#can_rename_owner}}
+      make_editable(
+        $('#document-owner-name'),
+        "Change Your Name",
+        "Give yourself a Draft.Cloud username.",
+        "/api/v1/users/{{owner.uuid}}");
+      {{/can_rename_owner}}
+
+      {{#can_rename_document}}
+      make_editable(
+        $('#document-name'),
+        "Change Document Name",
+        "Give this document a short name so it has a pretty URL.",
+        "/api/v1/documents/{{user.uuid}}/{{document.uuid}}");
+      {{/can_rename_document}}
     </script>
 
   </body>
