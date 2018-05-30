@@ -131,7 +131,10 @@
 
     <script>
       function resize_widget() {
-        $('#editor').height(window.innerHeight - $('footer').outerHeight());
+        $('#editor').height(
+          window.innerHeight
+          - $('nav').outerHeight()
+          - $('footer').outerHeight());
       }
       resize_widget();
       $(window).resize(resize_widget);
@@ -171,7 +174,7 @@
       make_editable(
         $('#document-owner-name'),
         "Change Your Name",
-        "Give yourself a Draft.Cloud username.",
+        "Give yourself a Draft.Cloud username. If you have shared this or other documents already, changing your username will break the links you have shared.",
         "/api/v1/users/{{owner.uuid}}");
       {{/can_rename_owner}}
 
@@ -179,7 +182,7 @@
       make_editable(
         $('#document-name'),
         "Change Document Name",
-        "Give this document a short name so it has a pretty URL.",
+        "Give this document a short name so it has a pretty URL. Changing the document's name changes its address, so if you have shared this document already you will need to send your collaborators a new link.",
         "/api/v1/documents/{{user.uuid}}/{{document.uuid}}");
       {{/can_rename_document}}
 
