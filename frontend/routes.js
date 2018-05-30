@@ -120,9 +120,19 @@ exports.create_routes = function(app, sessionStore, settings) {
               doc.updatedAtISO = moment((doc.currentRevision && doc.currentRevision.created) || doc.created).format(); // ISO
             });
 
+            // Make snippets.
+            documents.forEach(doc => {
+              if (doc.currentContent && doc.currentContent.ops) {
+                var preview = "";
+                doc.currentContent.ops.forEach(op => {
+                  preview += op.insert;
+                })
+                doc.preview = preview.substr(0, 250);
+              }
+            });
+
             // Sort.
             documents.sort(function(b, a) { return a.updatedAtISO < b.updatedAtISO ? -1 : +(a.updatedAtISO > b.updatedAtISO) })
-            console.log(documents)
 
             // List documents page.
             res.status(200).send(mustache.render(home_html, {
