@@ -23,6 +23,7 @@ exports.start_test_server = function(cb) {
 
     // Start the HTTP server.
     var app = express();
+    exports.add_middleware(app);
     exports.create_routes(app, {
       url: baseurl,
       allow_anonymous_user_creation: true
@@ -59,17 +60,12 @@ function unhandled_error_handler(res) {
   });
 }
 
-// Export a function that creates routes on the express app.
+// Export a function that adds authz middleware. All middleware
+// must be added before routes it is used in, and we want the
+// Authorization API key header check to work for the front-end
+// routes too, so we separate it.
 
-exports.create_routes = function(app, settings) {
-  // Set defaults for JSON responses.
-  app.set("json spaces", 2);
-
-  var api_public_base_url = settings.url;
-  var api_path_root = "/api/v1";
-
-  // AUTHORIZATION MIDDLEWARE
-
+exports.add_middleware = function(app) {
   app.use(function(req, res, next) {
     if (req.headers['authorization'])
       models.UserApiKey.validateApiKey(
@@ -82,6 +78,16 @@ exports.create_routes = function(app, settings) {
     else
       next();
   })
+}
+
+// Export a function that creates routes on the express app.
+
+exports.create_routes = function(app, settings) {
+  // Set defaults for JSON responses.
+  app.set("json spaces", 2);
+
+  var api_public_base_url = settings.url;
+  var api_path_root = "/api/v1";
 
   // USER CREATION
 

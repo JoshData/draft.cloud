@@ -10,9 +10,11 @@ var models = require("../backend/models.js");
 var auth = require("../backend/auth.js");
 var apiroutes = require("../backend/routes.js");
 
-// Export a function that creates routes on the express app.
-
-exports.create_routes = function(app, sessionStore, settings) {
+// Export a function that adds authz middleware. All middleware
+// must be added before routes it is used in, and we want
+// passport's functionality to work for the backend routes too,
+// so we separate it.
+exports.add_middleware = function(app, sessionStore, settings) {
   if (!settings.secret_key) return; // can't do the logged in front-end without this, so skip
   app.use(session({
     store: sessionStore,
@@ -32,7 +34,11 @@ exports.create_routes = function(app, sessionStore, settings) {
         done(null, user);
       });
   });
+}
 
+// Export a function that creates routes on the express app.
+
+exports.create_routes = function(app, settings) {
   var github_login_path = "/auth/github";
   var github_callback_path = github_login_path + "/callback";
   if (settings.GITHUB_CLIENT_ID && settings.GITHUB_CLIENT_SECRET) {

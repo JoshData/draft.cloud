@@ -19,13 +19,17 @@ require("./backend/models.js")
   if (settings.trust_proxy) app.set('trust proxy', settings.trust_proxy); // express won't set secure cookies if it can't see it's running behind https
   app.use(require('helmet')())
 
-  // Initialize the back-end API routes.
-  require("./backend/routes.js")
-    .create_routes(app, settings);
-
-  // Initialize the front-end web routes.
-  require("./frontend/routes.js")
-    .create_routes(app, sessionStore, settings);
+  // Initialize...
+  // * back-end middleware (Authorization API key header checking)
+  // * front-end middleware (passport-based login/session)
+  // * back-end API routes
+  // * front-end web routes
+  var backend = require("./backend/routes.js");
+  var frontend = require("./frontend/routes.js");
+  backend.add_middleware(app);
+  frontend.add_middleware(app, sessionStore, settings);
+  backend.create_routes(app, settings);
+  frontend.create_routes(app, settings);
 
   // Start listening.
   var bind = settings.bind || "127.0.0.1";
