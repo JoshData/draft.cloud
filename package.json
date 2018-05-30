@@ -14,6 +14,7 @@
     "jot": "git+https://github.com/joshdata/jot.git",
     "json-ptr": "^1.1.0",
     "jsoneditor": "^5.16.0",
+    "moment": "^2.22.1",
     "mustache": "*",
     "passport": "*",
     "passport-github2": "^0.1.11",

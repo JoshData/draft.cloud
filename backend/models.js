@@ -360,7 +360,8 @@ exports.initialize_database = function(settings, ready) {
       where: where,
       order: [["revisionId", "DESC"]],
       include: [{
-        model: exports.Revision
+        model: exports.Revision,
+        include: [ { model: exports.User } ]
       }]
     })
     .then(function(cache_hit) {
@@ -380,7 +381,10 @@ exports.initialize_database = function(settings, ready) {
         where['id'][Sequelize.Op.gt] = cache_hit.revisionId;
       exports.Revision.findAll({
         where: where,
-        order: [["id", "ASC"]]
+        order: [["id", "ASC"]],
+        include: [
+          { model: exports.User }
+        ]
       })
       .then(function(revs) {
         // Documents always start with a null value at the start of the revision history.
@@ -562,7 +566,8 @@ exports.initialize_database = function(settings, ready) {
     else
       exports.Revision.findOne({
         where: { documentId: doc.id },
-        order: [["id", "DESC"]] // most recent
+        order: [["id", "DESC"]], // most recent
+        include: [{ model: exports.User }]
       })
       .then(function(revision) {
         if (!revision)

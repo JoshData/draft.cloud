@@ -3,6 +3,8 @@ var session = require('express-session')
 var passport = require("passport");
 var GitHubStrategy = require('passport-github2').Strategy;
 var mustache = require("mustache");
+var moment = require("moment");
+var async = require("async");
 
 var models = require("../backend/models.js");
 var auth = require("../backend/auth.js");
@@ -83,6 +85,59 @@ exports.create_routes = function(app, sessionStore, settings) {
       });
   }
 
+  // Homepage.
+  var index_html = fs.readFileSync("templates/index.html", "utf8");
+  var home_html = fs.readFileSync("templates/home.html", "utf8");
+  app.get("/", function (req, res) {
+    if (!req.user) {
+      // Landing page.
+      res.status(200).send(mustache.render(index_html, {}));
+    } else {
+      // Does user have any documents?
+      models.Document.findAll({
+        where: { userId: req.user.id },
+        include: [ { model: models.User } ]
+      })
+      .then(function(documents) {
+        if (documents) {
+          // Fetch preview and current revision of each document.
+          async.each(documents, function(doc, cb) {
+            doc.get_content(null, null, true, function(err, revision, content, path) {
+              doc.currentContent = content;
+              if (revision)
+                doc.currentRevision = apiroutes.make_revision_response(revision, []);
+              cb(null);
+            });
+          }, function(err) {
+            // Format.
+            documents = documents.map(apiroutes.make_document_json);
+
+            // Format dates.
+            documents.forEach(doc => {
+              doc.createdRel = moment(doc.created).fromNow();
+              if (doc.currentRevision)
+                doc.currentRevision.createdRel = moment(doc.currentRevision.created).fromNow();
+              doc.updatedAtISO = moment((doc.currentRevision && doc.currentRevision.created) || doc.created).format(); // ISO
+            });
+
+            // Sort.
+            documents.sort(function(b, a) { return a.updatedAtISO < b.updatedAtISO ? -1 : +(a.updatedAtISO > b.updatedAtISO) })
+            console.log(documents)
+
+            // List documents page.
+            res.status(200).send(mustache.render(home_html, {
+                "user": req.user,
+                "documents": documents,
+            }));
+          });
+        } else {
+          // Go straight to starting a new document.
+          res.redirect("/new");
+        }
+      });
+    }
+  });
+
   // Start a new document.
   app.get("/new", function (req, res) {
     if (!req.user) {
@@ -142,7 +197,5 @@ exports.create_routes = function(app, sessionStore, settings) {
         });
       });      
     });      
-
-
   });
 }

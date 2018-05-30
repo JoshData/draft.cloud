@@ -286,7 +286,9 @@ exports.create_routes = function(app, settings) {
       web_urls: {
         document: settings.url + "/edit/:owner/:document".replace(/:owner/, doc.user.name)
           .replace(/:document/, doc.name)
-      }
+      },
+      currentContent: doc.currentContent, // used by frontend
+      currentRevision: doc.currentRevision, // used by frontend
     };
   }
 
