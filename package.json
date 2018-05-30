@@ -42,6 +42,7 @@
   "homepage": "https://github.com/joshdata/draft.cloud#readme",
   "main": "index.js",
   "devDependencies": {
+    "spectacle-docs": "^1.0.3",
     "tap": "^12.0.1"
   }
 }

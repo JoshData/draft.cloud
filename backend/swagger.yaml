@@ -3,7 +3,35 @@ swagger: '2.0'
 basePath: /api/v1
 info:
   version: '1'
-  title: Draft.Cloud API
+  title: Draft.Cloud RESTful HTTP API
+  description: |
+    Draft.Cloud is a structured document version management and conflictless
+    collaboration platform.
+
+    Each document on Draft.Cloud is a JSON value. Changes to documents
+    are tracked structurally, meaning instead of typical line-oriented
+    diffs and patches, Draft.Cloud tracks where in the JSON document
+    changes are made, traversing object keys, array indexes, and string
+    offsets.
+
+    Documents are modified either by `PUT`ing the new document or submitting
+    a `PATCH` using [JOT](https://github.com/joshdata/jot). In both cases
+    a base revision may (or should) be specified in the request headers.
+    When the base revision is not the current document version, Draft.Cloud
+    will merge the incoming changes with the changes already submitted with
+    conflicts automatically resolved.
+    
+    This page documents Draft.Cloud's RESTful HTTP API. The API includes
+
+    * creating user accounts
+    * creating and deleting documents
+    * adding other users to the document's team
+    * getting and updating document content
+
+    All API requests except for creating a new user require pasing an API
+    key in the HTTP request `Authorization` header. You can get an API key
+    by creating a new user using the API or from the Draft.Cloud website.
+
 paths:
   /users:
     post:
@@ -24,6 +52,7 @@ paths:
         '200':
           description: A user was created. The user's `id` and username and other
             information besides the API key are returned in the JSON response body.
+            See `GET /users/{user}` for details.
             The user's API key is returned in the `X-Api-Key` header.
           headers:
             X-Api-Key:
@@ -53,8 +82,26 @@ paths:
         '200':
           description: The User metadata is returned as JSON.
           schema:
-            title: User
             type: object
+            properties:
+              id:
+                type: string
+                example: ee84121d-3a2e-421f-80eb-180e9c340ad3
+              name:
+                type: string
+                example: dqGYQos5CM19E4DgfvPYb9
+              created:
+                type: string
+                example: 2018-05-30T12:58:48.955Z
+              api_urls:
+                type: object
+                properties:
+                  profile:
+                    type: string
+                    example: https://draft.cloud/api/v1/users/ee84121d-3a2e-421f-80eb-180e9c340ad3
+                  documents:
+                    type: string
+                    example: https://draft.cloud/api/v1/documents/ee84121d-3a2e-421f-80eb-180e9c340ad3
         '404':
           description: User does not exist or caller does not have permission to see
             the document.
@@ -109,7 +156,7 @@ paths:
           the document's anonymous access level is READ.
       responses:
         '200':
-          description: The documents are returned as a JSON array.
+          description: The documents are returned as a JSON array. See the GET response for documents for details.
         '404':
           description: User does not exist or caller does not have permission to see
             the user.
@@ -165,14 +212,50 @@ paths:
         '200':
           description: The document metadata is returned as JSON.
           schema:
-            title: Document
             type: object
+            properties:
+              id:
+                type: string
+                example: 6e0738d2-7729-45ea-aecf-62c078ddc6ee
+              name:
+                type: string
+                example: nMP4KdrJbfvAHHZQdTcIXf
+              created:
+                type: string
+                example: 2018-05-29T23:46:37.222Z
+              anon_access_level:
+                type: string
+                example: NONE | READ | WRITE
+              owner:
+                type: object
+                example: { (see GET user) }
+              userdata:
+                type: object
+                example: { }
+              api_urls:
+                type: object
+                properties:
+                  document:
+                    type: string
+                    example: https://draft.cloud/api/v1/documents/85f4ac37-5867-442b-8d69-f2e476de8aaf/6e0738d2-7729-45ea-aecf-62c078ddc6ee
+                  content:
+                    type: string
+                    example: https://draft.cloud/api/v1/documents/85f4ac37-5867-442b-8d69-f2e476de8aaf/6e0738d2-7729-45ea-aecf-62c078ddc6ee/content
+                  history:
+                    type: string
+                    example: https://draft.cloud/api/v1/documents/85f4ac37-5867-442b-8d69-f2e476de8aaf/6e0738d2-7729-45ea-aecf-62c078ddc6ee/history
+              web_urls:
+                type: object
+                properties:
+                  document:
+                    type: string
+                    example: https://draft.cloud/edit/KOYCZ1XT23YImR3hcyg6pd7N1tc4eGgoPlEgKbfslW5QsUNB/nMP4KdrJbfvAHHZQdTcIXfrjIIclCeqByeeT60s1a2TfiazS
         '404':
           description: The owner or document does not exist or caller does not have
             permission to see the owner or document.
     put:
       description: |
-        Updates an existing `Document`'s metadata. The response is as in GET.
+        Updates an existing `Document`'s metadata. The request body and response body are both as in GET.
       consumes:
       - application/json
       produces:
@@ -260,9 +343,6 @@ paths:
       responses:
         '200':
           description: The Document's team members are returned as JSON.
-          schema:
-            title: Document Team
-            type: object
         '404':
           description: The owner or document does not exist or caller does not have
             permission to see the owner or document.
@@ -359,26 +439,26 @@ paths:
           description: Document content is returned as JSON.
           headers:
             Revision-Id:
-              description: The `id` of the document's current `Revision`, or the revision
+              description: The id of the document's current Revision, or the revision
                 specified in the Revision-Id header if the header is given. May be
-                `singularity` to indicate that the document has not yet had any revisions
-                yet. (Such documents always have `null` content.)
+                "singularity" to indicate that the document has not yet had any revisions
+                yet. (Such documents always have null content.)
               type: string
             Access-Level:
               description: The access level that the user has on this document. Either
                 READ, WRITE, or ADMIN.
               type: string
             Content-Type:
-              description: '`application/json` or `text/plain`, depending on the Accept
+              description: application/json or text/plain, depending on the Accept
                 header you send. (If the Accept header says both formats are accepted
                 but text/plain is preferred, you may get application/json in the response
-                if the document''s content is not plain text.)'
+                if the document's content is not plain text.)
               type: string
         '404':
           description: Document does not exist or caller does not have permission
             to see the document.
         '406':
-          description: The Accept header was set to `text/plain` but the document
+          description: The Accept header was set to text/plain but the document
             content is not plain text, or an invalid content type was sent in the
             Accept header.
     put:
@@ -544,39 +624,6 @@ paths:
         '409':
           description: The document was modified after the base revision and a rebase
             of the operation was not possible.
-  /documents/{owner}/{document}/revision/{revision}:
-    get:
-      description: |
-        Gets a `Revision` objects.
-      produces:
-      - application/json
-      parameters:
-      - name: owner
-        in: path
-        description: The `id` of a `User` who owns the document.
-        required: true
-        type: string
-      - name: document
-        in: path
-        description: The `id` of a `Document` owned by  `owner`.
-        required: true
-        type: string
-      - name: revision
-        in: path
-        description: A `Revision` `id`.
-        required: true
-        type: string
-      - name: Authorization
-        in: header
-        type: string
-        description: An API key that has READ access to the document. Optional if
-          the document's anonymous access level is READ.
-      responses:
-        '200':
-          description: The revision is returned as JSON.
-        '404':
-          description: Document does not exist or caller does not have permission
-            to see the document
   /documents/{owner}/{document}/history:
     get:
       description: |
@@ -618,6 +665,39 @@ paths:
           description: Revision history is returned as JSON, in chronological order
             (oldest first). If the `path` parameter is specified, the revisions are
             relative to that location in the document.
+        '404':
+          description: Document does not exist or caller does not have permission
+            to see the document
+  /documents/{owner}/{document}/history/{revision}:
+    get:
+      description: |
+        Gets a `Revision` object.
+      produces:
+      - application/json
+      parameters:
+      - name: owner
+        in: path
+        description: The `id` of a `User` who owns the document.
+        required: true
+        type: string
+      - name: document
+        in: path
+        description: The `id` of a `Document` owned by  `owner`.
+        required: true
+        type: string
+      - name: revision
+        in: path
+        description: A `Revision` `id`.
+        required: true
+        type: string
+      - name: Authorization
+        in: header
+        type: string
+        description: An API key that has READ access to the document. Optional if
+          the document's anonymous access level is READ.
+      responses:
+        '200':
+          description: The revision is returned as JSON.
         '404':
           description: Document does not exist or caller does not have permission
             to see the document
