@@ -108,7 +108,7 @@ exports.create_routes = function(app, settings) {
       // is owned by the user making the request.
       models.User.create({
         name: randomstring.generate({
-          length: 48,
+          length: 22, // about 128 bits, same as the user's UUID
           charset: 'alphanumeric'
         }),
         ownerId: req_user ? req_user.id : null,
@@ -250,7 +250,7 @@ exports.create_routes = function(app, settings) {
     models.Document.create({
       userId: owner.id,
       name: doc.name || randomstring.generate({
-        length: 48,
+        length: 22, // about 128 bits, same as the user's UUID
         charset: 'alphanumeric'
       }),
       anon_access_level: doc.anon_access_level || auth.DEFAULT_NEW_DOCUMENT_ANON_ACCESS_LEVEL,
