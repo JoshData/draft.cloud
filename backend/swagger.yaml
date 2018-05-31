@@ -1,6 +1,9 @@
 # This is a description of the Draft.Cloud API in Swagger format.
 swagger: '2.0'
+host: draft.cloud
 basePath: /api/v1
+schemes:
+- https
 info:
   version: '1'
   title: Draft.Cloud RESTful HTTP API
@@ -35,9 +38,11 @@ info:
 paths:
   /users:
     post:
+      summary: Create a user
       description: |
         Creates a new user, responding with a user `id`, an API key, and the API base URL for the user's documents.
 
+        If an API key is sent in the request, the new user is owned by the user making the request.
         If the Draft.Cloud backend is configured to allow the creation of anonymous users,
         an API key is not required.
       produces:
@@ -46,8 +51,8 @@ paths:
       - name: Authorization
         in: header
         type: string
-        description: Optional (see description). An API key that has ADMIN access
-          to user making the request.
+        description: Optional (see description). If provided, an API key that has ADMIN access
+          to key's owner.
       responses:
         '200':
           description: A user was created. The user's `id` and username and other
@@ -63,8 +68,9 @@ paths:
             users through the API.
   /users/{user}:
     get:
+      summary: Get user information
       description: |
-        Gets `User` metadata.
+        Gets `User` information.
       produces:
       - application/json
       parameters:
@@ -76,11 +82,10 @@ paths:
       - name: Authorization
         in: header
         type: string
-        description: An API key that has READ access to the document. Optional if
-          the document's anonymous access level is READ.
+        description: An API key that has READ access to the user.
       responses:
         '200':
-          description: The User metadata is returned as JSON.
+          description: The User information is returned as JSON.
           schema:
             type: object
             properties:
@@ -104,8 +109,9 @@ paths:
                     example: https://draft.cloud/api/v1/documents/ee84121d-3a2e-421f-80eb-180e9c340ad3
         '404':
           description: User does not exist or caller does not have permission to see
-            the document.
+            the user.
     put:
+      summary: Update a user
       description: |
         Updates a User. The response is as in a GET.
       consumes:
@@ -125,20 +131,20 @@ paths:
       - name: Authorization
         in: header
         type: string
-        description: An API key that has ADMIN access to the document, or for a new
-          document and API key for the owner of the new document.
+        description: An API key that has ADMIN access to the user.
         required: true
       responses:
         '200':
           description: The User was updated. The response body is as in GET.
         '403':
           description: The caller has permission to see the User but not make changes
-            to its metadata.
+            to it.
         '404':
           description: User does not exist or caller does not have permission to see
             the document.
   /documents/{owner}:
     get:
+      summary: Get a user's documents
       description: |
         Gets all `Document`s owned by a user (that the requestor has permission to see).
       produces:
@@ -152,8 +158,7 @@ paths:
       - name: Authorization
         in: header
         type: string
-        description: An API key that has READ access to the document. Optional if
-          the document's anonymous access level is READ.
+        description: An API key that has READ access to owner's documents.
       responses:
         '200':
           description: The documents are returned as a JSON array. See the GET response for documents for details.
@@ -161,6 +166,7 @@ paths:
           description: User does not exist or caller does not have permission to see
             the user.
     post:
+      summary: Create a document
       description: |
         Creates a `Document` with a unique name.
       produces:
@@ -174,8 +180,7 @@ paths:
       - name: Authorization
         in: header
         type: string
-        description: An API key that has ADMIN access to the document, or for a new
-          document and API key for the owner of the new document.
+        description: An API key that has ADMIN access to the owner's documents.
         required: true
       responses:
         '200':
@@ -188,8 +193,9 @@ paths:
             see it.
   /documents/{owner}/{document}:
     get:
+      summary: Get document information
       description: |
-        Gets `Document` metadata.
+        Gets `Document` information.
       produces:
       - application/json
       parameters:
@@ -210,7 +216,7 @@ paths:
           the document's anonymous access level is READ.
       responses:
         '200':
-          description: The document metadata is returned as JSON.
+          description: The document information is returned as JSON.
           schema:
             type: object
             properties:
@@ -254,8 +260,9 @@ paths:
           description: The owner or document does not exist or caller does not have
             permission to see the owner or document.
     put:
+      summary: Update document information
       description: |
-        Updates an existing `Document`'s metadata. The request body and response body are both as in GET.
+        Updates an existing `Document`'s metadata information. The request body and response body are both as in GET.
       consumes:
       - application/json
       produces:
@@ -278,19 +285,19 @@ paths:
       - name: Authorization
         in: header
         type: string
-        description: An API key that has ADMIN access to the document, or for a new
-          document and API key for the owner of the new document.
+        description: An API key that has ADMIN access to the document.
         required: true
       responses:
         '200':
           description: The document was updated. The response body is as in GET.
         '403':
           description: The caller has permission to see the document but not make
-            changes to its metadata.
+            changes to its metadata information.
         '404':
           description: Document does not exist or caller does not have permission
             to see the document.
     delete:
+      summary: Delete a document
       description: |
         Deletes a `Document`.
       parameters:
@@ -320,6 +327,7 @@ paths:
             to see the document.
   /documents/{owner}/{document}/team:
     get:
+      summary: Get document team members
       description: |
         Gets a list of all `User`s with READ permission on the `Document`.
       produces:
@@ -347,6 +355,7 @@ paths:
           description: The owner or document does not exist or caller does not have
             permission to see the owner or document.
     put:
+      summary: Update document team members
       description: |
         Updates `User` permissions on a `Document`. The request body must be a JSON-encoded object
         `{ user: userid, access_level: level }` containing the `id` of the user whose permissions are
@@ -384,17 +393,19 @@ paths:
           description: The access_level was invalid.
         '403':
           description: The caller has permission to see the document but not make
-            changes to its metadata.
+            changes to its metadata information.
         '404':
           description: Document does not exist or caller does not have permission
             to see the document.
   /documents/{owner}/{document}/content{path}:
     get:
-      description: >
-        Gets `Document` content. If a path to a subpart of the document is given at
-        the end of the URL, then only a part of the document is returned. The document
-        is returned either as JSON or as UTF-8 encoded plain text, depending on the
-        Accept header you send in the request.
+      summary: Get document content
+      description: |
+        Gets `Document` content. The document is returned either as JSON or as
+        UTF-8 encoded plain text, depending on the Accept header in the request.
+
+        If a JSON Pointer specifying a path to a subpart of the document is sent at
+        the end of the URL, then only a part of the document is returned. 
       produces:
       - application/json
       - text/plain
@@ -413,9 +424,8 @@ paths:
         in: path
         description: |
           A [JSON Pointer](https://tools.ietf.org/html/rfc6901), which looks like `/x/y/15`.
-          Can be omitted.
+          (A final `/-` is not permitted.) Optional.
         type: string
-        format: binary
         required: true
       - name: Revision-Id
         in: header
@@ -423,7 +433,6 @@ paths:
         description: A Revision `id`. If specified, gets the content of the document
           at the indicated revision. Otherwise the document's content at the most
           recent revision is returned.
-        default: ''
       - name: Accept
         in: header
         type: string
@@ -462,6 +471,7 @@ paths:
             content is not plain text, or an invalid content type was sent in the
             Accept header.
     put:
+      summary: Update document content with new content
       description: |
         Updates the content of a `Document` with content provided in the request body.
         Document content is text or arbitrary JSON data provided in the request body
@@ -469,16 +479,13 @@ paths:
 
         If a [JSON Pointer](https://tools.ietf.org/html/rfc6901) to a subpart of the document is given at the end of the URL (see GET),
         then the content provided in this PUT request replaces the content at the location in the
-        document that the pointer points to and the operation in the revision in the response body is
-        relative to that part of the document.
+        document that the pointer points to.
 
         If a base revision is specified with the Base-Revision-Id header, then the changes made
         relative to the base revision will be merged with the changes made in any Revisions that
         were made after the base revision (probably by other users acting simultaneously).
 
-        The response is a new uncommitted `Revsion` object, meaning it has not yet been applied
-        to the document. Revisions are applied in an asynchronous manner, so the document's content
-        and history will reflect the new Revision after a few moments.
+        The response is a new `Revsion` object.
       consumes:
       - application/json
       - text/plain
@@ -500,9 +507,8 @@ paths:
         in: path
         description: |
           A [JSON Pointer](https://tools.ietf.org/html/rfc6901), which looks like `/x/y/15`.
-          Can be omitted.
+          (A final `/-` is not permitted.) Optional.
         type: string
-        format: binary
         required: true
       - name: Revision-Comment
         in: header
@@ -533,7 +539,7 @@ paths:
         required: true
       responses:
         '201':
-          description: A `Revision` was saved. The response is the new uncommitted
+          description: A `Revision` was saved. The response is the new
             `Revision`.
         '400':
           description: The path or base revision is not valid.
@@ -543,24 +549,19 @@ paths:
         '404':
           description: Document does not exist or caller does not have permission
             to see the document
-        '409':
-          description: The document was modified after the base revision and a rebase
-            of the changes was not possible.
     patch:
+      summary: Update document content with a patch
       description: |
-        Updates the content of a `Document` with a raw JOT operation provided in the request body.
+        Updates the content of a `Document` with a raw [JOT](https://github.com/joshdata/jot) operation provided in the request body.
 
         If a [JSON Pointer](https://tools.ietf.org/html/rfc6901) to a subpart of the document is given at the end of the URL (see GET),
-        then the operation applies to that location in the document that the pointer points to and the operation in the revision in the response body is
-        relative to that part of the document.
+        then the operation applies to that location in the document that the pointer points to.
 
         If a base revision is specified with the Base-Revision-Id header, then the operation
         will be transformed to apply logically as if the changes made in any Revisions that
         were made after the base revision were made simultaneously.
 
-        The response is a new uncommitted `Revsion` object, meaning it has not yet been applied
-        to the document. Revisions are applied in an asynchronous manner, so the document's content
-        and history will reflect the new Revision after a few moments.
+        The response is a new `Revsion` object.
       consumes:
       - application/json
       produces:
@@ -580,9 +581,8 @@ paths:
         in: path
         description: |
           A [JSON Pointer](https://tools.ietf.org/html/rfc6901), which looks like `/x/y/15`.
-          Can be omitted.
+          (A final `/-` is not permitted.) Optional.
         type: string
-        format: binary
         required: true
       - name: Revision-Comment
         in: header
@@ -621,11 +621,9 @@ paths:
         '404':
           description: Document does not exist or caller does not have permission
             to see the document
-        '409':
-          description: The document was modified after the base revision and a rebase
-            of the operation was not possible.
   /documents/{owner}/{document}/history:
     get:
+      summary: Get document revision history
       description: |
         Gets the revision history of a `Document`, which is an array of `Revision` objects.
       produces:
@@ -670,6 +668,7 @@ paths:
             to see the document
   /documents/{owner}/{document}/history/{revision}:
     get:
+      summary: Get a document revision
       description: |
         Gets a `Revision` object.
       produces:
