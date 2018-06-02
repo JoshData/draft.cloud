@@ -198,8 +198,8 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
         seen_ours = revision;
 
       // Skip any other Revisions whose status is "error" --- that
-      // means another client submitted an invalid Revision. Everyone
-      // is notified because there is no way to notify just the submitter.
+      // means another client submitted an invalid Revision. This
+      // isn't currently something that actually happens.
       else if (revision.status != "committed")
         return;
 
@@ -224,20 +224,6 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
         : (revs_before_ours.length + "+" ))
       + revs_after_ours.length
       + " revisions");
-
-    if (seen_ours && seen_ours.status == "error") {
-      // The operation we sent somehow turned out to be invalid.
-      // As a result, we probably cannot process anything further.
-      // The rebase with anything incoming will likely fail, and
-      // so we can't apply any further changes from the server.
-      // The only thing to do now is to close the connection and
-      // warn the user.
-      logger("fatal error: our revision could not be committed!");
-      widget.status("error");
-      widget.show_message("error", "There is a problem with the document. Copy any changes you made into a new document, or discard your recent changes by reloading this page. Apologies for the inconvenience.");
-      close_client();
-      return;
-    }
 
     // Turn the history arrays into jot operations.
     revs_before_ours = new jot.LIST(revs_before_ours).simplify();
@@ -322,6 +308,20 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
           // remote changes, so we can identify when we see
           // our own change come back to us as a remote change.
           if (revision) {
+            if (revision.status == "error") {
+              // The operation we sent somehow turned out to be invalid.
+              // As a result, we probably cannot process anything further.
+              // The rebase with anything incoming will likely fail, and
+              // so we can't apply any further changes from the server.
+              // The only thing to do now is to close the connection and
+              // warn the user.
+              logger("fatal error: our revision could not be committed!");
+              widget.status("error");
+              widget.show_message("error", "There is a problem with the document. Copy any changes you made into a new document, or discard your recent changes by reloading this page. Apologies for the inconvenience.");
+              close_client();
+              return;
+            }
+
             waiting_for_local_change_to_return = {
               revision_id: revision.id,
               op: patch
