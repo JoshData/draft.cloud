@@ -24,7 +24,7 @@
     "randomstring": "*",
     "sequelize": "^4.37.10",
     "socket.io": "^2.1.1",
-    "sqlite3": "https://github.com/mapbox/node-sqlite3/tarball/master",
+    "sqlite3": "^4.0.0",
     "textarea-caret": "git+https://github.com/component/textarea-caret-position.git",
     "ua-parser-js": "^0.7.18",
     "uuid": "^3.2.1"
