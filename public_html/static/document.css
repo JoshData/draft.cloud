@@ -1,4 +1,9 @@
-@import url('https://fonts.googleapis.com/css?family=Macondo');
+@font-face {
+  font-family: 'Macondo';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Macondo'), local('Macondo-Regular'), url(/static/fonts/google/Macondo-regular.ttf) format('truetype');
+}
 
 body, .ql-editor {
   font-size: 16px;

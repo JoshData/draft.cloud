@@ -21,8 +21,8 @@ require("./backend/models.js")
   app.use(require('helmet-csp')({
     directives: {
       defaultSrc: ["'self'", (settings.url + (/https:/.test(settings.url) ? ":443" : "")).replace(/https?:/, 'ws:')],
-      styleSrc: ["'self'", "'unsafe-inline'" /* Quill clipboard paste breaks without it */, 'fonts.googleapis.com'],
-      fontSrc: ["'self'", 'fonts.gstatic.com'],
+      styleSrc: ["'self'", "'unsafe-inline'" /* Quill clipboard paste breaks without it */],
+      fontSrc: ["'self'"],
       imgSrc: ["'self'", 'data:']
     }
   }))
