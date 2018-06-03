@@ -4,39 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css" integrity="sha384-WskhaSGFgHYWDcbwN70/dfYBj47jz9qbsMId/iRN3ewGhXQFZCSftd1LZCfmhktB" crossorigin="anonymous">
+    <link rel="stylesheet" href="/static/npm/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/document.css">
 
-    <title>Draft.Cloud: {{owner.name}}/{{document.name}}</title>
-
-    <style type="text/css">
-      @import url('https://fonts.googleapis.com/css?family=Macondo');
-
-      body, .ql-editor {
-        font-size: 16px;
-      }
-
-      .navbar {
-      }
-
-      .navbar-brand {
-          font-family: 'Macondo', sans-serif;                
-      }
-
-      .editable {
-        cursor: pointer;
-      }
-        .editable:hover {
-          color: #00A;
-        }
-
-      footer {
-        cursor: default;
-        padding: 3px 5px;
-        font-size: 11.5px;
-        background-color: #FFC;
-        color: #444;
-      }
-    </style>        
+    <title>Draft.Cloud: {{owner.name}}/{{document.name}}</title>  
   </head>
   <body>
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
@@ -45,7 +16,7 @@
         <span class="navbar-toggler-icon"></span>
       </button>
 
-      <span class="navbar-text" style="margin-right: 2em">
+      <span class="navbar-text">
         <span id="document-owner-name">{{owner.name}}</span>
         / 
         <span id="document-name">{{document.name}}</span>
@@ -57,7 +28,7 @@
             <a class="nav-link" href="/logout">Log out</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" href="#" onclick="show_api_info(); return false;">API</a>
+            <a id="show-api" class="nav-link" href="#">API</a>
           </li>
         </ul>
       </div>
@@ -69,10 +40,6 @@
       data-draftdotcloud-owner="{{owner.name}}"
       data-draftdotcloud-document="{{document.name}}"
       ></div>
-          <script>draftdotcloud_widget_options = {
-            sizeTo: "container",
-            placeholder: "Share this page’s address with anyone you would like to edit with."
-          };</script>
     </div>
 
     <footer>
@@ -95,7 +62,7 @@
                 <th>sample</th>
                 <td>
                   <a href="/api/v1/documents/{{owner.uuid}}/{{document.uuid}}">GET /api/v1/documents/{{owner.uuid}}/{{document.uuid}}</a>
-                  <div style="font-size: 95%; line-height: 125%;">
+                  <div class="compact-text">
                     This link will work in your browser because you are logged in with a cookie. Get an API key to access this URL from your application.
                     </div>
                 </td>
@@ -121,75 +88,17 @@
       </div>
     </div>
 
-    <script
-        src="https://code.jquery.com/jquery-3.3.1.min.js"
-        integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
-        crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js" integrity="sha384-smHYKdLADwkXOn1EmN1qk/HfnUcbVRZyYmZ4qpPea6sjB/pTJ0euyQp0Mk8ck+5T" crossorigin="anonymous"></script>
+    <div class="d-none">
+      <div id="user-id">{{user.uuid}}</div>
+      <div id="owner-id" can-rename-owner="{{can_rename_owner}}">{{owner.uuid}}</div>
+      <div id="document-id" can-rename-document="{{can_rename_document}}">{{document.uuid}}</div>
+
+      <div id="valid-name-text">{{valid_name_text}}</div>
+    </div>
+
+    <script src="/static/npm/jquery.min.js"></script>
+    <script src="/static/npm/bootstrap.min.js"></script>
+    <script src="/static/document.js"> </script>
     <script src="/draftdotcloud.js"> </script>
-
-    <script>
-      function resize_widget() {
-        $('#editor').height(
-          window.innerHeight
-          - $('nav').outerHeight()
-          - $('footer').outerHeight());
-      }
-      resize_widget();
-      $(window).resize(resize_widget);
-
-      function make_editable(elem, title, explanation, apiendpoint) {
-        elem.addClass('editable');
-        elem.attr("title", title);
-        elem.click(function() {
-          // Prompt. Check for cancel or no change.
-          var old_name = $(elem).text();
-          var new_name = prompt(title + "? " + explanation + " {{valid_name_text}}", old_name);
-          if (!new_name || new_name == old_name)
-            return;
-
-          // Submit.
-          jQuery.ajax({
-            method: "PUT",
-            url: apiendpoint,
-            data : JSON.stringify({ "name": new_name }),
-            contentType: 'application/json',
-            success: function(res) {
-              // Update label & browser URL.
-              elem.text(res.name);
-              window.history.pushState(null, "", "/edit/" + $('#document-owner-name').text() + "/" + $('#document-name').text());
-            },
-            error: function(xhr, error, message) {
-              if (/^text\/plain(;|$)/.test(xhr.getResponseHeader("content-type")))
-                alert(xhr.responseText)
-              else
-                alert(message);
-            }
-          })
-        });
-      }
-
-      {{#can_rename_owner}}
-      make_editable(
-        $('#document-owner-name'),
-        "Change Your Name",
-        "Give yourself a Draft.Cloud username. If you have shared this or other documents already, changing your username will break the links you have shared.",
-        "/api/v1/users/{{owner.uuid}}");
-      {{/can_rename_owner}}
-
-      {{#can_rename_document}}
-      make_editable(
-        $('#document-name'),
-        "Change Document Name",
-        "Give this document a short name so it has a pretty URL. Changing the document's name changes its address, so if you have shared this document already you will need to send your collaborators a new link.",
-        "/api/v1/documents/{{user.uuid}}/{{document.uuid}}");
-      {{/can_rename_document}}
-
-      function show_api_info() {
-        $('#api-info').modal();
-      }
-    </script>
-
   </body>
 </html>

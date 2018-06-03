@@ -37,7 +37,7 @@ exports.quill = function(elem, quill_options, baseurl) {
   this.scrollingContainer = document.createElement("div");
   this.elem.parentNode.insertBefore(this.scrollingContainer, this.elem);
   this.scrollingContainer.appendChild(this.elem);
-  this.scrollingContainer.setAttribute("style", "position: relative;");
+  this.scrollingContainer.style.position = "relative";
 
   // Add a DIV above the scrollingContainer for the toolbar so that the toolbar'
   // position is fixed.
@@ -158,14 +158,21 @@ exports.quill.prototype.prepare_dom_async2 = function(callback) {
   // when the size of the element changes.
   this.saved_state_indicator = document.createElement('span');
   this.saved_state_indicator.setAttribute("class", "ql-formats");
-  this.saved_state_indicator.setAttribute("style", "margin-left: 1em; font-size: 95%; letter-spacing: -.5px; font-style: italic; color: #666; min-width: 5.5em;");
+  this.saved_state_indicator.style.marginLeft = "1em";
+  this.saved_state_indicator.style.fontSize = "95%";
+  this.saved_state_indicator.style.letterSpacing = "-.5px";
+  this.saved_state_indicator.style.fontStyle = "italic";
+  this.saved_state_indicator.style.color = "#666";
+  this.saved_state_indicator.style.minWidth = "5.5em";
   toolbar.appendChild(this.saved_state_indicator);
 
   var _this = this;
 
   if (this.quill_options.sizeTo == "container") {
     // Correctly size the editor to the parent node's size minus the toolbar size.
-    this.scrollingContainer.setAttribute("style", "position: relative; height: 100%; overflow-y: auto;");
+    this.scrollingContainer.style.position = "relative";
+    this.scrollingContainer.style.height = "100%";
+    this.scrollingContainer.style.overflowY = "auto";
     function resize() { _this.scrollingContainer.style.height = (_this.scrollingContainer.parentNode.clientHeight - toolbar.offsetHeight) + "px"; }
     window.addEventListener("resize", resize);
     resize();

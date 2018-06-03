@@ -18,6 +18,14 @@ require("./backend/models.js")
   // General expresss settings.
   if (settings.trust_proxy) app.set('trust proxy', settings.trust_proxy); // express won't set secure cookies if it can't see it's running behind https
   app.use(require('helmet')())
+  app.use(require('helmet-csp')({
+    directives: {
+      defaultSrc: ["'self'", (settings.url + (/https:/.test(settings.url) ? ":443" : "")).replace(/https?:/, 'ws:')],
+      styleSrc: ["'self'", "'unsafe-inline'" /* Quill clipboard paste breaks without it */, 'fonts.googleapis.com'],
+      fontSrc: ["'self'", 'fonts.gstatic.com'],
+      imgSrc: ["'self'", 'data:']
+    }
+  }))
 
   // Initialize...
   // * back-end middleware (Authorization API key header checking)

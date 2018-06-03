@@ -1,0 +1,36 @@
+@import url('https://fonts.googleapis.com/css?family=Macondo');
+
+body, .ql-editor {
+  font-size: 16px;
+}
+
+.navbar {
+}
+
+.navbar-brand {
+    font-family: 'Macondo', sans-serif;                
+}
+
+.navbar-text {
+   margin-right: 2em;
+}
+
+.editable {
+  cursor: pointer;
+}
+  .editable:hover {
+    color: #00A;
+  }
+
+.compact-text {
+  font-size: 95%;
+  line-height: 125%;
+}
+
+footer {
+  cursor: default;
+  padding: 3px 5px;
+  font-size: 11.5px;
+  background-color: #FFC;
+  color: #444;
+}
