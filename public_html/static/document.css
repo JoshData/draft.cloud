@@ -2,7 +2,63 @@
   font-family: 'Macondo';
   font-style: normal;
   font-weight: 400;
-  src: local('Macondo'), local('Macondo-Regular'), url(/static/fonts/google/Macondo-regular.ttf) format('truetype');
+  src: url(/static/fonts/google/Macondo-regular.ttf) format('truetype');
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  src: url(/static/fonts/google/IbmPlexSans-regular.ttf) format('truetype');
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: italic;
+  font-weight: 400;
+  src: url(/static/fonts/google/IbmPlexSans-italic.ttf) format('truetype');
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: bold;
+  src: url(/static/fonts/google/IbmPlexSans-700.ttf) format('truetype');
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: italic;
+  font-weight: bold;
+  src: url(/static/fonts/google/IbmPlexSans-700italic.ttf) format('truetype');
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  src: url(/static/fonts/google/IbmPlexMono-regular.ttf) format('truetype');
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: italic;
+  font-weight: 400;
+  src: url(/static/fonts/google/IbmPlexMono-italic.ttf) format('truetype');
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: bold;
+  src: url(/static/fonts/google/IbmPlexMono-700.ttf) format('truetype');
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: italic;
+  font-weight: bold;
+  src: url(/static/fonts/google/IbmPlexMono-700italic.ttf) format('truetype');
 }
 
 body, .ql-editor {
@@ -31,6 +87,27 @@ body, .ql-editor {
   font-size: 95%;
   line-height: 125%;
 }
+
+.ql-editor {
+  font-family: IBM Plex Sans;
+}
+  .ql-editor h1, .ql-editor h2, .ql-editor h3, .ql-editor h4, .ql-editor h5, .ql-editor h6 {
+    font-weight: bold;
+    margin: 1.25em 0 .75em 0 !important; /* override snow theme */
+  }
+    .ql-editor h1:first-child, .ql-editor h2:first-child, .ql-editor h3:first-child, .ql-editor h4:first-child, .ql-editor h5:first-child, .ql-editor h6:first-child {
+      /* probably the page's first heading */
+      margin: 0 !important;
+    }
+  .ql-editor code, .ql-editor kbd, .ql-editor pre, .ql-editor samp {
+    font-family: IBM Plex Mono;
+  }
+  .ql-editor p, .ql-editor blockquote {
+    margin: 0 0 1em 0 !important; /* override snow theme */
+  }
+  .ql-editor li {
+    margin: .25em 0 !important; /* override snow theme */
+  }
 
 footer {
   cursor: default;
