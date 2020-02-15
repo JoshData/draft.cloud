@@ -14,8 +14,15 @@ exports.min_access = function(level1, level2) {
   return level2;
 }
 
-function get_user_from_uuid(user_uuid, cb) {
-  // Gets an User by name.
+function get_user_from_uuid(user_uuid, requestor, cb) {
+  // If the user UUID is given as "me" and requestor is not null,
+  // then it is an alias for the user making the request.
+  if (user_uuid === "me" && requestor) {
+    cb(requestor);
+    return;
+  }
+
+  // Gets a User by name.
   models.User.findOne({
     where: {
       uuid: user_uuid,
@@ -51,23 +58,23 @@ exports.check_request_authorization = function(req, cb) {
 }
 
 exports.get_user_authz = function(req, user_uuid, cb) {
-  // Gets the access level of the user to a user account.
+  // Gets the access level of the requesting user to a particular user account.
   //
   // cb(requestor, target, level), where requestor is the User that is
   // making the request, target is the User whose resources are
   // being requested, and level is the access level the requestor has
   // on target.
 
-  // Get the user that owns the document.
-  get_user_from_uuid(user_uuid, function(target) {
-    if (!target) {
-      // the target does not exist, so nothing is possible
-      cb();
-      return;
-    }
+  // Get the user making the request.
+  exports.check_request_authorization(req, function(requestor, requestor_api_key) {
+    // Get the user whose account is being accessed.
+    get_user_from_uuid(user_uuid, requestor, function(target) {
+      if (!target) {
+        // the target does not exist, so nothing is possible
+        cb();
+        return;
+      }
 
-    // Get the user making the request.
-    exports.check_request_authorization(req, function(requestor, requestor_api_key) {
       // Compute the access level in order of precedence.
       var level;
 
@@ -107,19 +114,19 @@ exports.get_document_authz = function(req, owner_uuid, document_uuid, cb) {
   // being requested, document is the resource being requested,
   // and level is the access level the user has for it.
 
-  // Get the user that owns the document.
-  get_user_from_uuid(owner_uuid, function(owner) {
-    if (!owner) {
-      // the owner does not exist, so nothing is possible
-      cb();
-      return;
-    }
+  // Get the user making the request.
+  exports.check_request_authorization(req, function(user, user_api_key) {
+    // Get the user that owns the document.
+    get_user_from_uuid(owner_uuid, user, function(owner) {
+      if (!owner) {
+        // the owner does not exist, so nothing is possible
+        cb();
+        return;
+      }
 
-    // Get the document, if it exists. (It may not exist if the request is
-    // to create a new document.)
-    get_document_from_uuid(owner, document_uuid, function(document) {
-      // Get the user making the request.
-      exports.check_request_authorization(req, function(user, user_api_key) {
+      // Get the document, if it exists. (It may not exist if the request is
+      // to create a new document.)
+      get_document_from_uuid(owner, document_uuid, function(document) {
         // Get permissions for this user to this document.
         models.DocumentPermission.findOne({
           where: {

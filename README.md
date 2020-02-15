@@ -41,11 +41,21 @@ Test functionality:
 	node index.js
 	  ^C it once it starts running
 
-Testing using the command line & browser:
+Testing using the command line & browser. Install `jq` first.
 
+	# Create a new user:
 	backend/req POST '' users
+
+	# The user's API key is returned in the X-Api-Key HTTP header.
+	# Copy it into an environment variable:
 	export API_KEY=(copy X-Api-Key header here)
-	backend/req POST '' documents/(copy user id here)
+
+	# Create a document:
+	backend/req POST '' documents/me
+
+	# Copy the "web_urls" => "document" value into your browser to
+	# edit the document. Lose the URL? List your documents:
+	backend/req GET '' documents/me
 	
 
 ## Deployment

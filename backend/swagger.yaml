@@ -76,7 +76,7 @@ paths:
       parameters:
       - name: user
         in: path
-        description: The `id` of a `User`.
+        description: The `id` of a `User`, or "me" to get your own information.
         required: true
         type: string
       - name: Authorization
@@ -121,7 +121,7 @@ paths:
       parameters:
       - name: user
         in: path
-        description: The `id` of a `User`.
+        description: The `id` of a `User`, or "me" to update your own information.
         required: true
         type: string
       - name: Content-Type
@@ -152,7 +152,7 @@ paths:
       parameters:
       - name: owner
         in: path
-        description: The `id` of a `User` who owns the document.
+        description: The `id` of a `User` who owns the document, or "me" if you are the owner.
         required: true
         type: string
       - name: Authorization
@@ -174,7 +174,7 @@ paths:
       parameters:
       - name: owner
         in: path
-        description: The `id` of a `User` who owns the document.
+        description: The `id` of a `User` who owns the document, or "me" if you are the owner.
         required: true
         type: string
       - name: Authorization
@@ -201,7 +201,7 @@ paths:
       parameters:
       - name: owner
         in: path
-        description: The `id` of a `User` who owns the document.
+        description: The `id` of a `User` who owns the document, or "me" if you are the owner.
         required: true
         type: string
       - name: document
@@ -270,7 +270,7 @@ paths:
       parameters:
       - name: owner
         in: path
-        description: The `id` of a `User` who owns the document.
+        description: The `id` of a `User` who owns the document, or "me" if you are the owner.
         required: true
         type: string
       - name: document
@@ -303,7 +303,7 @@ paths:
       parameters:
       - name: owner
         in: path
-        description: The `id` of a `User` who owns the document.
+        description: The `id` of a `User` who owns the document, or "me" if you are the owner.
         required: true
         type: string
       - name: document
@@ -335,7 +335,7 @@ paths:
       parameters:
       - name: owner
         in: path
-        description: The `id` of a `User` who owns the document.
+        description: The `id` of a `User` who owns the document, or "me" if you are the owner.
         required: true
         type: string
       - name: document
@@ -367,7 +367,7 @@ paths:
       parameters:
       - name: owner
         in: path
-        description: The `id` of a `User` who owns the document.
+        description: The `id` of a `User` who owns the document, or "me" if you are the owner.
         required: true
         type: string
       - name: document
@@ -412,7 +412,7 @@ paths:
       parameters:
       - name: owner
         in: path
-        description: The `id` of a `User` who owns the document.
+        description: The `id` of a `User` who owns the document, or "me" if you are the owner.
         required: true
         type: string
       - name: document
@@ -495,7 +495,7 @@ paths:
       parameters:
       - name: owner
         in: path
-        description: The `id` of a `User` who owns the document.
+        description: The `id` of a `User` who owns the document, or "me" if you are the owner.
         required: true
         type: string
       - name: document
@@ -569,7 +569,7 @@ paths:
       parameters:
       - name: owner
         in: path
-        description: The `id` of a `User` who owns the document.
+        description: The `id` of a `User` who owns the document, or "me" if you are the owner.
         required: true
         type: string
       - name: document
@@ -631,7 +631,7 @@ paths:
       parameters:
       - name: owner
         in: path
-        description: The `id` of a `User` who owns the document.
+        description: The `id` of a `User` who owns the document, or "me" if you are the owner.
         required: true
         type: string
       - name: document
@@ -676,7 +676,7 @@ paths:
       parameters:
       - name: owner
         in: path
-        description: The `id` of a `User` who owns the document.
+        description: The `id` of a `User` who owns the document, or "me" if you are the owner.
         required: true
         type: string
       - name: document
