@@ -33,6 +33,7 @@ In `local/environment.json`:
 	  "GITHUB_CLIENT_ID": "...",
 	  "GITHUB_CLIENT_SECRET": "...",
 	  "database": "postgresql://draftdotcloud:...@localhost/draftdotcloud"
+	  "database_logging": true
 	}
 
 Test functionality:

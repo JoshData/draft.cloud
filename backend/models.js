@@ -179,7 +179,11 @@ exports.initialize_database = function(settings, ready) {
           exports.UserApiKey.findOne({
             where: {
               uuid: uuid,
-            }})
+            },
+            include: [{
+                model: exports.User
+            }]
+          })
           .then(function(userapikey) {
             if (!userapikey) {
               cb();
@@ -194,14 +198,7 @@ exports.initialize_database = function(settings, ready) {
                 return;
               }
 
-              // TODO: Merge this database query with the previous query.
-              exports.User.findOne({
-                where: {
-                  id: userapikey.userId
-                }})
-              .then(function(user) {
-                cb(user, userapikey);
-              });
+              cb(userapikey.user, userapikey);
             });
           });
         }
