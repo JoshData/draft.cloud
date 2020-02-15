@@ -23,7 +23,6 @@ exports.initialize_database = function(settings, ready) {
     settings.database || "sqlite://db.sqlite",
     {
       dialectOptions: settings.database_connection_options,
-      operatorsAliases: false,
       logging: settings.database_logging ? console.log : null
     }
   );
