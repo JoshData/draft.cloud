@@ -165,6 +165,11 @@ exports.create_routes = function(app, settings) {
   // Start a new document.
   app.get("/new", function (req, res) {
     if (!req.user) {
+      if (!req.session) {
+        // Sessions are not enabled.
+        res.status(500).send('Sessions are not enabled.');
+        return;
+      }
       // Authenticate if not logged in.
       req.session.redirect_after_login = "/new";
       res.redirect(github_callback_path)
@@ -192,7 +197,7 @@ exports.create_routes = function(app, settings) {
   // A document.
   var document_page = fs.readFileSync("templates/document.html", "utf8");
   app.get("/edit/:owner/:document", function (req, res) {
-    if (!req.user) {
+    if (!req.user && req.session /* if sessions are enabled */) {
       // Authenticate if not logged in.
       req.session.redirect_after_login = req.url;
       res.redirect(github_callback_path);

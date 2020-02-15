@@ -60,7 +60,7 @@ make_editable(
   $('#document-name'),
   "Change Document Name",
   "Give this document a short name so it has a pretty URL. Changing the document's name changes its address, so if you have shared this document already you will need to send your collaborators a new link.",
-  "/api/v1/documents/" + $('#owner-id').text + "/" + $('#document-id').text);
+  "/api/v1/documents/" + $('#owner-id').text() + "/" + $('#document-id').text());
 
 function show_api_info() {
   $('#api-info').modal();

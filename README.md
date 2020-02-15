@@ -57,6 +57,10 @@ Testing using the command line & browser. Install `jq` first.
 	# Copy the "web_urls" => "document" value into your browser to
 	# edit the document. Lose the URL? List your documents:
 	backend/req GET '' documents/me
+
+Using a browser extension to add HTTP headers to requests, and add an API key header:
+
+	Authorization: {your API key}
 	
 
 ## Deployment
