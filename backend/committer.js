@@ -178,8 +178,8 @@ function commit_revision(revision, cb) {
     }
 
     // Load the document at the base revision.
-    revision.document.get_content(revision.doc_pointer, revision.baseRevision, false /* don't cache */,
-      function(err, doc_revision, content, op_path) {
+    revision.document.get_content(null, revision.baseRevision, false /* don't cache */,
+      function(err, doc_revision, content, __) {
         // There should not be any errors...
         if (err) {
           // There is an error with document content.
@@ -190,23 +190,26 @@ function commit_revision(revision, cb) {
         // Load the JOT operation.
         var op = jot.opFromJSON(revision.op);
 
+        // If this operation occurred at a sub-path on the document, then wrap the
+        // operation within APPLY operations to get down to that path. doc_pointer
+        // doesn't distinguish between array indexes and object keys, so use
+        // parse_json_pointer_path_with_content to figure that out. After this,
+        // op and content are both relative to the whole document. It would be nice
+        // if we could focus just on the targeted path, but because we might rebase
+        // on operations that affected other parts of the document that might also
+        // affect the targeted part, it's probably safer to work on the whole document.
+        var parsed_path = models.parse_json_pointer_path_with_content(revision.doc_pointer, content);
+        for (var i = parsed_path[0].length-1; i >= 0; i--)
+          op = new jot.APPLY(parsed_path[0][i], op);
+
         // Validate the operation. It should apply without error to the document
-        // at the base revision. If revision.doc_pointer was set, then the document
-        // content is for that pointer.
+        // at the base revision.
         try {
           op.apply(content);
         } catch (e) {
           error_handler(e);
           return;
         }
-
-        // If this operation occurred at a sub-path on the document, then wrap the
-        // operation within APPLY operations to get down to that path. op_path has been
-        // constructed so that the elements are either numbers or strings, and jot.APPLY
-        // will use that distinction to select whether it is the APPLY for sequences
-        // (the element is a number, an index) or objects (the element is a string, a key).
-        for (var i = op_path.length-1; i >= 0; i--)
-          op = new jot.APPLY(op_path[i], op);
 
         // Rebase against all of the subsequent operations after the base revision to
         // the current revision. Find all of the subsequent operations.
