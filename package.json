@@ -20,6 +20,7 @@
     "jsoneditor": "^5.34.0",
     "moment": "^2.24.0",
     "mustache": "^4.0.0",
+    "node-cache": "^5.1.0",
     "passport": "^0.4.1",
     "passport-github2": "^0.1.11",
     "pg": "^6.4.2",

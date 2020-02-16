@@ -1,6 +1,7 @@
 const fs = require('fs');
 const Sequelize = require('sequelize');
 const credential = require('credential');
+const NodeCache = require('node-cache');
 
 const auth = require('./auth.js');
 
@@ -14,6 +15,18 @@ var valid_name_text = "Names may only contain the characters A-Z, a-z, 0-9, unde
 
 exports.valid_name_text = valid_name_text;
 
+class MemoryCache {
+  constructor() {
+    this.cache = new NodeCache({ stdTTL: 60 });
+  }
+  get(key, cb) {
+    cb(null, this.cache.get(key));
+  }
+  set(key, value) {
+    this.cache.set(key, value);
+  }
+};
+
 exports.initialize_database = function(settings, ready) {
   // Replace the ssl.ca field with file contents.
   if (settings.database_connection_options && settings.database_connection_options.ssl && settings.database_connection_options.ssl.ca)
@@ -26,6 +39,8 @@ exports.initialize_database = function(settings, ready) {
       logging: settings.database_logging ? console.log : null
     }
   );
+
+  exports.volatile_cache = new MemoryCache();
 
   // CREATE MODELS
 
@@ -339,7 +354,10 @@ exports.initialize_database = function(settings, ready) {
     }
 
     if (typeof at_revision === "string") {
-      // If given a Revision UUID, look it up in the database.
+      // If given a Revision UUID, look it up in the database,
+      // and then use the Revision instance to get the document
+      // content by re-calling this method with the instance
+      // instead of the string.
       exports.Revision.from_uuid(doc, at_revision, function(revision) {
         if (!revision)
             cb('Invalid revision: ' + at_revision);
@@ -349,100 +367,141 @@ exports.initialize_database = function(settings, ready) {
       return;
     }
 
-    // Find the most recent CachedContent, but no later
-    // than at_revision (if at_revision is not null).
-    var where = { documentId: doc.id };
-    if (at_revision)
-      where['revisionId'] = { [Sequelize.Op.lte]: at_revision.id };
-    exports.CachedContent.findOne({
-      where: where,
-      order: [["revisionId", "DESC"]],
-      include: [{
-        model: exports.Revision,
-        include: [ { model: exports.User } ]
-      }]
-    })
-    .then(function(cache_hit) {
-      // Load all subsequent revisions. Add to the id filter to only get
-      // revisions after the cache hit's revision. The cache_hit may be null
-      // if there is no available cached content --- in which case
-      // we load all revisions from the beginning.
-      var where = {
-        documentId: doc.id,
-        committed: true
-      };
-      if (at_revision || cache_hit)
-        where["id"] = { };
-      if (at_revision)
-        where['id'][Sequelize.Op.lte] = at_revision.id;
-      if (cache_hit)
-        where['id'][Sequelize.Op.gt] = cache_hit.revisionId;
-      exports.Revision.findAll({
-        where: where,
-        order: [["id", "ASC"]],
-        include: [
-          { model: exports.User }
-        ]
-      })
-      .then(function(revs) {
-        // Documents always start with a null value at the start of the revision history.
-        var current_revision = null;
-        var content = null;
+    // Get the most recent CachedContent entry for the document that is not
+    // more recent than at_revision, if given.
+    load_document_cached_content_upto(doc, at_revision, function(cache_hit, volatile_cache_hit, vcache_key) {
+      // Load all revisions subsequent to the CachedContent document and up
+      // at_revision so that we can assemble the document content at at_revision.
+      // If there was a cache miss, then we need all revisions from the beginning
+      // of the document. If at_revision is not given, then we're looking for
+      // the current document content and we need all subsequent revisions.
+      load_revisions_between(doc,
+        cache_hit ? cache_hit.revision.id : null, // revisions after this one
+        at_revision ? at_revision.id : null, // revisions up to and including this one
+        function(revs) {
+          // Documents always start with a null value at the start of the revision history.
+          var current_revision = null;
+          var content = null;
 
-        // Start with the peg revision, assuming there was one.
-        if (cache_hit) {
-          content = cache_hit.document_content;
-          current_revision = cache_hit.revision;
-        }
+          // Start with the peg revision, assuming there was one.
+          if (cache_hit) {
+            content = cache_hit.document_content;
+            current_revision = cache_hit.revision;
+          }
 
-        // Apply all later revisions' operations (if any).
-        for (var i = 0; i < revs.length; i++) {
-          var op = jot.opFromJSON(revs[i].op);
-          content = op.apply(content);
-          current_revision = revs[i];
-        }
+          // Apply all later revisions' operations (if any).
+          for (var i = 0; i < revs.length; i++) {
+            var op = jot.opFromJSON(revs[i].op);
+            content = op.apply(content);
+            current_revision = revs[i];
+          }
 
-        // We now have the latest content....
+          // We now have the latest content.
 
-        // If the most recent revision doesn't have cached content,
-        // store it so we don't have to do all this work again next time.
-        if (revs.length > 0 && save_cached_content) {
-          exports.CachedContent.create({
+          if (current_revision) {
+            // Put this document back into the volatile cache unless there's already
+            // an entry in the volatile cache for this document for a later revision.
+            // If at_revision was not specified, then this must be the most recent
+            // anyway. Otherwise check that at_revision is newer than the cached entry.
+            if (!at_revision || !volatile_cache_hit || volatile_cache_hit.revision.id < current_revision.id) {
+              exports.volatile_cache.set(vcache_key, {
+                revision: current_revision,
+                document_content: content
+              });
+            }
+
+            // If the most recent revision doesn't have cached content,
+            // store it so we don't have to do all this work again next time.
+            if (revs.length > 0 && save_cached_content) {
+              exports.CachedContent.create({
                 documentId: doc.id,
                 revisionId: current_revision.id,
                 document_content: content
-              }).then(function(user) {
-                // we're not waiting for this to finish
-              });
-        }
+              }); // not waiting for this to finish
+            }
+          }
 
-        // Execute the JSON Pointer given in the URL. We could use
-        // json_ptr.get(content, pointer). But the PUT function needs
-        // to know whether the pointer passes through arrays or objects
-        // in order to create the correct JOT operations that represent
-        // the change. So we have to step through each part and record
-        // whether we are passing through an Object or Array.
-        var x = parse_json_pointer_path_with_content(pointer, content);
-        if (!x)
-          cb('Document path ' + pointer + ' not found.');
-        op_path = x[0];
-        content = x[1];
+          // Execute the JSON Pointer given in the URL. We could use
+          // json_ptr.get(content, pointer). But the PUT function needs
+          // to know whether the pointer passes through arrays or objects
+          // in order to create the correct JOT operations that represent
+          // the change. So we have to step through each part and record
+          // whether we are passing through an Object or Array.
+          var x = exports.parse_json_pointer_path_with_content(pointer, content);
+          if (!x)
+            cb('Document path ' + pointer + ' not found.');
+          op_path = x[0];
+          content = x[1];
 
-        // Callback.
-        cb(null, current_revision, content, op_path);
-      })
-      .catch(function(err) {
-        cb("There is an error with the document.");
-        console.log(err);
-      });
-    })
-    .catch(function(err) {
-      cb("There is an error with the document cache.");
-      console.log(err);
+          // Callback.
+          cb(null, current_revision, content, op_path);
+        });
     });
   }
 
-  function parse_json_pointer_path_with_content(pointer, content) {
+  function load_document_cached_content_upto(doc, at_revision, cb) {
+    // Check the volatile cache for the most recent content for
+    // the document. CachedContent instances are immutable, so
+    // if we have a cache entry, it is usable.
+    var cache_key = "cachedcontent_latest_" + doc.id; // also constructed in committer.js
+    exports.volatile_cache.get(cache_key, function(err, vcache_hit) {
+      // If at_revision is given, then the cached content can't be
+      // any later than from that revision.
+      if (vcache_hit
+        && (!at_revision || vcache_hit.revision.id <= at_revision.id)) {
+        cb(vcache_hit, null, cache_key);
+        return;
+      }
+
+      // Cache miss - try the database.
+      var where = { documentId: doc.id };
+      if (at_revision)
+        where['revisionId'] = { [Sequelize.Op.lte]: at_revision.id };
+      exports.CachedContent.findOne({
+        where: where,
+        order: [["revisionId", "DESC"]],
+        include: [{
+          model: exports.Revision,
+          include: [ { model: exports.User } ]
+        }]
+      })
+      .then(function(cache_hit) {
+        // Return it.
+        cb(cache_hit, vcache_hit, cache_key);
+      });
+    });
+  }
+
+  function load_revisions_between(doc, revision_gt, revision_lte, cb) {
+    // Find all revisions in a range.
+
+    // If the range has the same revision at the start and end, then there
+    // cannot be any revisions to return.
+    if (revision_gt == revision_lte) {
+      cb([]);
+      return;
+    }
+
+    var where = {
+      documentId: doc.id,
+      committed: true
+    };
+    if (revision_gt || revision_lte)
+      where["id"] = { };
+    if (revision_lte)
+      where['id'][Sequelize.Op.lte] = revision_lte;
+    if (revision_gt)
+      where['id'][Sequelize.Op.gt] = revision_gt;
+    exports.Revision.findAll({
+      where: where,
+      order: [["id", "ASC"]],
+      include: [
+        { model: exports.User }
+      ]
+    }).then(cb); // cb(revisions)
+  }
+
+  exports.parse_json_pointer_path_with_content = function(pointer, content) {
     // The path is a JSON Pointer which we parse with json-ptr.
     // Unfortunately the path components are all strings, but
     // we need to distinguish array index accessses from object
@@ -539,25 +598,48 @@ exports.initialize_database = function(settings, ready) {
     // ... is passed to the callback.
 
     // If "singularity" is passed, pass it through as a specicial revision.
-    if (uuid == "singularity")
-      cb("singularity")
+    if (uuid == "singularity") {
+      cb("singularity");
+      return;
+    }
 
     // Find the named revision.
-    else if (uuid)
-      exports.Revision.findOne({
-        where: { documentId: doc.id, uuid: uuid },
-        include: [{ model: exports.User }]
-      })
-      .then(function(revision) {
-        if (!revision)
-          cb(null);
-        else
+    if (uuid) {
+      // Revisions are immutable once they are committed,
+      // so if we have it in the cache, we can return it.
+      // Revisions are added to the cache when fetched
+      // below and when initially committed.
+      var cache_key = "revision_" + uuid; // Also constructed in committer.js
+      exports.volatile_cache.get(cache_key, function(err, cache_hit) {
+        if (cache_hit) {
+          cb(cache_hit);
+          return;
+        }
+
+        // Cache miss - try the database.
+        exports.Revision.findOne({
+          where: { documentId: doc.id, uuid: uuid },
+          include: [{ model: exports.User }]
+        })
+        .then(function(revision) {
+          if (!revision) {
+            cb(null);
+            return;
+          }
+
+          // Return the Revision.
           cb(revision);
-      })
-      .catch(function(err) {
-        console.log(err);
-        cb(null);
+
+          // Cache it if committed, which is when it becomes immutable.
+          if (revision.committed)
+           exports.volatile_cache.set(cache_key, revision);
+        })
+        .catch(function(err) {
+          console.log(err);
+          cb(null);
+        });
       });
+    }
 
     // Get the most recent revision. If there are no revisions yet,
     // pass forward the spcial ID "singularity".

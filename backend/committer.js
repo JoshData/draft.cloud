@@ -238,27 +238,26 @@ function commit_revision(revision, cb) {
             return;
           }
 
-          if (0 && op_path.length == 0) {
+          // Ensure operation is simplified.
+          op = op.simplify();
+
           try {
             // Although rebase should always give us a good result, sanity check
             // that a) the operation can be composed with the prior operations and
             // b) it can apply to the current document content. We sanity check
             // two ways to be sure we don't corrupt the document. We're just
-            // checking for thrown exceptions.
-            // TODO: This won't work if the doc_pointer was set because right now
-            // op and base_ops apply to the whole document but content is only
-            // the part of the document targetted by doc_pointer.
-            op.apply(base_ops.apply(content)); // (content + base_ops) + op
+            // checking for thrown exceptions. A deep-equal comparison might also
+            // be good.
+            //
+            // Save the final content so we can cache the new document content.
+            var new_content = op.apply(base_ops.apply(content)); // (content + base_ops) + op
             base_ops.compose(op).apply(content); // content + (base_ops+op)
+            content = new_content;
           } catch (e) {
             // Don't commit it.
             error_handler(e);
             return;
           }
-          }
-
-          // Ensure operation is simplified.
-          op = op.simplify();
 
           // Make a revision.
           revision.op = op.toJSON();
@@ -271,6 +270,13 @@ function commit_revision(revision, cb) {
 
             // Indicate this revision is finished.
             debugging_paused_callback(cb);
+
+            // Save to cache.
+            models.volatile_cache.set("revision_" + saved_rev.uuid, saved_rev);
+            models.volatile_cache.set("cachedcontent_latest_" + revision.document.id, {
+              document_content: content,
+              revision: saved_rev
+            });
           }).catch(error_handler);
         }).catch(error_handler);
     });
