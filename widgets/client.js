@@ -45,7 +45,7 @@ exports.Client = function(owner_name, document_name, api_key, channel, widget, l
 
   // Open the communication channel and initialize the widget asynchronously,
   // wait for both to finish, and then start polling for widget changes.
-  async.parallel([
+  async.series([
     function(callback) {
       // Open the communication channel.
       logger("opening document using " + channel.name);
