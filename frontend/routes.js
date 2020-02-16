@@ -21,7 +21,7 @@ exports.add_middleware = function(app, sessionStore, settings) {
     secret: settings.secret_key,
     resave: false,
     saveUninitialized: true,
-    cookie: { secure: settings.https }
+    cookie: { secure: /^https:/.test(settings.url) }
   }))
   app.use(passport.initialize());
   app.use(passport.session());

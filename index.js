@@ -1,12 +1,90 @@
-var fs = require('fs');
-var http = require('http');
-var https = require('https');
-var express = require('express');
+const commandLineArgs = require('command-line-args');
+const fs = require('fs');
+const http = require('http');
+const https = require('https');
+const express = require('express');
 
-// Load local settings.
-var settings = JSON.parse(fs.readFileSync("local/environment.json"))
+// Parse settings from environment variables, then command line arguments, then a specified
+// configuration file.
 
-// Prep the database.
+const optionDefinitions = [
+  { name: 'bind_host', type: String, typeLabel: "localhost", description: "The network interface to listen on." },
+  { name: 'port', type: Number, typeLabel: "8000", description: "The network port to listen on." },
+  { name: 'url', type: String, typeLabel: "http://localhost:8000", description: "The public URL for the service." },
+  { name: 'trust_proxy', type: String, typeLabel: "ip_address", description: "If behind a proxy, the IP address(es) or subnets of the proxy to trust for X-Forwarded-* headers. See https://expressjs.com/en/guide/behind-proxies.html." },
+  { name: 'database', type: String, typeLabel: "sqlite://db.sqlite", description: "See https://sequelize.org/v5/manual/dialects.html for connection strings." },
+  { name: 'database_logging', type: Boolean, description: "Log every database query." },
+  { name: 'secret_key', type: String, typeLabel: "somerandomtext", description: "See https://www.npmjs.com/package/express-session#secret" },
+  { name: 'allow_anonymous_user_creation', type: Boolean, description: "Allow user accounts to be created by unauthenticated users." },
+  { name: 'GITHUB_CLIENT_ID', type: String, description: "GitHub OAuth client ID."},
+  { name: 'GITHUB_CLIENT_SECRET', type: String, description: "GitHub OAuth client secret."},
+  { name: 'settings_file', type: String, typeLabel: "file.env", description: "Read settings from configuration file." },
+  { name: 'help', type: Boolean, description: "Show this help." }
+];
+
+var optionsMapUppercase = { };
+optionDefinitions.forEach(opt => { optionsMapUppercase[opt.name.toUpperCase()] = opt });
+
+function env_to_argv() {
+  // Convert recognized environment variables to an array that looks like command-line arguments.
+  var argv = [];
+  Object.keys(process.env).forEach(key => {
+    if (key in optionsMapUppercase) {
+      argv.push("--" + optionsMapUppercase[key].name);
+      if (optionsMapUppercase[key].type != Boolean)
+        argv.push(process.env[key]);
+    }
+  });
+  return argv;
+}
+
+function file_to_argv(fn) {
+  // Convert a file containing KEY=value lines into an array that looks like command-line arguments.
+  var argv = [];
+  var lines = fs.readFileSync(fn, "utf8").split(/[\r\n]+/);
+  lines.forEach(line => {
+    var kv = /^(.*?)(=(.*))?$/.exec(line);
+    if (!kv[1]) return;
+    argv.push("--" + (kv[1] in optionsMapUppercase ? optionsMapUppercase[kv[1]].name : kv[1] ));
+    if (kv[1] in optionsMapUppercase && optionsMapUppercase[kv[1]].type != Boolean)
+      argv.push(kv[3]);
+  });
+  return argv;
+}
+
+var settings = {
+  ...commandLineArgs(optionDefinitions, { argv: env_to_argv() }), // parse environment variables
+  ...commandLineArgs(optionDefinitions) // parse command line
+};
+if (settings.settings_file)
+  settings = { ...settings, ...commandLineArgs(optionDefinitions, { argv: file_to_argv(settings.settings_file) }) };
+
+if (settings.help) {
+  console.log(require('command-line-usage')([
+  {
+    header: 'Draft.cloud',
+    content: 'A document collaboration server based on JOT: JSON Operational Transformation.'
+  },
+  {
+    header: 'Options',
+    optionList: optionDefinitions
+  }
+  ]));
+  console.log("");
+  console.log("All options can also be given in environment variables or in a settings file using these keys: "
+    + optionDefinitions.map(opt => { return opt.name.toUpperCase() }).join(', '));
+  process.exit(1);
+}
+
+// Fill in some defaults.
+var bind = settings.bind_host || "localhost";
+var port = settings.port || 8000;
+if (!settings.url) // Default the 'url' to the same as the bind host and port.
+  settings.url = "http://" + bind + ":" + port;
+
+// Start the application.
+
+// First initialize the database.
 require("./backend/models.js")
   .initialize_database(settings, function() {
 
@@ -20,7 +98,7 @@ require("./backend/models.js")
   app.use(require('helmet')())
   app.use(require('helmet-csp')({
     directives: {
-      defaultSrc: ["'self'", (settings.url + (/https:/.test(settings.url) ? ":443" : "")).replace(/https?:/, 'ws:')],
+      defaultSrc: ["'self'", (settings.url + (/^https:/.test(settings.url) ? ":443" : "")).replace(/https?:/, 'ws:')],
       styleSrc: ["'self'", "'unsafe-inline'" /* Quill clipboard paste breaks without it */],
       fontSrc: ["'self'"],
       imgSrc: ["'self'", 'data:']
@@ -40,8 +118,6 @@ require("./backend/models.js")
   frontend.create_routes(app, settings);
 
   // Start listening.
-  var bind = settings.bind || "127.0.0.1";
-  var port = settings.port || 8000;
   console.log("Starting on " + bind + ":" + port + ".");
   var server;
   if (!settings.tls) {

@@ -13,29 +13,6 @@ Install node and packages:
 	cd draft.cloud
 	npm install
 
-If running with a Postgres database:
-
-	npm install pg # requires Postgresql's JSON column type
-
-Configure Draft.Cloud:
-
-	mkdir local
-	nano local/environment.json
-
-In `local/environment.json`:
-
-	{
-	  "https": true,
-	  "port": 3005,
-	  "url": "https://draft.cloud",
-	  "allow_anonymous_user_creation": false,
-	  "secret_key": "...",
-	  "GITHUB_CLIENT_ID": "...",
-	  "GITHUB_CLIENT_SECRET": "...",
-	  "database": "postgresql://draftdotcloud:...@localhost/draftdotcloud"
-	  "database_logging": true
-	}
-
 Test functionality:
 
 	./build.sh
@@ -61,9 +38,18 @@ Testing using the command line & browser. Install `jq` first.
 Using a browser extension to add HTTP headers to requests, and add an API key header:
 
 	Authorization: {your API key}
-	
 
 ## Deployment
+
+See the full set of options that you may need to set:
+
+	node index.js --help
+
+Options can be specified in environment variables, on the command-line, or in a configuration file.
+
+If running with a Postgres database:
+
+	npm install pg # requires Postgresql's JSON column type
 
 Configure nginx and supervisor:
 
