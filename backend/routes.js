@@ -93,10 +93,9 @@ exports.create_routes = function(app, settings) {
 
   var user_route = api_path_root + '/users/:user';
 
-  app.post(api_path_root + '/users', function (req, res) {
-    // Create a new User with an initial, strong API key. Return a
-    // redirect to the User's API url but include the API key in a
-    // response header.
+  app.post(api_path_root + '/users', bodyParser.json(), function (req, res) {
+    // Create a new User with an initial, strong API key. Return the usual user
+    // data but include the API key in a separate response header.
 
     auth.check_request_authorization(req, function(req_user, requestor_api_key) {
       if (!req_user && !settings.allow_anonymous_user_creation) {
@@ -110,13 +109,26 @@ exports.create_routes = function(app, settings) {
         return;
       }
 
+      // Validate/sanitize the request body which contains initial
+      // User object fields.
+      // See https://github.com/expressjs/body-parser#bodyparserjsonoptions for
+      // default restrictions on the request body payload.
+      req.body = models.User.clean_user_dict(req.body);
+      if (typeof req.body != "object") req.body = { };
+
+      // Make a random name if one isn't provided by the user.
+      if (!req.body.name) {
+        req.body.name = randomstring.generate({
+          length: 22, // about 128 bits, same as the user's UUID
+          charset: 'alphanumeric'
+        });   
+      }
+
       // Create a new User. If this API call is authenticated, then the new User
       // is owned by the user making the request.
       models.User.create({
-        name: randomstring.generate({
-          length: 22, // about 128 bits, same as the user's UUID
-          charset: 'alphanumeric'
-        }),
+        name: req.body.name,
+        profile: req.body.profile,
         ownerId: req_user ? req_user.id : null,
       }).then(function(user) {
         // Create an initial API key for this user.
@@ -130,7 +142,22 @@ exports.create_routes = function(app, settings) {
             .status(200)
             .json(exports.form_user_response_body(user));
         });
-      }).catch(unhandled_error_handler(res));
+      }).catch(function(err) {
+        var handler = unhandled_error_handler(res);
+        if (err.errors && err.errors[0].path == "name") {
+          // Validation failed --- probably because the 'name' was already
+          // taken by a user.
+          res_send_plain(res, 400, "Name already taken.");
+          return;
+        }
+        if (err.errors) {
+          // Validation failed --- probably because the 'name' was already
+          // taken by a user.
+          res_send_plain(res, 400, err.errors.map(x => { return x.message; }).join("; "));
+          return;
+        }
+        handler(err);
+      });
     });
   });
 
@@ -182,10 +209,13 @@ exports.create_routes = function(app, settings) {
       return res_send_plain(res, 400, req.body);
 
     authz_user(req, res, req.params.user, "ADMIN", function(requestor, target) {
+      // Also see the POST route.
+
       // Update user's globally unique name.
       if (typeof req.body.name != "undefined")
         target.set("name", req.body.name);
 
+      // Update the user's profile data.
       if (typeof req.body.profile != "undefined")
         target.set("profile", req.body.profile);
       
@@ -201,8 +231,8 @@ exports.create_routes = function(app, settings) {
             return;
           }
         } catch (e) {
-          unhandled_error_handler(res)
         }
+        unhandled_error_handler(res)
       });
     });
   })
@@ -352,6 +382,13 @@ exports.create_routes = function(app, settings) {
     authz_document(req, res, false, "ADMIN", function(user, owner, doc) {
       exports.create_document(owner, req.body, function(doc, err) {
         if (err) {
+          try {
+            if (err.name == "SequelizeUniqueConstraintError" && err.fields.indexOf("name") >= 0) {
+              res_send_plain(res, 400, 'There is already a document with that name.');
+              return;
+            }
+          } catch (e) {
+          }
           unhandled_error_handler(res)(err);
           return;
         }

@@ -45,6 +45,10 @@ paths:
         If an API key is sent in the request, the new user is owned by the user making the request.
         If the Draft.Cloud backend is configured to allow the creation of anonymous users,
         an API key is not required.
+
+        If a JSON object is given in the request POST body, then the `name` and `profile` fields are used to initialize the new user.
+      consumes:
+      - application/json
       produces:
       - application/json
       parameters:
@@ -63,6 +67,8 @@ paths:
             X-Api-Key:
               description: The user's API key.
               type: string
+        '400':
+          description: The name given in the request body is already in use.
         '403':
           description: The Draft.Cloud backend does not allow the creation of new
             users through the API.
@@ -168,7 +174,11 @@ paths:
     post:
       summary: Create a document
       description: |
-        Creates a `Document` with a unique name.
+        Creates a `Document`.
+      
+        If a JSON object is given in the request POST body, then the `name` and other fields are used to initialize the new document.
+      consumes:
+      - application/json
       produces:
       - application/json
       parameters:
@@ -186,6 +196,8 @@ paths:
         '200':
           description: A new document was created. The response JSON body contains
             the new document's `id`, name and other metadata.
+        '400':
+          description: There is already a document owned by the user with the given name.
         '403':
           description: The caller has permission to see the owner but not create documents.
         '404':
