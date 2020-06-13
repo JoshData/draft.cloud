@@ -526,6 +526,10 @@ paths:
         in: header
         type: string
         description: JSON-encoded arbitrary user data stored with the Revision.
+      - name: Revision-Userdata-*
+        in: header
+        type: string
+        description: Arbitrary string data to store within the Revision's userdata.
       - name: Base-Revision-Id
         in: header
         type: string
@@ -595,6 +599,10 @@ paths:
         in: header
         type: string
         description: JSON-encoded arbitrary user data stored with the Revision.
+      - name: Revision-Userdata-*
+        in: header
+        type: string
+        description: Arbitrary string data to store within the Revision's userdata.
       - name: Base-Revision-Id
         in: header
         type: string

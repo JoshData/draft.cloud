@@ -684,6 +684,29 @@ exports.create_routes = function(app, settings) {
     return ret;
   }
 
+  function parse_revision_userdata(req) {
+    // Parse the JSON-encoded Revision-Userdata header, if present.
+    var userdata = null;
+    if (req.headers['revision-userdata'])
+      userdata = JSON.parse(req.headers['revision-userdata']);
+
+    // Parse strings from Revision-Userdata-* headers. If one is
+    // encountered and userdata is null, upgrade it to an object.
+    // If userdata has already been parsed as a non-object value,
+    // ignore these headers.
+    for (let k in req.headers) {
+      var m = /^revision-userdata-(.*)$/.exec(k);
+      if (!m) continue;
+      var key = m[1];
+      var value = req.headers[k];
+      if (userdata === null) userdata = { };
+      if (typeof userdata != "object") continue;
+      userdata[key] = value;
+    }
+
+    return userdata;
+  }
+
   app.put(
     document_content_route,
     [
@@ -715,13 +738,11 @@ exports.create_routes = function(app, settings) {
 
     // parse the userdata, same as in the PATCH route
     var userdata = null;
-    if (req.headers['revision-userdata']) {
-      try {
-        userdata = JSON.parse(req.headers['revision-userdata']);
-      } catch(e) {
-        res_send_plain(res, 400, "Invalid userdata: " + e);
-        return;
-      }
+    try {
+      userdata = parse_revision_userdata(req);
+    } catch(e) {
+      res_send_plain(res, 400, "Invalid userdata: " + e);
+      return;
     }
 
     // Get the current content and revision of the document.
@@ -797,13 +818,11 @@ exports.create_routes = function(app, settings) {
 
       // parse the userdata, same as in the PUT route
       var userdata = null;
-      if (req.headers['revision-userdata']) {
-        try {
-          userdata = JSON.parse(req.headers['revision-userdata']);
-        } catch(e) {
-          res_send_plain(res, 400, "Invalid userdata: " + e);
-          return;
-        }
+      try {
+        userdata = parse_revision_userdata(req);
+      } catch(e) {
+        res_send_plain(res, 400, "Invalid userdata: " + e);
+        return;
       }
 
       // check authz
