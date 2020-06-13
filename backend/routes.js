@@ -576,9 +576,9 @@ exports.create_routes = function(app, settings) {
   }
 
   app.get(document_content_route, function (req, res) {
-    // Fetch (the content of) a document. If a JSON Pointer is given at the end
+    // Fetch the content of a document. If a JSON Pointer is given at the end
     // of the path, then only return that part of the document. A JSON document
-    // is returned. READ access is required.
+    // is returned unless the accept header specifies otherwise. READ access is required.
     authz_document_content(req, res, "READ", function(user, owner, doc, access_level) {
       doc.get_content(
         req.params.pointer,
