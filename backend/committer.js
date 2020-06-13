@@ -12,33 +12,7 @@ var jot = require("jot");
 var document_queues = { };
 var sync_queue = [];
 
-exports.make_revision_async = function(user, doc, base_revision, op, pointer, comment, userdata, cb) {
-  // Record an uncommitted transaction, return it, and schedule
-  // an asynchronous commit (i.e. cb is called as soon as the
-  // uncommitted revision is written to the database).
-  models.Revision.create({
-    userId: user.id,
-    documentId: doc.id,
-    baseRevisionId: base_revision == "singularity" ? null : base_revision.id,
-    doc_pointer: pointer,
-    op: op.toJSON(),
-    comment: comment,
-    userdata: userdata
-  })
-  .then(function(rev) {
-    // Return to caller.
-    rev.user = user; // fill in model - expected by cb
-    rev.document = doc; // fill in model - expected by commit_revision
-    rev.baseRevision = base_revision; // fill in model - expected by commit_revision
-    cb(null, rev);
-    
-    // Queue revision.
-    queue_revision(rev, function() { });
-  })
-  .catch(cb);
-}
-
-exports.make_revision_sync = function(user, doc, base_revision, op, pointer, comment, userdata, cb) {
+exports.save_revision = function(user, doc, base_revision, op, pointer, comment, userdata, cb) {
   // Schedule an asynchronous commit of the revision and call the
   // callback once it is committed.
   var rev = models.Revision.build({
@@ -101,71 +75,6 @@ exports.sync = function(cb) {
     cb();
   else
     sync_queue.push(cb);
-}
-
-exports.commit_uncommitted_revisions = function(cb) {
-  // Pull all uncommitted revisions.
-  models.Revision.findAll({
-    where: {
-      committed: false,
-      error: false
-    },
-    order: [["documentId", "ASC"], ["id", "ASC"]],
-    include: [{
-      model: models.User
-    }, {
-      model: models.Document
-    }, {
-      model: models.Revision
-    }]
-  })
-  .then(function(revs) {
-    if (revs.length > 0)
-      console.log("Committing...");
-
-    // Make a mapping from document IDs to arrays of revisions.
-    var revsbydoc = { };
-    revs.forEach(function(rev) {
-      if (!(rev.documentId in revsbydoc))
-        revsbydoc[rev.documentId] = [];
-      revsbydoc[rev.documentId].push(rev);
-    });
-
-    // Fetch all Document instances.
-    models.Document.findAll({
-      where: {
-        id: {
-          [Sequelize.Op.in]: Object.keys(revsbydoc)
-        }
-      }
-    })
-    .then(function(docs) {
-      // For each document...
-      async.each(
-        docs,
-        function(doc, cb) {
-          // Process all of the revisions in this document in order.
-          var revs = revsbydoc[doc.id];
-          async.eachSeries(
-            revs,
-            commit_revision,
-            function(err) {
-              cb();
-              if (err) console.error(err);
-            }
-          );
-        },
-        function(err) {
-          // All documents are done processing.
-          // Unblock.
-          if (err)
-            cosole.log(err);
-          cb();
-        })
-    })
-    .catch(cb);
-  })
-  .catch(cb);
 }
 
 function commit_revision(revision, cb) {

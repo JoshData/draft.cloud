@@ -224,7 +224,7 @@ exports.init = function(io, sessionStore, settings) {
 
       // Find the base revision. If not specified, it's the current revision.
       models.Revision.from_uuid(doc_state.document, data.base_revision, function(base_revision) {
-        committer.make_revision_sync(
+        committer.save_revision(
           doc_state.user,
           doc_state.document,
           base_revision,
