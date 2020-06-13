@@ -573,11 +573,6 @@ exports.initialize_database = function(settings, ready) {
         type: Sequelize.JSON
       },
 
-      // A comment about the revision entered by the revision's author.
-      comment: {
-        type: Sequelize.TEXT
-      },
-
       // User-provided arbitrary metadata stored with the revision.
       userdata: {
         type: Sequelize.JSON

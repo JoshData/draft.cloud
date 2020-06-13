@@ -667,7 +667,6 @@ exports.create_routes = function(app, settings) {
         id: rev.user.uuid,
         name: rev.user.name
       },
-      comment: rev.comment,
       userdata: rev.userdata
     };
 
@@ -759,7 +758,6 @@ exports.create_routes = function(app, settings) {
                 base_revision,
                 op,
                 req.params.pointer,
-                req.headers['revision-comment'],
                 userdata,
                 function(err, rev) {
                   if (err)
@@ -825,7 +823,6 @@ exports.create_routes = function(app, settings) {
             base_revision,
             op,
             req.params.pointer,
-            req.headers['revision-comment'],
             userdata,
             function(err, rev) {
               if (err)

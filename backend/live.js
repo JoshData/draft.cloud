@@ -230,7 +230,6 @@ exports.init = function(io, sessionStore, settings) {
           base_revision,
           op,
           doc_state.doc_pointer,
-          data.comment,
           userdata,
           function(err, rev) {
             if (err) {

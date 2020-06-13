@@ -142,7 +142,6 @@ function open(owner_name, document_name, api_key, cbobj) {
       base_revision: base_revision,
       patch: patch.toJSON(),
       widget_state: widget_state,
-      comment: null,
       userdata: null
     }, function(data) {
       if (data.error) {

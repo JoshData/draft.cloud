@@ -12,7 +12,7 @@ var jot = require("jot");
 var document_queues = { };
 var sync_queue = [];
 
-exports.save_revision = function(user, doc, base_revision, op, pointer, comment, userdata, cb) {
+exports.save_revision = function(user, doc, base_revision, op, pointer, userdata, cb) {
   // Schedule an asynchronous commit of the revision and call the
   // callback once it is committed.
   var rev = models.Revision.build({
@@ -21,7 +21,6 @@ exports.save_revision = function(user, doc, base_revision, op, pointer, comment,
     baseRevisionId: base_revision == "singularity" ? null : base_revision.id,
     doc_pointer: pointer,
     op: op.toJSON(),
-    comment: comment,
     userdata: userdata
   })
   rev.user = user; // fill in model - expected by cb

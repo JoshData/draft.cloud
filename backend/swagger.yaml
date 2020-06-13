@@ -522,11 +522,6 @@ paths:
           (A final `/-` is not permitted.) Optional.
         type: string
         required: true
-      - name: Revision-Comment
-        in: header
-        type: string
-        description: An optional comment (typically explaining the purpose of the
-          Revision) that is stored with the Revision.
       - name: Revision-Userdata
         in: header
         type: string
@@ -596,11 +591,6 @@ paths:
           (A final `/-` is not permitted.) Optional.
         type: string
         required: true
-      - name: Revision-Comment
-        in: header
-        type: string
-        description: An optional comment (typically explaining the purpose of the
-          Revision) that is stored with the Revision.
       - name: Revision-Userdata
         in: header
         type: string
