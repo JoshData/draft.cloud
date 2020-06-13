@@ -477,7 +477,7 @@ exports.initialize_database = function(settings, ready) {
 
     // If the range has the same revision at the start and end, then there
     // cannot be any revisions to return.
-    if (revision_gt == revision_lte) {
+    if (revision_gt == revision_lte && revision_gt != null) {
       cb([]);
       return;
     }
