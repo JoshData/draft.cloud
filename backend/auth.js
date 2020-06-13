@@ -44,9 +44,7 @@ function get_document_from_uuid(owner, document_uuid, cb) {
       userId: owner.id,
       uuid: document_uuid
     },
-    include: [
-      { model: models.User }
-    ]
+    include: models.Document.INCLUDES
   })
   .then(function(doc) {
     cb(doc);

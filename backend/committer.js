@@ -12,20 +12,23 @@ var jot = require("jot");
 var document_queues = { };
 var sync_queue = [];
 
-exports.save_revision = function(user, doc, base_revision, op, pointer, userdata, cb) {
+exports.save_revision = function(revision_data, cb) {
   // Schedule an asynchronous commit of the revision and call the
   // callback once it is committed.
   var rev = models.Revision.build({
-    userId: user.id,
-    documentId: doc.id,
-    baseRevisionId: base_revision == "singularity" ? null : base_revision.id,
-    doc_pointer: pointer,
-    op: op.toJSON(),
-    userdata: userdata
+    userId: revision_data.user.id,
+    documentId: revision_data.doc.id,
+    baseRevisionId: revision_data.base_revision == "singularity" ? null : revision_data.base_revision.id,
+    doc_pointer: revision_data.pointer,
+    op: revision_data.op.toJSON(),
+    userdata: revision_data.userdata,
+    mergesId: revision_data.merges_revision ? revision_data.merges_revision.id : null,
+    mergesOp: revision_data.merges_revision ? revision_data.merges_op.toJSON() : null
   })
-  rev.user = user; // fill in model - expected by cb
-  rev.document = doc; // fill in model - expected by commit_revision
-  rev.baseRevision = base_revision; // fill in model - expected by commit_revision
+  rev.user = revision_data.user; // fill in model with instance - expected by cb
+  rev.document = revision_data.doc; // fill in model with instance - expected by commit_revision
+  rev.baseRevision = revision_data.base_revision; // fill in model with instance - expected by commit_revision
+  rev.merges = revision_data.merges_revision; // fill in model with instance
   
   // Queue revision.
   queue_revision(rev, function(err) {

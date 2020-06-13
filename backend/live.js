@@ -166,9 +166,7 @@ exports.init = function(io, sessionStore, settings) {
                   committed: true
                 },
                 order: [["id", "ASC"]],
-                include: [{
-                  model: models.User
-                }]
+                include: models.Revision.INCLUDES
               })
               .then(function(revs) {
                 socket.emit("new-revisions", {
@@ -224,13 +222,14 @@ exports.init = function(io, sessionStore, settings) {
 
       // Find the base revision. If not specified, it's the current revision.
       models.Revision.from_uuid(doc_state.document, data.base_revision, function(base_revision) {
-        committer.save_revision(
-          doc_state.user,
-          doc_state.document,
+        committer.save_revision({
+          user: doc_state.user,
+          doc: doc_state.document,
           base_revision,
           op,
-          doc_state.doc_pointer,
-          userdata,
+          pointer: doc_state.doc_pointer,
+          userdata
+          },
           function(err, rev) {
             if (err) {
               response({ error: "There was an error committing the revision." });
@@ -316,9 +315,7 @@ function emit_revisions(doc, revs) {
           }
         },
         order: [["id", "ASC"]],
-        include: [{
-          model: models.User
-        }]
+        include: models.Revision.INCLUDES
       }).then(function(earlier_revs) {
         // Emit all of the earlier ones, plus the new ones.
         emit_the_revisions(earlier_revs.concat(revs));

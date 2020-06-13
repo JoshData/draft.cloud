@@ -290,7 +290,7 @@ exports.initialize_database = function(settings, ready) {
       ],
       freezeTableName: true // Model tableName will be the same as the model name
     });
-  exports.Document.belongsTo(exports.User);
+  exports.Document.user = exports.Document.belongsTo(exports.User);
 
   exports.Document.clean_document_dict = function(doc) {
     // Validate that user-supplied fields are valid.
@@ -360,7 +360,7 @@ exports.initialize_database = function(settings, ready) {
       // instead of the string.
       exports.Revision.from_uuid(doc, at_revision, function(revision) {
         if (!revision)
-            cb('Invalid revision: ' + at_revision);
+          cb('Invalid revision: ' + at_revision);
         else
           doc.get_content(pointer, revision, save_cached_content, cb);
       });
@@ -368,14 +368,16 @@ exports.initialize_database = function(settings, ready) {
     }
 
     // Get the most recent CachedContent entry for the document that is not
-    // more recent than at_revision, if given.
+    // more recent than at_revision, if given. If doc is a fork, it never
+    // has a cache miss --- it always at least returns the parent document's
+    // content at the time of the fork.
     load_document_cached_content_upto(doc, at_revision, function(cache_hit, volatile_cache_hit, vcache_key) {
       // Load all revisions subsequent to the CachedContent document and up
       // at_revision so that we can assemble the document content at at_revision.
       // If there was a cache miss, then we need all revisions from the beginning
       // of the document. If at_revision is not given, then we're looking for
       // the current document content and we need all subsequent revisions.
-      load_revisions_between(doc,
+      doc.load_revisions_between(
         cache_hit ? cache_hit.revision.id : null, // revisions after this one
         at_revision ? at_revision.id : null, // revisions up to and including this one
         function(revs) {
@@ -466,14 +468,38 @@ exports.initialize_database = function(settings, ready) {
         }]
       })
       .then(function(cache_hit) {
-        // Return it.
-        cb(cache_hit, vcache_hit, cache_key);
+        if (cache_hit) {
+          // If we found something, return it.
+          cb(cache_hit, vcache_hit, cache_key);
+          return;
+        }
+
+        // If the document is a fork, return the content of the document it was
+        // forked from at the fork revision.
+        if (doc.forkedFrom) {
+          doc.forkedFrom.document.get_content(null, doc.forkedFrom, true, function(err, current_revision, content, op_path) {
+            cb({
+              document: doc,
+              revision: doc.forkedFrom,
+              document_content: content
+            }, vcache_hit, cache_key);
+          });
+          return;
+        }
+
+        // No cache hit.
+        cb(null, vcache_hit, cache_key);
       });
     });
   }
 
-  function load_revisions_between(doc, revision_gt, revision_lte, cb) {
-    // Find all revisions in a range.
+  exports.Document.prototype.load_revisions_between = function(revision_gt, revision_lte, cb) {
+    // Find all revisions in a range after revision_gt and before and including revision_lte.
+    // If revision_gt is null, then we're looking from the beginning of the
+    // document. If revision_lte is null, then we're looking for all revisions
+    // through the current revision.
+
+    var doc = this;
 
     // If the range has the same revision at the start and end, then there
     // cannot be any revisions to return.
@@ -495,9 +521,7 @@ exports.initialize_database = function(settings, ready) {
     exports.Revision.findAll({
       where: where,
       order: [["id", "ASC"]],
-      include: [
-        { model: exports.User }
-      ]
+      include: exports.Revision.INCLUDES
     }).then(cb); // cb(revisions)
   }
 
@@ -576,13 +600,41 @@ exports.initialize_database = function(settings, ready) {
       // User-provided arbitrary metadata stored with the revision.
       userdata: {
         type: Sequelize.JSON
-      }
+      },
+
+      // If the "merges" foreign key is set, this field stores a JOT operation that
+      // would merge this document into merges.document, i.e. a merge in the other
+      // direction. This operation doesn't affect this document's history but is
+      // necessary to perform merges of documents that have already been merged.
+      mergesOp: {
+        type: Sequelize.JSON
+      },
+
     }, {
       freezeTableName: true // Model tableName will be the same as the model name
     });
-  exports.Revision.belongsTo(exports.User);
-  exports.Revision.belongsTo(exports.Document);
+  exports.Revision.user = exports.Revision.belongsTo(exports.User);
+  exports.Revision.document = exports.Revision.belongsTo(exports.Document);
   exports.Revision.belongsTo(exports.Revision, {as: 'baseRevision'});
+  exports.Revision.merges = exports.Revision.belongsTo(exports.Revision, {as: 'merges'});
+  exports.Document.forkedFrom = exports.Document.belongsTo(exports.Revision, {as: 'forkedFrom', constraints: false /* avoid cyclic dependency */});
+
+  exports.Revision.INCLUDES = [
+    { association: exports.Revision.user },
+    { association: exports.Revision.document, include: [
+        { association: exports.Document.user }
+      ] },
+    { association: exports.Revision.merges, include: [
+      { association: exports.Revision.document, include: [
+          { association: exports.Document.user }
+        ] },
+      ] },
+  ];
+
+  exports.Document.INCLUDES = [
+    { association: exports.Document.user },
+    { association: exports.Document.forkedFrom, include: exports.Revision.INCLUDES },
+  ];
 
   exports.Revision.from_uuid = function(doc, uuid, cb) {
     // Gets a Revision instance from a revision UUID. If uuid is...
@@ -613,11 +665,17 @@ exports.initialize_database = function(settings, ready) {
 
         // Cache miss - try the database.
         exports.Revision.findOne({
-          where: { documentId: doc.id, uuid: uuid },
-          include: [{ model: exports.User }]
+          where: { uuid: uuid },
+          include: exports.Revision.INCLUDES
         })
         .then(function(revision) {
           if (!revision) {
+            cb(null);
+            return;
+          }
+
+          // Sanity check that the revision is for the given document (if given).
+          if (doc && revision.document.id != doc.id) {
             cb(null);
             return;
           }
@@ -637,18 +695,21 @@ exports.initialize_database = function(settings, ready) {
     }
 
     // Get the most recent revision. If there are no revisions yet,
-    // pass forward the spcial ID "singularity".
+    // pass forward the spcial ID "singularity". If the document
+    // is a fork, then its first revision is the forked from revision.
     else
       exports.Revision.findOne({
         where: { documentId: doc.id },
         order: [["id", "DESC"]], // most recent
-        include: [{ model: exports.User }]
+        include: exports.Revision.INCLUDES
       })
       .then(function(revision) {
-        if (!revision)
-          cb("singularity");
-        else
+        if (revision)
           cb(revision);
+        else if (doc.forkedFrom)
+          cb(doc.forkedFrom);
+        else
+          cb("singularity");
       });
   }
 

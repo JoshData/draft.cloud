@@ -7,6 +7,7 @@ const Sequelize = require('sequelize');
 var auth = require("./auth.js");
 var models = require("./models.js");
 var committer = require("./committer.js");
+var merge = require("./merge.js");
 
 var jot = require("jot");
 
@@ -232,7 +233,7 @@ exports.create_routes = function(app, settings) {
           }
         } catch (e) {
         }
-        unhandled_error_handler(res)
+        unhandled_error_handler(res)(err);
       });
     });
   })
@@ -257,32 +258,33 @@ exports.create_routes = function(app, settings) {
   var document_route = document_list_route + '/:document';
   var document_content_route = document_route + '/content:pointer(/[\\w\\W]*)?';
 
-  function authz_document(req, res, must_exist, min_level, cb) {
+  function authz_document2(req, res, document_owner_id, document_id, must_exist, min_level, error_msg_descr, cb) {
     // Checks authorization for document URLs. The callback is called
     // as: cb(user, owner, document) where user is the user making the
     // request, owner is the owner of the document, and document is the
     // document.
     if (!(min_level == "READ" || min_level == "WRITE" || min_level == "ADMIN")) throw "invalid argument";
-    auth.get_document_authz(req, req.params.owner, req.params.document, function(user, owner, doc, level) {
+    auth.get_document_authz(req, document_owner_id, document_id, function(user, owner, doc, level) {
       // Check permission level.
       if (auth.min_access(min_level, level) != min_level) {
         // The user's access level is lower than the minimum access level required.
         if (auth.min_access("READ", level) == "READ")
           // The user has READ access but a higher level was required.
-          res_send_plain(res, 403, 'You do not have ' +  min_level + ' permission on this document. You have ' + level + '.');
+          res_send_plain(res, 403, 'You do not have ' +  min_level + ' permission on the document ' + error_msg_descr + '. You have ' + level + ' permission.');
         else
           // The user does not have READ access, so we do not reveal whether or not
           // a document exists here.
-          res_send_plain(res, 404, 'User or document not found or you do not have permission to see it.');
+          res_send_plain(res, 404, 'User or document ' + error_msg_descr + ' not found or you do not have permission to see it.');
         return;
       }
 
-      // Check if document exists.
+      // The user has or would have the right level of access to the document.
+      // Check if the document actually exists.
       if (must_exist && !doc) {
         // Document doesn't exist but must. Since the user would at least have READ access
         // if the document existed, or else we would have given a different error above,
         // we can reveal that the document doesn't exist.
-        res_send_plain(res, 404, 'Document does not exist.');
+        res_send_plain(res, 404, 'Document ' + error_msg_descr + ' does not exist.');
         return;
       }
 
@@ -291,7 +293,30 @@ exports.create_routes = function(app, settings) {
     });
   }
 
+  function authz_document(req, res, must_exist, min_level, cb) {
+    authz_document2(req, res, req.params.owner, req.params.document, must_exist, min_level, "in the URL", cb);
+  }
+
   exports.create_document = function(owner, doc, cb) {
+    // If doc.forkedFrom is given and it is not a Revision, then
+    // resolve the UUID to a Revision instance.
+   if (doc.forkedFrom && !(doc.forkedFrom instanceof models.Revision)) {
+      // If "singularity" is given, it's not really forking at all.
+      if (doc.forkedFrom == "singularity") {
+        delete doc.forkedFrom;
+      } else {
+        models.Revision.from_uuid(null, doc.forkedFrom, function(revision) {
+          if (!revision) {
+            cb(null, "forkedFrom was not a valid revision id.")
+            return;
+          }
+          doc.forkedFrom = revision;
+          exports.create_document(owner, doc, cb);
+        });
+        return;
+      }
+    }
+
     // Create a new document.
     models.Document.create({
       userId: owner.id,
@@ -299,12 +324,14 @@ exports.create_routes = function(app, settings) {
         length: 22, // about 128 bits, same as the user's UUID
         charset: 'alphanumeric'
       }),
+      forkedFromId: doc.forkedFrom ? doc.forkedFrom.id : null,
       anon_access_level: doc.anon_access_level || auth.DEFAULT_NEW_DOCUMENT_ANON_ACCESS_LEVEL,
       userdata: doc.userdata || {}
     })
-    .then(function(doc) {
-      doc.user = owner; // fill in
-      cb(doc);
+    .then(function(newdoc) {
+      newdoc.user = owner; // fill in
+      newdoc.forkedFrom = doc.forkedFrom; // fill in
+      cb(newdoc);
     })
     .catch(function(err) {
        cb(null, err);
@@ -312,12 +339,28 @@ exports.create_routes = function(app, settings) {
   }
 
   exports.make_document_json = function(doc) {
+    // doc must have been fetched from the database using
+    // `include: exports.Document.INCLUDES` so that it has
+    // all of the JOIN'd fields used below.
     return {
       id: doc.uuid,
       name: doc.name,
       created: doc.createdAt,
       anon_access_level: doc.anon_access_level,
       owner: exports.form_user_response_body(doc.user),
+      forkedFrom: !doc.forkedFrom ? null : {
+        // Don't expose possibly private data of the forked document,
+        // and don't recurse into the forked document because it may
+        // also be a fork.
+        owner: doc.forkedFrom.document.user.uuid,
+        document: doc.forkedFrom.document.uuid,
+        revision: doc.forkedFrom.uuid,
+        revisionCreated: doc.forkedFrom.createdAt,
+        api_urls: {
+          document: api_public_base_url + document_route.replace(/:owner/, doc.forkedFrom.document.user.uuid)
+            .replace(/:document/, doc.forkedFrom.document.uuid)
+          }
+      },
       userdata: doc.userdata,
       api_urls: {
         document: api_public_base_url + document_route.replace(/:owner/, doc.user.uuid)
@@ -349,9 +392,7 @@ exports.create_routes = function(app, settings) {
         where: {
           userId: owner.id
         },
-        include: [
-          { model: models.User }
-        ]
+        include: models.Document.INCLUDES
       })
       .then(function(docs) {
         // Turn the documents into API JSON.
@@ -373,6 +414,7 @@ exports.create_routes = function(app, settings) {
     // default restrictions on the request body payload.
     //
     // Requires default ADMIN permission on documents owned by the owner user.
+
     // Validate/sanitize input.
     req.body = models.Document.clean_document_dict(req.body);
     if (typeof req.body == "string")
@@ -431,7 +473,7 @@ exports.create_routes = function(app, settings) {
             return;
           }
         } catch (e) {
-          unhandled_error_handler(res)
+          unhandled_error_handler(res)(err);
         }
       });
     })
@@ -669,6 +711,19 @@ exports.create_routes = function(app, settings) {
       },
       userdata: rev.userdata
     };
+    if (rev.merges) {
+      // Don't expose possibly private data of the revision from the
+      // document that was merged in.
+      ret['merges'] = {
+        // Don't expose possibly private data of the forked document,
+        // and don't recurse into the forked document because it may
+        // also be a fork.
+        owner: rev.merges.document.user.uuid,
+        document: rev.merges.document.uuid,
+        revision: rev.merges.uuid,
+        revisionCreated: rev.merges.createdAt
+      };
+    }
 
     if (rev.committed) {
       ret.status = "committed";
@@ -736,7 +791,7 @@ exports.create_routes = function(app, settings) {
       return;
     }
 
-    // parse the userdata, same as in the PATCH route
+    // parse the userdata, same as in the PATCH route and merge
     var userdata = null;
     try {
       userdata = parse_revision_userdata(req);
@@ -773,19 +828,20 @@ exports.create_routes = function(app, settings) {
               res_send_plain(res, 200, "no change");
             else
               // Make a new revision.
-              committer.save_revision(
+              committer.save_revision({
                 user,
                 doc,
                 base_revision,
                 op,
-                req.params.pointer,
-                userdata,
+                pointer: req.params.pointer,
+                userdata
+                },
                 function(err, rev) {
                   if (err)
-                    unhandled_error_handler(res)
+                    unhandled_error_handler(res)(err);
                   else
                     res.status(201).json(exports.make_revision_response(rev, []));
-                })
+                });
           })
         });
 
@@ -816,7 +872,7 @@ exports.create_routes = function(app, settings) {
         return;
       }
 
-      // parse the userdata, same as in the PUT route
+      // parse the userdata, same as in the PUT route and merge
       var userdata = null;
       try {
         userdata = parse_revision_userdata(req);
@@ -836,19 +892,114 @@ exports.create_routes = function(app, settings) {
           }
 
           // Make a new revision.
-          committer.save_revision(
+          committer.save_revision({
             user,
             doc,
             base_revision,
             op,
-            req.params.pointer,
-            userdata,
+            pointer: req.params.pointer,
+            userdata
+            },
             function(err, rev) {
               if (err)
-                unhandled_error_handler(res)
+                unhandled_error_handler(res)(err);
               else
                 res.status(201).json(exports.make_revision_response(rev, []));
             })
+        });
+      })
+    }
+  )
+
+  function get_merge_data(req, res, target_document_permission_level, cb) {
+    // Check authorization on the main document --- the user must have READ or WRITE permission as provided.
+    authz_document_content(req, res, target_document_permission_level, function(user, owner, doc) {
+      // Load the current revision of the document. We call it the
+      // base_revision because it is the revision that we will form
+      // operations against to commit.
+      models.Revision.from_uuid(doc, null, function(base_revision) {
+        // Load the revision specified in the URL, which tells us the document
+        // whose changes are to be merged in.
+        models.Revision.from_uuid(null, req.params.revision, function(source_revision) {
+          // Invalid revision ID.
+          if (!source_revision) {
+            res_send_plain(res, 400, "Invalid revision ID.")
+            return;
+          }
+
+          // Check the authorization on the source document, i.e. the one
+          // with changes to merge in --- the user must have READ access.
+          // Even though we already have model instances, we pass the ids
+          // because that's what the authorization check function uses.
+          authz_document2(req, res, source_revision.document.user.uuid, source_revision.document.uuid, true, "READ", "to merge", function(_, source_owner, source_doc) {
+            cb(user, owner, doc, base_revision, source_owner, source_doc, source_revision);
+          });
+        });
+      });
+    });
+  }
+
+  app.get(
+    document_route + "/merge/:revision",
+    function (req, res) {
+      // Get the changes that would be made to merge the changes in another
+      // document up to the given revision (it's a peg for the most recent
+      // revision in that document to merge, not a pointer to the changes
+      // themselves to merge) into the document. Return the JOT operation
+      // that would be committed if POST were called instead.
+      get_merge_data(req, res, "READ", function(user, target_owner, target_doc, base_revision, source_owner, source_doc, source_revision) {
+        merge.compute_merge_operation(target_doc, base_revision, source_doc, source_revision, function(err, op, dual_op) {
+          if (err) {
+            unhandled_error_handler(res)(err);
+            return;
+          }
+          res.status(200).json({
+            op: op.toJSON()
+          });
+        })
+      })
+    }
+  )
+
+  app.post(
+    document_route + "/merge/:revision",
+    function (req, res) {
+      // Merge the changes in the document up to the given revision (it's a
+      // peg for the most recent revision to merge, not a pointer to the
+      // changes themselves to merge) into the document.
+
+      // parse the userdata for the commit, same as in the content POST and PUT routes
+      var userdata = null;
+      try {
+        userdata = parse_revision_userdata(req);
+      } catch(e) {
+        res_send_plain(res, 400, "Invalid userdata: " + e);
+        return;
+      }
+
+      get_merge_data(req, res, "WRITE", function(user, target_owner, target_doc, base_revision, source_owner, source_doc, source_revision) {
+        merge.compute_merge_operation(target_doc, base_revision, source_doc, source_revision, function(err, op, dual_op) {
+          if (err) {
+            unhandled_error_handler(res)(err);
+            return;
+          }
+
+          // Commit the change.
+          committer.save_revision({
+            user,
+            doc: target_doc,
+            base_revision,
+            op,
+            userdata,
+            merges_revision: source_revision,
+            merges_op: dual_op
+            },
+            function(err, rev) {
+              if (err)
+                unhandled_error_handler(res)(err);
+              else
+                res.status(200).json(exports.make_revision_response(rev, []));
+          });
         });
       })
     }
@@ -878,9 +1029,7 @@ exports.create_routes = function(app, settings) {
         models.Revision.findAll({
           where: where,
           order: [["id", "ASC"]],
-          include: [{
-            model: models.User
-          }]
+          include: models.Revision.INCLUDES
         })
         .then(function(revs) {
           // Parse the "pointer" parameter, which is a JSON Pointer to the
