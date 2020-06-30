@@ -113,6 +113,16 @@ function api_request(hostname, port, method, path, body, headers, expected_respo
       buffer = Buffer.concat([buffer, chunk]);
     });
     res.on('end', () => {
+      test.equal(res.statusCode, expected_response_code, ' => ' + expected_response_code);
+
+      // The 'No Content' status means there is no Content-Type header or
+      // response body. So there is nothing to check except that we expect
+      // this code.
+      if (res.statusCode == 204) {
+        cb('', res.headers);
+        return;
+      }
+
       var content_type = res.headers['content-type'].replace(/;.*/, '');
       var response_body;
       if (content_type == "application/json")
@@ -120,7 +130,6 @@ function api_request(hostname, port, method, path, body, headers, expected_respo
       else
         response_body = buffer.toString("utf8");
 
-      test.equal(res.statusCode, expected_response_code, ' => ' + expected_response_code);
       test.equal(content_type, expected_response_type, ' => ' + expected_response_type);
       if (res.statusCode != expected_response_code || content_type != expected_response_type)
         test.notOk(response_body, response_body);

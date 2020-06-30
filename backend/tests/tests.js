@@ -206,7 +206,7 @@ test.test("Document Tests", {}, function(test) {
           "PUT", doc.api_urls.content,
           "Hello world!",
           { },
-          201, "application/json",
+          200, "application/json",
           function(body, headers, test) {
             test.ok(body.id)
             test.same(body.author.id, user.id);
@@ -223,12 +223,18 @@ test.test("Document Tests", {}, function(test) {
               test.same(body.op, { _ver: 1, _type: 'values.SET', value: 'Hello world!' });
           });
 
+          test.apicall( // send the same text again and check we get a 204 status code
+            "PUT", doc.api_urls.content,
+            "Hello world!",
+            { },
+            204, "application/json");
+
           // make a second change
           test.apicall(
             "PUT", doc.api_urls.content,
             "Hello cruel world!",
             { "Revision-UserData": '{ "key": "value" }' },
-            201, "application/json",
+            200, "application/json",
             function(body, headers, test) {
               test.ok(body.id)
               test.same(body.author.id, user.id);
@@ -251,7 +257,7 @@ test.test("Document Tests", {}, function(test) {
               "PUT", doc.api_urls.content,
               "Hello fine world!",
               { "Base-Revision-Id": initial_revision_id },
-              201, "application/json",
+              200, "application/json",
               function(body, headers, test) {
                 test.ok(body.id)
                 test.same(body.author.id, user.id);
@@ -323,7 +329,7 @@ test.test("Document Tests", {}, function(test) {
         "PUT", doc.api_urls.content,
         { "key": "Hello world!" },
         { },
-        201, "application/json",
+        200, "application/json",
         function(body, headers, test) {
           test.ok(body.id)
           test.same(body.author.id, user.id);
@@ -347,7 +353,7 @@ test.test("Document Tests", {}, function(test) {
           "PUT", doc.api_urls.content + "/key",
           "Hello cruel world!",
           { },
-          201, "application/json")
+          200, "application/json")
         .then((res) => {
           var previous_revision_id = res.body.id;
           
@@ -391,7 +397,7 @@ test.test("Document Tests", {}, function(test) {
             "PATCH", doc.api_urls.content,
             op,
             { },
-            201, "application/json")
+            200, "application/json")
           .then((res) => {
             // check it was committed
             test.apicall(

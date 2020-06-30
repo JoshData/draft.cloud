@@ -549,9 +549,11 @@ paths:
         description: An API key that has WRITE access to the document.
         required: true
       responses:
-        '201':
+        '200':
           description: A `Revision` was saved. The response is the new
             `Revision`.
+        '204':
+          description: The document already has the content provided. No `Revision` was created.
         '400':
           description: The path or base revision is not valid.
         '403':
@@ -620,7 +622,7 @@ paths:
         description: An API key that has WRITE access to the document.
         required: true
       responses:
-        '201':
+        '200':
           description: A `Revision` was saved. The response is the new uncommitted
             `Revision`.
         '400':

@@ -824,8 +824,7 @@ exports.create_routes = function(app, settings) {
               res_send_plain(res, 400, err);
             else if (!op)
               // The document wasn't changed - don't take any action.
-              // (There is a similar response if the result of the rebase is a no-op too.)
-              res_send_plain(res, 200, "no change");
+              res_send_plain(res, 204); // 204 is No Content
             else
               // Make a new revision.
               committer.save_revision({
@@ -840,7 +839,7 @@ exports.create_routes = function(app, settings) {
                   if (err)
                     unhandled_error_handler(res)(err);
                   else
-                    res.status(201).json(exports.make_revision_response(rev, []));
+                    res.status(200).json(exports.make_revision_response(rev, []));
                 });
           })
         });
@@ -904,7 +903,7 @@ exports.create_routes = function(app, settings) {
               if (err)
                 unhandled_error_handler(res)(err);
               else
-                res.status(201).json(exports.make_revision_response(rev, []));
+                res.status(200).json(exports.make_revision_response(rev, []));
             })
         });
       })
