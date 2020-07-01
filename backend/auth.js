@@ -2,7 +2,7 @@ var models = require("./models.js");
 
 var ACCESS_LEVELS = ["NONE", "READ", "WRITE", "ADMIN"];
 
-exports.DEFAULT_NEW_DOCUMENT_ANON_ACCESS_LEVEL = "NONE"; // i.e. no access
+exports.DEFAULT_NEW_DOCUMENT_PUBLIC_ACCESS_LEVEL = "NONE"; // i.e. no access
 
 exports.is_access_level = function(level) {
   return typeof level == "string" && ACCESS_LEVELS.indexOf(level) >= 0;
@@ -155,10 +155,10 @@ exports.get_document_authz = function(req, owner_uuid, document_uuid, cb) {
             level = document_permission.access_level;
 
           // Otherwise the document, if it exists, provides a default access level
-          // (but never more than WRITE (and if the requets is anonymous then not
+          // (but never more than WRITE (and if the request is anonymous then not
           // more than READ).
           else if (document) {
-            level = document.anon_access_level;
+            level = document.public_access_level;
 
             // If the request is not authenticated, do not allow WRITE or ADMIN.
             if (!user)

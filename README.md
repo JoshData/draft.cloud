@@ -60,7 +60,7 @@ Output:
 	  "id": "ff5a3057-b112-4d05-9de3-9b1c91dec3fa",
 	  "name": "document1",
 	  "created": "2020-02-16T13:49:46.257Z",
-	  "anon_access_level": "NONE",
+	  "public_access_level": "NONE",
 	  "owner": {
 	    "name": "user1",
 	    ...

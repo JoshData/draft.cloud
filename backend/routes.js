@@ -325,7 +325,7 @@ exports.create_routes = function(app, settings) {
         charset: 'alphanumeric'
       }),
       forkedFromId: doc.forkedFrom ? doc.forkedFrom.id : null,
-      anon_access_level: doc.anon_access_level || auth.DEFAULT_NEW_DOCUMENT_ANON_ACCESS_LEVEL,
+      public_access_level: doc.public_access_level || auth.DEFAULT_NEW_DOCUMENT_PUBLIC_ACCESS_LEVEL,
       userdata: doc.userdata || {}
     })
     .then(function(newdoc) {
@@ -346,7 +346,7 @@ exports.create_routes = function(app, settings) {
       id: doc.uuid,
       name: doc.name,
       created: doc.createdAt,
-      anon_access_level: doc.anon_access_level,
+      public_access_level: doc.public_access_level,
       owner: exports.form_user_response_body(doc.user),
       forkedFrom: !doc.forkedFrom ? null : {
         // Don't expose possibly private data of the forked document,
@@ -457,8 +457,8 @@ exports.create_routes = function(app, settings) {
       // Document exists. Update its metadata from any keys provided.
       if (typeof req.body.name != "undefined")
         doc.set("name", req.body.name);
-      if (typeof req.body.anon_access_level != "undefined")
-        doc.set("anon_access_level", req.body.anon_access_level);
+      if (typeof req.body.public_access_level != "undefined")
+        doc.set("public_access_level", req.body.public_access_level);
       if (typeof req.body.userdata != "undefined")
         doc.set("userdata", req.body.userdata);
       doc.save().then(function() {

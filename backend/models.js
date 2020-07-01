@@ -274,7 +274,7 @@ exports.initialize_database = function(settings, ready) {
 
       // The access level granted to all (including anonymous) users
       // (default no access to anyone but the owner).
-      anon_access_level: {
+      public_access_level: {
         type: Sequelize.STRING(16),
         defaultValue: ""
       },
@@ -314,12 +314,12 @@ exports.initialize_database = function(settings, ready) {
     }
 
     // Acess level must be valid.
-    if (typeof doc.anon_access_level != "undefined") {
-      if (!auth.is_access_level(doc.anon_access_level))
+    if (typeof doc.public_access_level != "undefined") {
+      if (!auth.is_access_level(doc.public_access_level))
         return "Invalid access level.";
 
       // Document cannot be world-ADMINable.
-      if (doc.anon_access_level == "ADMIN")
+      if (doc.public_access_level == "ADMIN")
         return "Invalid document access level.";
     }
 
