@@ -480,13 +480,17 @@ exports.create_routes = function(app, settings) {
   })
 
   app.get(document_route, function (req, res) {
-    // Fetch metadata about a document.
+    // Fetch metadata about a document, including the current revision.
     //
     // Requires READ permission on the document (and the document must exist).
     authz_document(req, res, true, "READ", function(user, owner, doc) {
-      res
-      .status(200)
-      .json(exports.make_document_json(doc));
+      models.Revision.from_uuid(doc, null, function(current_revision) {
+        var data = exports.make_document_json(doc);
+        data["latestRevision"] = exports.make_revision_response(current_revision, []);
+        res
+        .status(200)
+        .json(data);
+      });
     })
   })
 

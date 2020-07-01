@@ -113,6 +113,14 @@ exports.create_routes = function(app, settings) {
       });
   }
 
+  function res_send_plain(res, status_code, message) {
+    res
+      .status(status_code)
+      .set('Content-Type', 'text/plain')
+      .send(message)
+      .end();
+  }
+  
   var templates = { };
   function get_template(name) {
     if (!(name in templates) || settings.debug)

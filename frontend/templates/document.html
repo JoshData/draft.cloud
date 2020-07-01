@@ -24,6 +24,15 @@
 
       <div class="collapse navbar-collapse" id="navbarSupportedContent">
         <ul class="navbar-nav mr-auto">
+          {{#can_rename_document}}
+          <span class="navbar-text" style="display: none;">
+            <button id="access_level_toggle" data-value="{{document.public_access_level}}" style="font-size: 75%">Access</button>
+          </span>
+          {{/can_rename_document}}
+          <li class="nav-item">
+            <a id="fork-document" class="nav-link" href="#fork_document">Make a Copy</a>
+          </li>
+
           <li class="nav-item">
             <a class="nav-link" href="/logout">Log out</a>
           </li>
@@ -33,6 +42,19 @@
         </ul>
       </div>
     </nav>
+
+    {{#document.forkedFrom}}
+    <div id="forked-from">
+      Based on
+      <a href="/edit/{{document.forkedFrom.document.user.name}}/{{document.forkedFrom.document.name}}">
+        {{document.forkedFrom.document.user.name}}/{{document.forkedFrom.document.name}}
+      </a>
+      &mdash;
+      <a id="do-merge" href="#">
+        Merge
+      </a>
+    </div>
+    {{/document.forkedFrom}}
 
     <div id="editor">
     <div class="draftdotcloud-widget"

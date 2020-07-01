@@ -39,9 +39,9 @@ exports.compute_merge_operation = function(target_doc, target_revision, source_d
       // Map each revision ID to the ID of its parent.
 
       var prev_revision = "singularity";
-      if (doc.forkedFrom) {
-        prev_revision = doc.forkedFrom.id;
-        parent_histories[doc.forkedFrom.id] = doc.forkedFrom;
+      if (doc.forkedFromId) {
+        prev_revision = doc.forkedFromId;
+        parent_histories[doc.forkedFromId] = doc.forkedFrom;
       }
 
       revs.forEach((rev) => {
@@ -90,6 +90,7 @@ exports.compute_merge_operation = function(target_doc, target_revision, source_d
           op: [jot.opFromJSON(rev.op), rev.mergesOp ? jot.opFromJSON(rev.mergesOp) : null]
         };
       })
+
 
       try {
         var m = merge.merge(target_revision.id, source_revision.id, graph);
