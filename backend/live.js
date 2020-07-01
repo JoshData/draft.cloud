@@ -34,14 +34,11 @@ var document_watchers = {
 
 exports.init = function(io, sessionStore, settings) {
 
-  // Pull express session information from the connection request.
-  // Adapted from https://github.com/leeroybrun/socketio-express-sessions/blob/master/server.js.
-  var cookieParser = expressCookieParser(settings.secret_key);
-  var EXPRESS_SID_KEY = 'connect.sid';
   io.use(function(socket, next) {
     var request = socket.request;
 
     // Check an Authorization header for an API key.
+    // If an Authorization header is present, we only look at that.
     if (request.headers['authorization']) {
       models.UserApiKey.validateApiKey(
         request.headers['authorization'],
@@ -53,6 +50,10 @@ exports.init = function(io, sessionStore, settings) {
       return;
     }
 
+    // Pull express session information from the connection request.
+    // Adapted from https://github.com/leeroybrun/socketio-express-sessions/blob/master/server.js.
+    var cookieParser = expressCookieParser(settings.secret_key);
+    var EXPRESS_SID_KEY = 'connect.sid';
     if (!request.headers.cookie)
       return next();
     cookieParser(request, {}, function(parseErr) {
@@ -63,7 +64,7 @@ exports.init = function(io, sessionStore, settings) {
       sessionStore.load(sidCookie, function(err, session) {
         if (err) return next();
         if (session && session.passport && session.passport.user) {
-          models.User.findById(session.passport.user)
+          models.User.findByPk(session.passport.user)
             .then(function(user) {
               request.user = user;
               next();

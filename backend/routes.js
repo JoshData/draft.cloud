@@ -1085,7 +1085,7 @@ exports.create_routes = function(app, settings) {
     })
   })
 
-  var debug_template = fs.readFileSync("templates/document_debug.html", "utf8");
+  var debug_template = fs.readFileSync("frontend/templates/document_debug.html", "utf8");
   app.get(document_route + "/debug", function (req, res) {
     // Show a debug page for the document.
     //

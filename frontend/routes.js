@@ -1,6 +1,9 @@
 var fs = require('fs');
 var session = require('express-session')
 var passport = require("passport");
+const credential = require('credential');
+var bodyParser = require('body-parser')
+const LocalStrategy = require("passport-local");
 var GitHubStrategy = require('passport-github2').Strategy;
 var mustache = require("mustache");
 var moment = require("moment");
@@ -29,7 +32,7 @@ exports.add_middleware = function(app, sessionStore, settings) {
     done(null, user.id);
   });
   passport.deserializeUser(function(id, done) {
-    models.User.findById(id)
+    models.User.findByPk(id)
       .then(function(user) {
         done(null, user);
       });
@@ -39,10 +42,29 @@ exports.add_middleware = function(app, sessionStore, settings) {
 // Export a function that creates routes on the express app.
 
 exports.create_routes = function(app, settings) {
-  var github_login_path = "/auth/github";
-  var github_callback_path = github_login_path + "/callback";
+  // Local username/password logins.
+  passport.use(new LocalStrategy(
+    function(username, password, done) {
+      models.User.findOne({ where: { name: username }}).then(user => {
+        if (!user) { return done(null, false); }
+        credential().verify(user.key_hash, password, function(err, isValid) {
+          if (err) return done(err);
+          if (!isValid)
+            return done(null, false);
+          return done(null, user);
+        });
+      }).catch(done);
+    }
+  ));
+
+  var github_login_path;
+  var github_callback_path;
   if (settings.GITHUB_CLIENT_ID && settings.GITHUB_CLIENT_SECRET) {
     // Github login.
+    
+    github_login_path = "/auth/github";
+    github_callback_path = github_login_path + "/callback"
+
     passport.use(new GitHubStrategy({
         clientID: settings.GITHUB_CLIENT_ID,
         clientSecret: settings.GITHUB_CLIENT_SECRET,
@@ -91,15 +113,23 @@ exports.create_routes = function(app, settings) {
       });
   }
 
+  var templates = { };
+  function get_template(name) {
+    if (!(name in templates) || settings.debug)
+      templates[name] = fs.readFileSync("frontend/templates/" + name + ".html", "utf8");
+    return templates[name];
+  }
+
   // Homepage.
-  var index_html = fs.readFileSync("templates/index.html", "utf8");
-  var home_html = fs.readFileSync("templates/home.html", "utf8");
   app.get("/", function (req, res) {
     if (!req.user) {
       // Landing page.
-      res.status(200).send(mustache.render(index_html, {
+      res.status(200).send(mustache.render(get_template("index"), {
+        "settings": settings,
         "github_login_path": github_login_path,
+        "user": req.user
       }));
+
     } else {
       // Does user have any documents?
       models.Document.findAll({
@@ -143,7 +173,7 @@ exports.create_routes = function(app, settings) {
             documents.sort(function(b, a) { return a.updatedAtISO < b.updatedAtISO ? -1 : +(a.updatedAtISO > b.updatedAtISO) })
 
             // List documents page.
-            res.status(200).send(mustache.render(home_html, {
+            res.status(200).send(mustache.render(get_template("home"), {
                 "user": req.user,
                 "documents": documents,
             }));
@@ -156,10 +186,64 @@ exports.create_routes = function(app, settings) {
     }
   });
 
-  // Start a new document.
+  // Clear the session.
+  app.post("/login",
+    require('body-parser').urlencoded({ extended: true }),
+    passport.authenticate('local', { failureRedirect: '/#login-error' }),
+    function (req, res) {
+      res.redirect("/")
+  });
+
+  // Clear the session.
   app.get("/logout", function (req, res) {
     req.logout();
     res.redirect("/")
+  });
+
+  // Create a new account.
+  app.post("/new-account", bodyParser.urlencoded({ extended: true }), function (req, res) {
+    if (!settings.allow_anonymous_user_creation) {
+      res_send_plain(res, 403, 'You are not allowed to create a new user.');
+      return;
+    }
+
+    // Validate the username.
+    var validation = models.User.clean_user_dict({
+      name: req.body.username
+    });
+    if (typeof validation != "object") {
+      // Username was invalid.
+      res_send_plain(res, 400, validation);
+      return;
+    }
+    
+    // Validate the password.
+    if ((req.body.password || "").length < 4) {
+      res_send_plain(res, 400, "Password is not long enough.");
+      return;
+    }
+
+    // Hash the password.
+    credential()
+    .hash(req.body.password, function(err, key_hash) {
+      if (err) {
+        res_send_plain(res, 500, err);
+        return;
+      }
+
+      // Create the user.
+      models.User.create({
+        name: req.body.username,
+        key_hash: key_hash
+      })
+      .then(user => {
+        // OK. Send them back to the homepage to login.
+        res.redirect("/");
+      })
+      .catch(err => {
+        res.redirect("/#new-account-error");
+      })
+    });
   });
 
   // Start a new document.
@@ -170,9 +254,10 @@ exports.create_routes = function(app, settings) {
         res.status(500).send('Sessions are not enabled.');
         return;
       }
-      // Authenticate if not logged in.
+
+      // Redirect to the homepage to login.
       req.session.redirect_after_login = "/new";
-      res.redirect(github_callback_path)
+      res.redirect("/");
     } else {
       // Hey we're logged in! We can create a new document
       // and redirect.
@@ -195,12 +280,11 @@ exports.create_routes = function(app, settings) {
   });
 
   // A document.
-  var document_page = fs.readFileSync("templates/document.html", "utf8");
   app.get("/edit/:owner/:document", function (req, res) {
     if (!req.user && req.session /* if sessions are enabled */) {
       // Authenticate if not logged in.
       req.session.redirect_after_login = req.url;
-      res.redirect(github_callback_path);
+      res.redirect("/");
       return;
     }
 
@@ -218,7 +302,7 @@ exports.create_routes = function(app, settings) {
             return;
           }
 
-          res.status(200).send(mustache.render(document_page, {
+          res.status(200).send(mustache.render(get_template("document"), {
             "user": user,
             "owner": owner,
             "document": doc,

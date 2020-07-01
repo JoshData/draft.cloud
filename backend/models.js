@@ -47,7 +47,7 @@ exports.initialize_database = function(settings, ready) {
   // USERs.
   exports.User = exports.db.define('user',
     {
-      // The 'name' is the text that appears in URLs.
+      // The 'name' is the user's slug that appears in URLs.
       name: {
         type: Sequelize.STRING
       },
@@ -56,6 +56,12 @@ exports.initialize_database = function(settings, ready) {
       uuid: {
         type: Sequelize.UUID,
         defaultValue: Sequelize.UUIDV4
+      },
+
+      // The SHA1 hash of the API key, a salt, etc., as constructed by
+      // the credential package. 
+      key_hash: {
+        type: Sequelize.TEXT,
       },
 
       // A JSON object containing user profile information.
@@ -116,7 +122,8 @@ exports.initialize_database = function(settings, ready) {
         type: Sequelize.TEXT
       },
 
-      // The SHA1 hash of the API key. We don't store the actual API
+      // The SHA1 hash of the API key, a salt, etc., as constructed by
+      // the credential package. We don't store the actual API
       // key, just as we wouldn't store a password plainly.
       key_hash: {
         type: Sequelize.TEXT,

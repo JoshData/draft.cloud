@@ -5,27 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 
     <link rel="stylesheet" href="/static/npm/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/main.css">
 
     <title>Draft.Cloud: A structured document collaboration platform</title>
 
     <style>
-        @font-face {
-          font-family: 'Macondo';
-          font-style: normal;
-          font-weight: 400;
-          src: local('Macondo'), local('Macondo-Regular'), url(/static/fonts/google/Macondo-regular.ttf) format('truetype');
-        }
-
-        .navbar {
-        }
-
-        .navbar-brand {
-            font-family: 'Macondo', sans-serif;                
-        }
-
-        h1 {
-          margin: 30px 0 20px 0;
-        }
     </style>        
   </head>
   <body>
@@ -45,6 +29,11 @@
 
       <div class="container">
             <h1>Documents</h1>
+
+            <a class="btn btn-primary" href="/new" style="display: inline-block; margin-bottom: 2em; padding: 8px 16px;">
+                <span class="glyphicon glyphicon-plus"></span>
+                New Document
+            </a>
 
             {{#documents}}
                 <h3><a href="{{web_urls.document}}">{{name}}</a></h3>

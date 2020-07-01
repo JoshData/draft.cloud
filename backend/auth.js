@@ -52,6 +52,10 @@ function get_document_from_uuid(owner, document_uuid, cb) {
 }
 
 exports.check_request_authorization = function(req, cb) {
+  // The express middleware will have already filled in
+  // these values. See routes.add_middleware and live.js
+  // which checks for authentication information in the
+  // request headers and websocket message. 
   cb(req.user, req.user_api_key);
 }
 
@@ -114,6 +118,12 @@ exports.get_document_authz = function(req, owner_uuid, document_uuid, cb) {
 
   // Get the user making the request.
   exports.check_request_authorization(req, function(user, user_api_key) {
+    // No user is authenticated?
+    if (!user) {
+      cb();
+      return;
+    }
+
     // Get the user that owns the document.
     get_user_from_uuid(owner_uuid, user, function(owner) {
       if (!owner) {

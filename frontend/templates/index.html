@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <link rel="stylesheet" href="/static/npm/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/main.css">
+
+    <title>Draft.Cloud: A structured document collaboration platform</title>
+
+    <style>
+        .jumbotron {
+            background: none;
+        }
+
+        .jumbotron h1 {
+            font-family: 'Macondo', sans-serif;
+        }
+
+        .jumbotron a.btn {
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .jumbotron .usecases p {
+            font-size: 15px;
+            line-height: 128%;
+        }
+
+    </style>        
+  </head>
+  <body>
+    <div class="jumbotron">
+      <div class="container">
+        <div style="margin: 30px 0 45px 0;">
+            <h1 style="font-weight: bold; color: black;">Draft.Cloud</h1>
+            <p>A structured document collaboration platform.</p>
+        </div>
+
+        <hr>
+
+        <div class="row">
+            <div class="col-sm-7" style="margin-bottom: 30px;">
+                {{#github_login_path}}
+                <a href="{{github_login_path}}">
+                    <img src="static/img/login_with_github.png">
+                </a>
+                {{/github_login_path}}
+
+                {{#settings.allow_anonymous_user_creation}}
+
+                <h2>Create an account to start:</h2>
+
+                <form action="/new-account" method="post" style="max-width: 20em">
+                  <div class="form-group">
+                    <label for="createAccountFormName">User name</label>
+                    <input type="text" class="form-control" id="createAccountFormName" pattern="[A-Za-z0-9]{6,}" name="username">
+                    <small id="createAccountFormNameHelp" class="form-text text-muted">User names can only contain English letters and numbers and be at least 6 characters.</small>
+                  </div>
+                  <div class="form-group">
+                    <label for="createAccountFormPassword">Password</label>
+                    <input type="password" class="form-control" id="createAccountFormPassword" pattern="[A-Za-z0-9][A-Za-z0-9 ]{2,}[A-Za-z0-9]" name="password">
+                    <small id="createAccountFormPasswordHelp" class="form-text text-muted">Passwords must be at least 4 characters.</small>
+                  </div>
+                  <button type="submit" class="btn btn-primary">Create Account &raquo;</button>
+                </form>
+                {{/settings.allow_anonymous_user_creation}}
+
+                <h2>Sign in</h2>
+                <form action="/login" method="post" style="max-width: 20em">
+                  <div class="form-group">
+                    <label for="loginFormName">User name</label>
+                    <input type="text" class="form-control" id="loginFormName" pattern="[A-Za-z0-9]{6,}" name="username">
+                  </div>
+                  <div class="form-group">
+                    <label for="loginFormPassword">Password</label>
+                    <input type="password" class="form-control" id="loginFormPassword" pattern="[A-Za-z0-9][A-Za-z0-9 ]{2,}[A-Za-z0-9]" name="password">
+                  </div>
+                  <button type="submit" class="btn btn-primary">Sign in &raquo;</button>
+                </form>
+
+            </div>
+            <div class="col-sm-5 usecases">
+                <p>Authors use <span class="brand">Draft.Cloud</span> to edit simple documents with coworkers.</p>
+                <p>Developers use <span class="brand">Draft.Cloud</span> to read, write, patch, fork, and merge JSON objects programmatically and without conflicts. <a href="apidocs/v1">API Docs &raquo;</a></p>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+      <div class="container">
+        <p style="margin-top: 100px; font-size: 85%; color: #666;">
+            A project of <a href="https://joshdata.me">Joshua Tauberer</a>.
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>

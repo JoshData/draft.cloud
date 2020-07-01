@@ -18,6 +18,7 @@ const optionDefinitions = [
   { name: 'allow_anonymous_user_creation', type: Boolean, description: "Allow user accounts to be created by unauthenticated users." },
   { name: 'GITHUB_CLIENT_ID', type: String, description: "GitHub OAuth client ID."},
   { name: 'GITHUB_CLIENT_SECRET', type: String, description: "GitHub OAuth client secret."},
+  { name: 'debug', type: Boolean, description: "Run in debug mode for Draft.Cloud development."},
   { name: 'settings_file', type: String, typeLabel: "file.env", description: "Read settings from configuration file." },
   { name: 'help', type: Boolean, description: "Show this help." }
 ];
@@ -72,7 +73,9 @@ if (settings.help) {
   ]));
   console.log("");
   console.log("All options can also be given in environment variables or in a settings file using these keys: "
-    + optionDefinitions.map(opt => { return opt.name.toUpperCase() }).join(', '));
+    + optionDefinitions
+      .filter(opt => opt.name != "help" && opt.name != "settings_file")
+      .map(opt => { return opt.name.toUpperCase() }).join(', '));
   process.exit(1);
 }
 
@@ -85,13 +88,14 @@ if (!settings.url) // Default the 'url' to the same as the bind host and port.
 // Start the application.
 
 // First initialize the database.
-require("./backend/models.js")
-  .initialize_database(settings, function() {
+const models = require("./backend/models.js");
+models.initialize_database(settings, function() {
 
   // Start the HTTP server.
   var app = express();
-  var sessionStore = require('express-session').MemoryStore;
-    sessionStore = new sessionStore();
+  const SequelizeStore = require('connect-session-sequelize')(require('express-session').Store);
+  var sessionStore = new SequelizeStore({ db: models.db });
+  sessionStore.sync(); // create session table
 
   // General expresss settings.
   if (settings.trust_proxy) app.set('trust proxy', settings.trust_proxy); // express won't set secure cookies if it can't see it's running behind https

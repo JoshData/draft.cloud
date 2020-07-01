@@ -259,9 +259,13 @@ See the full set of options that you may need to set:
 
 Options can be specified in environment variables, on the command-line, or in a configuration file.
 
-If running with a Postgres database:
+You will likely need to set the `URL` and `DATABASE` settings (and possibly also the `BIND_HOST`, `PORT`, and `TRUST_PROXY` settings) either by setting environment variables, a settings file with NAME=VALUE lines, or using the corresponding command-line arguments described in the help output. The `SECRET_KEY` setting is required to enable login sessions (see [express session](https://www.npmjs.com/package/express-session#secret)).
 
-	npm install pg # requires Postgresql's JSON column type
+Default values are also shown in the help output. The default database is a Sqlite database named `db.sqlite` stored in the current directory.
+
+If running with a Postgres database you'll need to install the `pg` package:
+
+	npm install pg
 
 Configure nginx and supervisor:
 
