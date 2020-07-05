@@ -2,7 +2,7 @@
 
 rm -rf /tmp/swagger-ui
 git clone https://github.com/swagger-api/swagger-ui /tmp/swagger-ui
-mv /tmp/swagger-ui/dist public_html/apidocs
+mv /tmp/swagger-ui/dist frontend/public_html/apidocs
 rm -rf /tmp/swagger-ui
-cp backend/swagger.html public_html/apidocs/index.html
-cp backend/swagger.yaml public_html/apidocs/swagger.yaml
+cp backend/swagger.html frontend/public_html/apidocs/index.html
+cp backend/swagger.yaml frontend/public_html/apidocs/swagger.yaml

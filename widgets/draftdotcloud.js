@@ -3,7 +3,7 @@
 //
 // Build with:
 //
-// browserify -d draft-cloud-widgets/draftdotcloud.js -o public_html/draftdotcloud.js
+// browserify -d draft-cloud-widgets/draftdotcloud.js -o frontend/public_html/draftdotcloud.js
 //
 
 // Let other initialization occur before we actually start initialization.

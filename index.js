@@ -140,7 +140,7 @@ models.initialize_database(settings, function() {
     .init(websocketio, sessionStore, settings);
 
   // Initialize the front-end.
-  app.use('', express.static(require('path').join(__dirname, 'public_html')))
+  app.use('', express.static(require('path').join(__dirname, 'frontend/public_html')))
 
   // Register a SIGINT handler to gracefully shut down
   // the application. Some considerations:

@@ -1,6 +1,6 @@
 local
-public_html/apidocs/
-public_html/static/fonts/google
+frontend/public_html/apidocs/
+frontend/public_html/static/fonts/google
 db.sqlite
 node_modules
-public_html/draftdotcloud.js
+frontend/public_html/draftdotcloud.js

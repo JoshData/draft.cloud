@@ -1,13 +1,15 @@
 #!/bin/bash
 
+ROOT=frontend/public_html
+
 # Build client-side widgets library.
-node_modules/browserify/bin/cmd.js -d widgets/draftdotcloud.js -o public_html/draftdotcloud.js
+node_modules/browserify/bin/cmd.js -d widgets/draftdotcloud.js -o $ROOT/draftdotcloud.js
 
 # Build API documentation.
-node_modules/spectacle-docs/bin/spectacle.js -j -t public_html/apidocs/v1 backend/swagger.yaml
+node_modules/spectacle-docs/bin/spectacle.js -j -t $ROOT/apidocs/v1 backend/swagger.yaml
 
 # Get fonts.
-FONTDIR=public_html/static/fonts/google
+FONTDIR=$ROOT/static/fonts/google
 rm -rf $FONTDIR
 mkdir -p $FONTDIR
 node_modules/google-font-installer/cli.js download -d $FONTDIR Macondo

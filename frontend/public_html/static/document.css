@@ -6,6 +6,13 @@
 }
 
 @font-face {
+  font-family: 'Dosis';
+  font-style: normal;
+  font-weight: 400;
+  src: url(/static/fonts/google/Dosis-regular.ttf) format('truetype');
+}
+
+@font-face {
   font-family: 'IBM Plex Sans';
   font-style: normal;
   font-weight: 400;
@@ -66,6 +73,7 @@ body, .ql-editor {
 }
 
 .navbar {
+  font-family: Dosis;
 }
 
 .navbar-brand {
@@ -74,6 +82,13 @@ body, .ql-editor {
 
 .navbar-text {
    margin-right: 2em;
+}
+
+#forked-from {
+  display: none;
+  background-color: #f8f9fa;
+  padding: 0 15px 10px 15px;
+  font-family: Dosis;
 }
 
 .editable {

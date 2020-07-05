@@ -1,0 +1,45 @@
+@font-face {
+  font-family: 'Macondo';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Macondo'), local('Macondo-Regular'), url(/static/fonts/google/Macondo-regular.ttf) format('truetype');
+}
+
+@font-face {
+  font-family: 'Dosis';
+  font-style: normal;
+  font-weight: 400;
+  src: url(/static/fonts/google/Dosis-regular.ttf) format('truetype');
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  src: url(/static/fonts/google/IbmPlexSans-regular.ttf) format('truetype');
+}
+
+body {
+  font-family: sans-serif;
+}
+
+.navbar, h1, h2, h3, h4, h5, h6 {
+  font-family: Dosis;
+}
+
+a.btn {
+  font-family: IBM Plex Sans;
+}
+
+span.brand {
+  font-family: Macondo, sans-serif;                
+}
+
+.navbar-brand {
+    font-family: 'Macondo', sans-serif;                
+}
+
+h1 {
+  margin: 30px 0 20px 0;
+}
+
