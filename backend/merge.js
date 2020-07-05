@@ -21,10 +21,12 @@ exports.compute_merge_operation = function(target_doc, target_revision, source_d
   let revision_cache = { };
   let parent_map = { };
 
-  function find_ancestors(up_to_revision, cb) {
+  function find_ancestors(doc, up_to_revision, cb) {
+    if (doc.forkedFromId && !doc.forkedFrom)
+      throw "Missing Sequelize include.";
+
     // Get all of the revisions in the document up to the
     // given revision.
-    let doc = up_to_revision.document;
     models.Revision.findAll({
       where: {
         documentId: doc.id,
@@ -39,9 +41,9 @@ exports.compute_merge_operation = function(target_doc, target_revision, source_d
       // Map each revision ID to the ID of its parent.
 
       var prev_revision = "singularity";
-      if (doc.forkedFromId) {
-        prev_revision = doc.forkedFromId;
-        parent_histories[doc.forkedFromId] = doc.forkedFrom;
+      if (doc.forkedFrom) {
+        prev_revision = doc.forkedFrom.id;
+        parent_histories[doc.forkedFrom.id] = doc.forkedFrom;
       }
 
       revs.forEach((rev) => {
@@ -62,7 +64,16 @@ exports.compute_merge_operation = function(target_doc, target_revision, source_d
       // already have its ancestors.
       var parent_history_ids = Object.keys(parent_histories).filter(id => !(id in parent_map));
       async.each(parent_history_ids, (id, cb) => {
-        find_ancestors(parent_histories[id], cb)
+        var d = parent_histories[id].document;
+        if (!d.forkedFromId || d.forkedFrom)
+          find_ancestors(d, parent_histories[id], cb)
+        else // need to fetch from database to fill in forkedFrom data
+          models.Document.findOne(
+            { where: { id: d.id },
+              include: models.Document.INCLUDES })
+          .then(d1 => {
+            find_ancestors(d1, parent_histories[id], cb)
+          });
       }, (err) => {
         cb();
       })
@@ -78,8 +89,8 @@ exports.compute_merge_operation = function(target_doc, target_revision, source_d
   // singularity revision, since everything can be generated from that. But if
   // we pull less of a history, we'd need to get document content at other
   // revisions whose parents we aren't including.
-  find_ancestors(target_revision, () => {
-    find_ancestors(source_revision, () => {
+  find_ancestors(target_doc, target_revision, () => {
+    find_ancestors(source_doc, source_revision, () => {
       // Form a graph data structure for jot.merge.
       var graph = {
         singularity: { document: null }

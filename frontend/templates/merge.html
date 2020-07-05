@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <link rel="stylesheet" href="/static/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/main.css">
+
+    <title>Draft.Cloud Merge: {{target_owner.name}}/{{target_document.name}} ⇐ {{source_owner.name}}/{{source_document.name}}</title>
+
+    <style>
+    </style>        
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+      <div class="container">
+        <a class="navbar-brand" href="/">Draft.Cloud</a>
+        <ul class="navbar-nav mr-auto">
+          <li class="nav-item">
+            <a class="nav-link" href="/logout">Log out</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/apidocs/v1">API Docs</a>
+          </li>
+        </ul>
+      </div>
+    </nav>
+
+    <div class="container">
+      <h1>Merge Documents</h1>
+
+      {{^can_merge}}
+      {{^who_can_merge}}
+        <p class="text-danger">
+          {{#is_source_admin}}
+            You will need to give one of the editors of <a href="/edit/{{target_owner.name}}/{{target_document.name}}">{{target_owner.name}}/{{target_document.name}}</a> permission to view <a href="/edit/{{source_owner.name}}/{{source_document.name}}">{{source_owner.name}}/{{source_document.name}}</a>. For example, you can make <a href="/edit/{{source_owner.name}}/{{source_document.name}}">{{source_owner.name}}/{{source_document.name}}</a> public.
+          {{/is_source_admin}}
+
+          {{^is_source_admin}}
+            None of the editors of <a href="/edit/{{target_owner.name}}/{{target_document.name}}">{{target_owner.name}}/{{target_document.name}}</a> has permission to view <a href="/edit/{{source_owner.name}}/{{source_document.name}}">{{source_owner.name}}/{{source_document.name}}</a>.
+          {{/is_source_admin}}
+        </p>
+      {{/who_can_merge}}
+      {{/can_merge}}
+
+      <div style="margin: 2em 0; padding: 1em; border-top: 1px solid #DDD; border-bottom: 1px solid #DDD;">
+
+        <div class="d-md-flex" style="flex-flow: row wrap; align-items: center;">
+          <div>
+            <p style="margin: 0;" class="small text-muted">Get changes from:</p>
+            <h2>
+                <svg class="bi" width="32" height="32" style="margin-right: 5px; margin-top: 10px;">
+                  <use xlink:href="/static/bootstrap-icons.svg#box-arrow-down"/>
+                </svg>
+                <a href="/edit/{{source_owner.name}}/{{source_document.name}}" class="btn btn-secondary">
+                    {{source_owner.name}}/{{source_document.name}}
+                </a>
+            </h2>
+          </div>
+          <div style="margin: 0 45px;" class="d-none d-md-block">
+            <h2>&rarr;</h2>
+          </div>
+          <div>
+            <p style="margin: 0;" class="small text-muted">Save changes into:</p>
+            <h2 style="margin-bottom: 15px;">
+                <svg class="bi" width="32" height="32" style="margin-right: 5px">
+                  <use xlink:href="/static/bootstrap-icons.svg#box-arrow-in-down"/>
+                </svg>
+                <a href="/edit/{{target_owner.name}}/{{target_document.name}}" class="btn btn-secondary">
+                  {{target_owner.name}}/{{target_document.name}}
+                </a>
+            </h2>
+          </div>
+        </div>
+      </div>
+
+        {{^has_merge}}
+          <p>There are no changes to merge.</p>
+        {{/has_merge}}
+
+        {{#has_merge}}
+
+        <div id="merge-diff">
+          {{{html_diff}}}
+        </div>
+
+        <div style="margin: 2em 0; padding: 1em 0; border-top: 1px solid #DDD;">
+
+        {{#can_merge}}
+        <form method="post">
+        <input type=hidden name=base_revision value="{{base_revision.uuid}}">
+        <input type=hidden name=source_revision value="{{source_revision.uuid}}">
+        <p style="margin-top: 1em; text-align: right;">
+            <button type="submit" class="btn btn-primary" href="/new" style="display: inline-block; margin-bottom: 1em; padding: 8px 16px; font-weight: bold;">
+                <svg class="bi" width="32" height="32" style="margin-right: 5px; margin-top: -5px">
+                  <use xlink:href="/static/bootstrap-icons.svg#box-arrow-in-down"/>
+                </svg>
+                Save Changes
+            </button>
+        </p>
+        </form>
+        {{/can_merge}}
+
+        {{^can_merge}}
+        <p class="text-muted">You do not have permission to save these changes. Share this page with an editor of <a href="/edit/{{target_owner.name}}/{{target_document.name}}">{{target_owner.name}}/{{target_document.name}}</a></p>
+        {{/can_merge}}
+
+        </div>
+
+        {{/has_merge}}
+    </div>
+
+    <footer>
+    </footer>
+  </body>
+</html>

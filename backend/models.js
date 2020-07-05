@@ -401,7 +401,14 @@ exports.initialize_database = function(settings, ready) {
           // Apply all later revisions' operations (if any).
           for (var i = 0; i < revs.length; i++) {
             var op = jot.opFromJSON(revs[i].op);
-            content = op.apply(content);
+            try {
+              content = op.apply(content);
+            } catch {
+              // This shouldn't happen because we validate documents
+              // prior to commiting revisions.
+              cb("The document content is invalid.");
+              return;
+            }
             current_revision = revs[i];
           }
 

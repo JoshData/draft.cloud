@@ -12,6 +12,9 @@ var async = require("async");
 var models = require("../backend/models.js");
 var auth = require("../backend/auth.js");
 var apiroutes = require("../backend/routes.js");
+var merge = require("../backend/merge.js");
+var committer = require("../backend/committer.js");
+var jot = require("jot");
 
 // Export a function that adds authz middleware. All middleware
 // must be added before routes it is used in, and we want
@@ -131,70 +134,73 @@ exports.create_routes = function(app, settings) {
   // Homepage.
   app.get("/", function (req, res) {
     if (!req.user) {
-      // Landing page.
+      // The user is not logged in. Show a landing page.
       res.status(200).send(mustache.render(get_template("index"), {
         "settings": settings,
         "github_login_path": github_login_path,
-        "user": req.user
+        "req": req
       }));
+      return;
 
-    } else {
-      // Does user have any documents?
-      models.Document.findAll({
-        where: { userId: req.user.id },
-        include: [ { model: models.User } ]
-      })
-      .then(function(documents) {
-        if (documents) {
-          // Fetch preview and current revision of each document.
-          async.each(documents, function(doc, cb) {
-            doc.get_content(null, null, true, function(err, revision, content, path) {
-              doc.currentContent = content;
-              if (revision)
-                doc.currentRevision = apiroutes.make_revision_response(revision, []);
-              cb(null);
-            });
-          }, function(err) {
-            // Format.
-            documents = documents.map(apiroutes.make_document_json);
-
-            // Format dates.
-            documents.forEach(doc => {
-              doc.createdRel = moment(doc.created).fromNow();
-              if (doc.currentRevision)
-                doc.currentRevision.createdRel = moment(doc.currentRevision.created).fromNow();
-              doc.updatedAtISO = moment((doc.currentRevision && doc.currentRevision.created) || doc.created).format(); // ISO
-            });
-
-            // Make snippets.
-            documents.forEach(doc => {
-              if (doc.currentContent && doc.currentContent.ops) {
-                var preview = "";
-                doc.currentContent.ops.forEach(op => {
-                  preview += op.insert;
-                })
-                doc.preview = preview.substr(0, 250);
-              }
-            });
-
-            // Sort.
-            documents.sort(function(b, a) { return a.updatedAtISO < b.updatedAtISO ? -1 : +(a.updatedAtISO > b.updatedAtISO) })
-
-            // List documents page.
-            res.status(200).send(mustache.render(get_template("home"), {
-                "user": req.user,
-                "documents": documents,
-            }));
-          });
-        } else {
-          // Go straight to starting a new document.
-          res.redirect("/new");
-        }
-      });
     }
+
+    // Show the user's home page.
+
+	  // Does user have any documents?
+	  models.Document.findAll({
+	    where: { userId: req.user.id },
+	    include: [ { model: models.User } ]
+	  })
+	  .then(function(documents) {
+	    if (documents) {
+	      // Fetch preview and current revision of each document.
+	      async.each(documents, function(doc, cb) {
+	        doc.get_content(null, null, true, function(err, revision, content, path) {
+	          doc.currentContent = content;
+	          if (revision)
+	            doc.currentRevision = apiroutes.make_revision_response(revision, []);
+	          cb(null);
+	        });
+	      }, function(err) {
+	        // Format.
+	        documents = documents.map(apiroutes.make_document_json);
+
+	        // Format dates.
+	        documents.forEach(doc => {
+	          doc.createdRel = moment(doc.created).fromNow();
+	          if (doc.currentRevision)
+	            doc.currentRevision.createdRel = moment(doc.currentRevision.created).fromNow();
+	          doc.updatedAtISO = moment((doc.currentRevision && doc.currentRevision.created) || doc.created).format(); // ISO
+	        });
+
+	        // Make snippets.
+	        documents.forEach(doc => {
+	          if (doc.currentContent && doc.currentContent.ops) {
+	            var preview = "";
+	            doc.currentContent.ops.forEach(op => {
+	              preview += op.insert;
+	            })
+	            doc.preview = preview.substr(0, 250);
+	          }
+	        });
+
+	        // Sort.
+	        documents.sort(function(b, a) { return a.updatedAtISO < b.updatedAtISO ? -1 : +(a.updatedAtISO > b.updatedAtISO) })
+
+	        // List documents page.
+	        res.status(200).send(mustache.render(get_template("home"), {
+	            "user": req.user,
+	            "documents": documents,
+	        }));
+	      });
+	    } else {
+	      // Go straight to starting a new document.
+	      res.redirect("/new");
+	    }
+	  });
   });
 
-  // Clear the session.
+  // Handle username/password login.
   app.post("/login",
     require('body-parser').urlencoded({ extended: true }),
     passport.authenticate('local', { failureRedirect: '/#login-error' }),
@@ -203,8 +209,10 @@ exports.create_routes = function(app, settings) {
   });
 
   // Clear the session.
+  // TODO: Make this a POST for CSRF protection.
   app.get("/logout", function (req, res) {
-    req.logout();
+    if (req.session)
+      req.logout();
     res.redirect("/")
   });
 
@@ -245,8 +253,10 @@ exports.create_routes = function(app, settings) {
         key_hash: key_hash
       })
       .then(user => {
-        // OK. Send them back to the homepage to login.
-        res.redirect("/");
+        // Log them in.
+        req.login(user, function (err) {
+          res.redirect("/");
+        })        
       })
       .catch(err => {
         res.redirect("/#new-account-error");
@@ -266,25 +276,48 @@ exports.create_routes = function(app, settings) {
       // Redirect to the homepage to login.
       req.session.redirect_after_login = "/new";
       res.redirect("/");
-    } else {
-      // Hey we're logged in! We can create a new document
-      // and redirect.
-      apiroutes.create_document(
-        req.user,
-        {
-          // make the document public by default since it will get an unguessable address anyway
-          public_access_level: "WRITE"
-        },
-        function(doc, err) {
-          if (err) {
-            console.log(err);
-            res.status(500).send('An internal error occurred.');
+      return;
+    }
+
+    // Hey we're logged in! We can create a new document
+    // and redirect.
+    apiroutes.create_document(
+      req.user,
+      {
+        // make the document public by default since it will get an unguessable address anyway
+        public_access_level: "WRITE"
+      },
+      function(doc, err) {
+        if (err) {
+          console.log(err);
+          res.status(500).send('An internal error occurred.');
+          return;
+        }
+        res.redirect("/edit/" + req.user.name + "/" + doc.name)
+      });
+  });
+
+  function document_auth(req, res, owner_name, document_name, cb) {
+    // We get the owner and document names. Convert those to UUIDs because
+    // auth.get_document_authz wants UUIDs. TODO: Once we have these records,
+    // there is no need to do a second look-up in auth.get_document_authz.
+    models.User.findOne({ where: { name: owner_name }})
+    .then(function(owner) {
+      models.Document.findOne({ where: { userId: owner ? owner.id : -1, name: document_name }})
+      .then(function(document) {
+        auth.get_document_authz(req, owner ? owner.uuid : "-invalid-", document ? document.uuid : "-invalid-", function(user, owner, doc, level) {
+          if (auth.min_access("READ", level) != "READ") {
+            res.status(404).send('User or document not found or you do not have permission to see it.');
             return;
           }
-          res.redirect("/edit/" + req.user.name + "/" + doc.name)
+          cb(user, owner, doc, level);
         });
-    }
-  });
+      });
+    });    
+  }
+  function document_route(req, res, cb) {
+    document_auth(req, res, req.params.owner, req.params.document, cb);
+  }
 
   // A document.
   app.get("/edit/:owner/:document", function (req, res) {
@@ -295,30 +328,148 @@ exports.create_routes = function(app, settings) {
       return;
     }
 
-    // We get the owner and document names. Convert those to UUIDs because
-    // auth.get_document_authz wants UUIDs. TODO: Once we have these records,
-    // there is no need to do a second look-up in auth.get_document_authz.
-    models.User.findOne({ where: { name: req.params.owner }})
-    .then(function(owner) {
-      models.Document.findOne({ where: { userId: owner ? owner.id : -1, name: req.params.document }})
-      .then(function(document) {
-        
-        auth.get_document_authz(req, owner ? owner.uuid : "-invalid-", document ? document.uuid : "-invalid-", function(user, owner, doc, level) {
-          if (auth.min_access("READ", level) != "READ") {
-            res.status(404).send('User or document not found or you do not have permission to see it.');
-            return;
-          }
-
-          res.status(200).send(mustache.render(get_template("document"), {
-            "user": user,
-            "owner": owner,
-            "document": doc,
-            "can_rename_owner": user.id == owner.id,
-            "can_rename_document": level == "ADMIN",
-            "valid_name_text": models.valid_name_text,
-          }))
-        });
-      });      
+    document_route(req, res, function(user, owner, doc, level) {
+      res.status(200).send(mustache.render(get_template("document"), {
+        "user": user,
+        "owner": owner,
+        "document": doc,
+        "can_rename_owner": user.id == owner.id,
+        "can_rename_document": level == "ADMIN",
+        "valid_name_text": models.valid_name_text,
+      }))
     });      
   });
+
+  function merge_route(req, res, cb) {
+    if (!req.user && req.session /* if sessions are enabled */) {
+      // Authenticate if not logged in.
+      req.session.redirect_after_login = req.url;
+      res.redirect("/");
+      return;
+    }
+
+    // Get the source and target documents. READ access is needed on each.
+    document_route(req, res, function(user, target_owner, target_doc, target_level) {
+      var other_user_doc = (req.query.from || "").split(/\//);
+      document_auth(req, res, other_user_doc[0], other_user_doc[1], function(_, source_owner, source_doc, source_level) {
+        // Get the most recent commit of each document. The source document can specify
+        // a revision UUID in the revision query string argument. On post, get the revisions
+        // from the form data.
+        var base_revision = null; // get latest revision
+        var source_revision = req.params.revision || null; // get specified revision or latest
+        if (req.body) {
+          // In a post request, get from the post.
+          base_revision = req.body.base_revision;
+          source_revision = req.body.source_revision;
+        }
+        models.Revision.from_uuid(target_doc, base_revision, function(base_revision) {
+          models.Revision.from_uuid(source_doc, source_revision, function(source_revision) {
+            if (!base_revision || !source_revision) {
+              // Impossible on GET but on POST we validate the revision IDs.
+              res.status(400).send("Invalid revision IDs.");
+              return;
+            }
+
+            // Compute the merge.
+            merge.compute_merge_operation(target_doc, base_revision, source_doc, source_revision, function(err, op, dual_op) {
+              if (err) {
+                res.status(500).send("Error performing merge: " + err);
+                return;
+              }
+              cb(user,
+                target_owner, target_doc, target_level, base_revision,
+                source_owner, source_doc, source_level, source_revision,
+                op, dual_op);
+            });
+          });
+        });
+      });
+    });
+  }
+
+
+  // Merge documents - preview.
+  app.get("/merge/:owner/:document", function (req, res) {
+    // The user must have READ access to both the source document and the
+    // target document.
+    // TODO: If the user is the owner of the source or target document (and
+    // in the former case must have had READ access to the target at some point)
+    //  but doesn't have access to the other one (anymore), a nicer error
+    // message might be nice.
+    merge_route(req, res, function(user,
+              target_owner, target_doc, target_level, base_revision,
+              source_owner, source_doc, source_level, source_revision,
+              op) {
+
+      // Get the document content of the target document.
+      target_doc.get_content(null, base_revision, true, function(err, revision, content_before, path) {
+        // Apply the changes.
+        var content_after = op.apply(content_before);
+
+        // Convert the document to HTML, before and after the change.
+        var to_html = (document) => {
+          const converter = require('quill-delta-to-html').QuillDeltaToHtmlConverter;
+          return new converter(document.ops, {}).convert();
+        }
+        var html_before = to_html(content_before);
+        var html_after = to_html(content_after);
+        var html_diff = require('node-htmldiff')(html_before, html_after);
+
+        // If the user doesn't have permission to save the merge, then does anyone?
+        auth.get_users_with_access_to_document(source_doc, "READ", function(source_readers) {
+          auth.get_users_with_access_to_document(target_doc, "WRITE", function(target_writers) {
+            res.status(200).send(mustache.render(get_template("merge"), {
+              "user": user,
+              "target_owner": target_owner,
+              "target_document": target_doc,
+              "base_revision": base_revision,
+              "source_owner": source_owner,
+              "source_document": source_doc,
+              "source_revision": source_revision,
+              "has_merge": !op.isNoOp(),
+              "html_diff": html_diff,
+              "can_merge": auth.min_access("WRITE", target_level) == "WRITE",
+              "who_can_merge": target_writers.filter(user => source_doc.public_access_level == "READ" || source_readers.includes(user)),
+              "is_source_admin": auth.min_access("ADMIN", source_level) == "ADMIN",
+            }));              
+          });
+        })
+      });
+    });
+  });
+
+  // Merge documents - commit.
+  app.post("/merge/:owner/:document",
+    require('body-parser').urlencoded({ extended: true }),
+    function (req, res) {
+    merge_route(req, res, function(user,
+              target_owner, target_doc, target_level, base_revision,
+              source_owner, source_doc, source_level, source_revision,
+              op, dual_op) {
+
+      if (auth.min_access("WRITE", target_level) != "WRITE") {
+        res.status(401).send("Permission denied.");
+        return;
+      }
+
+      // Commit the change.
+      var userdata = { };
+      committer.save_revision({
+        user,
+        doc: target_doc,
+        base_revision,
+        op,
+        userdata,
+        merges_revision: source_revision,
+        merges_op: dual_op
+        },
+        function(err, rev) {
+          if (err) {
+            res.status(500).send("Error performing merge: " + err);
+            return;
+          }
+          res.redirect("/edit/" + target_owner.name + "/" + target_doc.name);
+      });
+    });
+  });  
 }

@@ -193,3 +193,11 @@ exports.get_document_authz = function(req, owner_uuid, document_uuid, cb) {
     });
   })
 }
+
+exports.get_users_with_access_to_document = function(doc, level, cb) {
+  // Return a list of User instances with level permission and greater.
+  // Note that doc.public_access_level is not considered because it would
+  // be all users.
+  // TODO: Read DocumentPermissions.
+  cb([doc.user]);
+}

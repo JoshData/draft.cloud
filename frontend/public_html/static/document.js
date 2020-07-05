@@ -16,6 +16,54 @@ $('#show-api').click(function() {
   show_api_info();
   return false;
 })
+$('#update-document').click(function() {
+  if (!$('#forked-from').is(":visible")) {
+    // Update merge buttons with whether there are any changes to merge.
+    var this_doc = $('#owner-id').text() + "/" + $('#document-id').text();
+    var forked_from = $('#forked-from').attr('data-forked-from-document');
+    update_merge_button("Send Changes", "Nothing New to Send", $('#forked-from a')[1], this_doc, forked_from);
+    update_merge_button("Get Updates", "Nothing New to Get", $('#forked-from a')[2], forked_from, this_doc);
+    function update_merge_button(yes_text, no_text, button, source, target) {
+      // Put the button into a disabled state while we query for status.
+      var button = $(button);
+      button.addClass('disabled');
+      if (!button.hasClass("btn-secondary"))
+        button.addClass("text-muted"); // muted & secondary are the same color so text would disappear
+
+      // Get the most recent revision on the source document.
+      ddc_api_call("/api/v1/documents/" + source, "GET", null, function(res) {
+        // Get the operation that would merge the changes.
+        if (!res.latestRevision) {
+          set_button_state(button, false);
+          return;
+        }
+        ddc_api_call("/api/v1/documents/" + target + "/merge/" + res.latestRevision.id, "GET", null, function(res) {
+          set_button_state(yes_text, no_text, button, res.op._type != "values.NO_OP");
+        });
+      });
+    }
+    function set_button_state(yes_text, no_text, button, state) {
+      button.removeClass('text-muted');
+      if (state) {
+        // Enable the button.
+        button.removeClass('disabled');
+        button.removeClass("btn-secondary");
+        button.addClass("btn-success");
+        button.text(yes_text);
+      } else {
+        // Disable the button.
+        button.removeClass("btn-success");
+        button.addClass("btn-secondary");
+        button.text(no_text);
+      }
+    }
+  }
+
+  // Show the panel.
+  $('#forked-from').slideToggle();
+
+  return false;
+})
 $('#fork-document').click(function() {
   fork_document();
   return false;
@@ -29,7 +77,7 @@ function ddc_api_call(apiendpoint, method, data, success) {
   jQuery.ajax({
     method: method,
     url: apiendpoint,
-    data: JSON.stringify(data),
+    data: method != "GET" ? JSON.stringify(data) : null,
     contentType: 'application/json',
     success: success,
     error: function(xhr, error, message) {
@@ -85,10 +133,10 @@ function update_public_access_level() {
   if (access_level_toggle.attr("data-value") == "NONE")
     leveltext = "Private Document";
   else if (access_level_toggle.attr("data-value") == "READ")
-    leveltext = "Anyone Can Read";
+    leveltext = "Anyone Can View";
   else if (access_level_toggle.attr("data-value") == "WRITE")
     leveltext = "Anyone Can Edit";
-  access_level_toggle.text(leveltext);
+  access_level_toggle.find('span').text(leveltext);
 }
 update_public_access_level();
 access_level_toggle.click(function() {

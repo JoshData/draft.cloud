@@ -19,42 +19,59 @@
       <span class="navbar-text">
         <span id="document-owner-name">{{owner.name}}</span>
         / 
-        <span id="document-name">{{document.name}}</span>
+        <span id="document-name" style="color: black">{{document.name}}</span>
       </span>
 
       <div class="collapse navbar-collapse" id="navbarSupportedContent">
         <ul class="navbar-nav mr-auto">
           {{#can_rename_document}}
           <span class="navbar-text" style="display: none;">
-            <button id="access_level_toggle" data-value="{{document.public_access_level}}" style="font-size: 75%">Access</button>
+            <a id="access_level_toggle" data-value="{{document.public_access_level}}" style="font-size: 75%" class="btn btn-sm btn-light text-muted">
+              <svg class="bi" width="12" height="12" style="margin: -3px 5px 0 0; color: #AAA;">
+                <use xlink:href="/static/bootstrap-icons.svg#share"/>
+              </svg>
+              <span>Access</span>
+            </a>
           </span>
           {{/can_rename_document}}
+
+          {{#document.forkedFrom}}
           <li class="nav-item">
-            <a id="fork-document" class="nav-link" href="#fork_document">Make a Copy</a>
+            <a id="update-document" class="nav-link" href="#update">Update</a>
+          </li>
+          {{/document.forkedFrom}}
+
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+              More
+            </a>
+            <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+              <a id="fork-document" class="dropdown-item" href="#fork_document">Make a Copy</a>
+              <div class="dropdown-divider"></div>
+              <a class="dropdown-item" href="/logout">Log out</a>
+              <div class="dropdown-divider"></div>
+              <a id="show-api" class="dropdown-item" href="#">Developer API</a>
+            </div>
           </li>
 
-          <li class="nav-item">
-            <a class="nav-link" href="/logout">Log out</a>
-          </li>
-          <li class="nav-item">
-            <a id="show-api" class="nav-link" href="#">API</a>
-          </li>
         </ul>
       </div>
     </nav>
 
-    {{#document.forkedFrom}}
-    <div id="forked-from">
-      Based on
-      <a href="/edit/{{document.forkedFrom.document.user.name}}/{{document.forkedFrom.document.name}}">
-        {{document.forkedFrom.document.user.name}}/{{document.forkedFrom.document.name}}
+    <div id="forked-from" data-forked-from-document="{{document.forkedFrom.document.user.uuid}}/{{document.forkedFrom.document.uuid}}">
+      <a href="/edit/{{document.forkedFrom.document.user.name}}/{{document.forkedFrom.document.name}}" class="btn btn-primary btn-sm">
+        View {{document.forkedFrom.document.user.name}}/{{document.forkedFrom.document.name}}
       </a>
-      &mdash;
-      <a id="do-merge" href="#">
-        Merge
+      <svg class="bi" width="32" height="32" style="margin: 0 5px; color: #AAA;">
+        <use xlink:href="/static/bootstrap-icons.svg#arrow-left-right"/>
+      </svg>
+      <a href="/merge/{{document.forkedFrom.document.user.name}}/{{document.forkedFrom.document.name}}?from={{document.user.name}}/{{document.name}}" class="btn btn-secondary btn-sm disabled">
+        Send Changes
+      </a>
+      <a href="/merge/{{document.user.name}}/{{document.name}}?from={{document.forkedFrom.document.user.name}}/{{document.forkedFrom.document.name}}" class="btn btn-secondary btn-sm disabled">
+        Get Changes
       </a>
     </div>
-    {{/document.forkedFrom}}
 
     <div id="editor">
     <div class="draftdotcloud-widget"

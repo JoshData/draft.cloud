@@ -42,6 +42,8 @@
 
         <div class="row">
             <div class="col-sm-7" style="margin-bottom: 30px;">
+                {{#req.session}}
+
                 {{#github_login_path}}
                 <a href="{{github_login_path}}">
                     <img src="static/img/login_with_github.png">
@@ -80,6 +82,13 @@
                   <button type="submit" class="btn btn-primary">Sign in &raquo;</button>
                 </form>
 
+                {{/req.session}}
+
+                {{^req.session}}
+                {{#settings.debug}}
+                <p class="text-danger">Login is disabled because no session engine is present. You may need to set the SECRET_KEY setting.</p>
+                {{/settings.debug}}
+                {{/req.session}}
             </div>
             <div class="col-sm-5 usecases">
                 <p>Authors use <span class="brand">Draft.Cloud</span> to edit simple documents with coworkers.</p>
