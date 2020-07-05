@@ -267,7 +267,12 @@ If running with a Postgres database you'll need to install the `pg` package:
 
 	npm install pg
 
-Configure nginx and supervisor:
+To deploy with docker, build the image and run the image like so:
+
+	docker build -t draftdotcloud/draftdotcloud-server .
+	docker run --rm -p 8000:8000 -e ALLOW_ANONYMOUS_USER_CREATION=1 -e SECRET_KEY=mysecret  -e DATABASE=postgres://host/db draftdotcloud/draftdotcloud-server
+
+In a regular virtual machine environment, configure nginx and supervisor:
 
 	sudo ln -sf /home/draftdotcloud/draft.cloud/conf/nginx.conf /etc/nginx/sites-enabled/draftdotcloud
 	sudo ln -sf /home/draftdotcloud/draft.cloud/conf/supervisor.ini /etc/supervisor/conf.d/draftdotcloud.conf
